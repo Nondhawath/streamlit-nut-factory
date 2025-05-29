@@ -1,55 +1,113 @@
 import streamlit as st
 import pandas as pd
-from io import BytesIO
+import matplotlib.pyplot as plt
+from datetime import datetime
+import os
 
-st.set_page_config(page_title="Sorting Rework Process", layout="wide")
+st.set_page_config(page_title="Sorting Process App", layout="wide")
 
-# ฟังก์ชันโหลดไฟล์ที่ผู้ใช้อัปโหลด
+DATA_FILE = "sorting_report_updated.xlsx"
+
+# ----- Load Employee & Part Code Data -----
 @st.cache_data
-def load_excel(uploaded_file):
-    if uploaded_file is not None:
-        return pd.read_excel(uploaded_file)
-    return pd.DataFrame()
+def load_data():
+    df_emp = pd.read_excel("รายชื่อพนักงานแผนก Final Inspection.xlsx")
+    df_part = pd.read_excel("Master list SCS part name.xlsx")
+    return df_emp, df_part
 
-st.sidebar.header("📁 อัปโหลดไฟล์อ้างอิง")
+df_emp, df_part = load_data()
 
-# ให้ผู้ใช้อัปโหลด 2 ไฟล์
-employee_file = st.sidebar.file_uploader("📋 รายชื่อพนักงานแผนก Final Inspection", type=["xlsx"])
-part_file = st.sidebar.file_uploader("🧾 รายการรหัสงาน (SCS)", type=["xlsx"])
+employees = df_emp['ชื่อ'].dropna().unique().tolist()
+leaders = df_emp[df_emp['ตำแหน่ง'].str.contains("Leader", na=False)]['ชื่อ'].unique().tolist()
+part_codes = df_part['รหัส'].dropna().unique().tolist()
 
-# โหลดข้อมูลจากไฟล์
-df_employee = load_excel(employee_file)
-df_parts = load_excel(part_file)
+# ----- Load Existing Report or Create New -----
+def load_report():
+    if os.path.exists(DATA_FILE):
+        return pd.read_excel(DATA_FILE)
+    else:
+        columns = [
+            "Timestamp", "Employee", "Part Code", "Total Checked", "NG", "Un-Tested", "Status", 
+            "Current Process", "Rework Time", "Leader", "Oil Cleaning Time", "Sender"
+        ]
+        return pd.DataFrame(columns=columns)
 
-# ตรวจสอบว่ามีข้อมูลหรือไม่
-if df_employee.empty or df_parts.empty:
-    st.warning("⚠️ กรุณาอัปโหลดไฟล์ Excel ทั้งสองไฟล์ในแถบด้านซ้ายก่อนใช้งาน")
-    st.stop()
+report_df = load_report()
 
-# สมมุติว่า column ชื่ออยู่ในคอลัมน์แรก
-employee_names = df_employee.iloc[:, 0].dropna().unique().tolist()
-part_codes = df_parts.iloc[:, 0].dropna().unique().tolist()
+# ----- Form Input -----
+st.header("📋 กรอกข้อมูลผลการตรวจสอบจากแผนก Sorting")
+st.markdown("---")
 
-# ส่วนฟอร์มกรอกข้อมูล
-st.title("📦 ฟอร์มบันทึกงาน Sorting Rework Process")
+with st.form("sorting_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        employee = st.selectbox("ชื่อพนักงาน", employees)
+        part_code = st.text_input("รหัสงาน (สามารถพิมพ์หรือเลือก)", "")
+        part_code_dropdown = st.selectbox("เลือกรหัสงานจากรายการ", ["ไม่เลือก"] + part_codes)
+        if part_code_dropdown != "ไม่เลือก":
+            part_code = part_code_dropdown
 
-with st.form("data_entry"):
-    st.subheader("🔍 บันทึกผลการตรวจสอบ")
-    
-    name = st.selectbox("👷‍♀️ ชื่อพนักงาน", employee_names)
-    part_code = st.selectbox("🆔 รหัสงาน", part_codes)
-    custom_code = st.text_input("🔤 หรือพิมพ์รหัสงานเอง (ถ้ามี)", "")
-    part_code = custom_code if custom_code else part_code
+        total_checked = st.number_input("จำนวนที่ตรวจ", min_value=0)
+        ng = st.number_input("จำนวน NG", min_value=0)
+        untested = st.number_input("จำนวนที่ตรวจไม่ทัน (Un-Tested)", min_value=0)
 
-    qty_total = st.number_input("✅ จำนวนที่ตรวจ", min_value=0, step=1)
-    qty_ng = st.number_input("❌ จำนวน NG", min_value=0, step=1)
-    qty_unchecked = st.number_input("🕒 จำนวนที่ยังไม่ตรวจ (Un-Test)", min_value=0, step=1)
-    status = st.radio("📌 สถานะ", ["Rework", "Scrap"])
+    with col2:
+        status = st.selectbox("สถานะ", ["งาน NG จากเครื่อง", "Rework", "Scrap"])
+        current_process = "Sorting"
+        rework_time = ""
+        leader = ""
+        oil_time = ""
+        sender = ""
+
+        if status == "Rework":
+            if st.form_submit_button("📤 ส่งงานไปแผนก Oil Cleaning"):
+                rework_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                leader = st.selectbox("เลือก Leader ผู้ตัดสินใจ", leaders, key="leader_select")
+        elif current_process == "Oil Cleaning":
+            if st.form_submit_button("📤 ส่งงานกลับไป Sorting"):
+                oil_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                sender = st.selectbox("ชื่อผู้ส่งกลับ", employees, key="sender_select")
 
     submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-
     if submitted:
-        timestamp = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-        st.success(f"✅ บันทึกสำเร็จ: {name} - {part_code} ({status}) เวลา {timestamp}")
-        # ที่นี่คุณสามารถเพิ่มโค้ดบันทึกลง DataFrame หรือ Google Sheet ได้
+        new_data = pd.DataFrame([{
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Employee": employee,
+            "Part Code": part_code,
+            "Total Checked": total_checked,
+            "NG": ng,
+            "Un-Tested": untested,
+            "Status": status,
+            "Current Process": current_process,
+            "Rework Time": rework_time,
+            "Leader": leader,
+            "Oil Cleaning Time": oil_time,
+            "Sender": sender
+        }])
+        report_df = pd.concat([report_df, new_data], ignore_index=True)
+        report_df.to_excel(DATA_FILE, index=False)
+        st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
 
+# ----- Report Table -----
+st.subheader("📊 รายงานข้อมูลการตรวจสอบ")
+filter_date = st.date_input("กรองตามวันที่", value=None)
+filter_status = st.selectbox("กรองตามสถานะ", ["ทั้งหมด"] + ["งาน NG จากเครื่อง", "Rework", "Scrap"])
+
+filtered_df = report_df.copy()
+if filter_date:
+    filtered_df = filtered_df[filtered_df["Timestamp"].str.contains(filter_date.strftime("%Y-%m-%d"))]
+if filter_status != "ทั้งหมด":
+    filtered_df = filtered_df[filtered_df["Status"] == filter_status]
+
+st.dataframe(filtered_df, use_container_width=True)
+
+# ----- Pie Chart -----
+st.subheader("📈 สัดส่วนงาน Scrap เทียบ Rework")
+status_counts = report_df["Status"].value_counts()
+fig, ax = plt.subplots()
+ax.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=90)
+ax.axis('equal')
+st.pyplot(fig)
+
+# ----- Download Button -----
+st.download_button("📥 ดาวน์โหลดรายงานเป็น Excel", data=report_df.to_excel(index=False), file_name="sorting_report.xlsx")
