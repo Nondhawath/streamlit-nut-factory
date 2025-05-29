@@ -9,8 +9,9 @@ st.set_page_config(page_title="📋 ระบบติดตามงานโ�
 REPORT_PATH = "/mnt/data/sorting_report.xlsx"
 EMP_PATH = "/mnt/data/employee_list.xlsx"
 PART_PATH = "/mnt/data/part_code_list.xlsx"
-IMAGE_FOLDER = "/mnt/data/uploaded_images"
-os.makedirs(IMAGE_FOLDER, exist_ok=True)
+IMAGE_FOLDER = "uploaded_images"
+if not os.path.exists(IMAGE_FOLDER):
+    os.makedirs(IMAGE_FOLDER)
 
 # โหลดข้อมูลรายชื่อพนักงานและรหัสงาน (ถ้ามีไฟล์)
 if os.path.exists(EMP_PATH):
