@@ -3,7 +3,6 @@ import pandas as pd
 import streamlit as st
 import os
 from PIL import Image
-
 # 📁 กำหนด path สำหรับจัดเก็บไฟล์
 DATA_DIR = "data"
 IMAGE_FOLDER = os.path.join(DATA_DIR, "images")
