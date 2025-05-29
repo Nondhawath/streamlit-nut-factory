@@ -191,4 +191,4 @@ elif menu == "🛠 Upload Master":
             if part_upload:
                 save_master_file(part_upload, PART_PATH)
             st.success("✅ อัปโหลดและบันทึก Master สำเร็จแล้ว")
-            st.experimental_rerun()
+            st.rerun()
