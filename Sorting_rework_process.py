@@ -131,7 +131,7 @@ elif menu == "🧾 Waiting Judgement":
                     report_df.at[idx, "สถานะ"] = "Rework"
                     report_df.at[idx, "เวลา Scrap/Rework"] = datetime.now()
                     report_df.to_excel(REPORT_PATH, index=False)
-                    st.experimental_rerun()
+                    st.rerun()
             with col3:
                 if st.button("🗑 Scrap", key=f"scrap_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Scrap"
