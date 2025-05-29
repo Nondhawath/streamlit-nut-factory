@@ -4,14 +4,14 @@ import streamlit as st
 import os
 from PIL import Image
 
-# 📁 กำหนด path สำหรับจัดเก็บไฟล์
+# 📁 Path
 DATA_DIR = "data"
 IMAGE_FOLDER = os.path.join(DATA_DIR, "images")
 REPORT_PATH = os.path.join(DATA_DIR, "report.xlsx")
 EMP_PATH = os.path.join(DATA_DIR, "employee_master.xlsx")
 PART_PATH = os.path.join(DATA_DIR, "part_code_master.xlsx")
 
-# 🛡 สร้างโฟลเดอร์หากยังไม่มี
+# 🛡 Create folders
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(IMAGE_FOLDER, exist_ok=True)
@@ -20,21 +20,19 @@ except PermissionError:
 except Exception as e:
     st.error(f"❌ ไม่สามารถสร้างโฟลเดอร์จัดเก็บข้อมูล: {e}")
 
-# 📄 โหลดไฟล์ Master
+# 📄 Load master files
 def load_master_data():
     try:
         emp_df = pd.read_excel(EMP_PATH, engine="openpyxl")
     except:
         emp_df = pd.DataFrame(columns=["ชื่อพนักงาน"])
-    
     try:
         part_df = pd.read_excel(PART_PATH, engine="openpyxl")
     except:
         part_df = pd.DataFrame(columns=["รหัสงาน"])
-
     return emp_df, part_df
 
-# 💾 บันทึกไฟล์ Master
+# 💾 Save master files
 def save_master_file(uploaded_file, path):
     try:
         df = pd.read_excel(uploaded_file, engine="openpyxl")
@@ -42,7 +40,7 @@ def save_master_file(uploaded_file, path):
     except Exception as e:
         st.error(f"❌ ไม่สามารถบันทึกไฟล์: {e}")
 
-# 🔁 โหลด Master และ Report
+# 🔁 Load report
 emp_df, part_df = load_master_data()
 if os.path.exists(REPORT_PATH):
     try:
@@ -50,15 +48,15 @@ if os.path.exists(REPORT_PATH):
     except:
         report_df = pd.DataFrame(columns=[
             "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
+            "จำนวนทั้งหมด", "ชื่อเครื่อง", "Lot Number", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
         ])
 else:
     report_df = pd.DataFrame(columns=[
         "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-        "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
+        "จำนวนทั้งหมด", "ชื่อเครื่อง", "Lot Number", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
     ])
 
-# 🆔 สร้าง Job ID อัตโนมัติ
+# 🆔 Generate Job ID
 def generate_job_id():
     now = datetime.now()
     prefix = now.strftime("%y%m")
@@ -69,7 +67,7 @@ def generate_job_id():
         last_seq = 0
     return f"{prefix}{last_seq + 1:04d}"
 
-# 🖥 เริ่มต้น UI
+# 🖥 UI
 st.set_page_config(page_title="Sorting Process", layout="wide")
 st.title("🔧 ระบบบันทึกข้อมูล Sorting Process โรงงานน๊อต")
 
@@ -77,7 +75,7 @@ menu = st.sidebar.selectbox("📌 เลือกโหมด", [
     "📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"
 ])
 
-# 📥 โหมด 1: Sorting MC
+# 📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
     with st.form("sorting_form"):
@@ -86,9 +84,12 @@ if menu == "📥 Sorting MC":
 
         emp_list = emp_df['ชื่อพนักงาน'].dropna().unique() if 'ชื่อพนักงาน' in emp_df.columns else []
         part_list = part_df['รหัสงาน'].dropna().unique() if 'รหัสงาน' in part_df.columns else []
+        machine_list = [f"SM{str(i).zfill(2)}" for i in range(1, 31)]
 
         employee = st.selectbox("👷‍♂️ เลือกชื่อพนักงาน", emp_list)
         part_code = st.selectbox("🔩 เลือกรหัสงาน", part_list)
+        machine = st.selectbox("🛠 เลือกชื่อเครื่อง", machine_list)
+        lot_number = st.text_input("📦 ระบุ Lot Number")
         qty_ng = st.number_input("❌ จำนวน NG", min_value=0)
         qty_pending = st.number_input("⏳ จำนวนที่ยังไม่ตรวจ", min_value=0)
         total = qty_ng + qty_pending
@@ -114,6 +115,8 @@ if menu == "📥 Sorting MC":
                 "จำนวน NG": qty_ng,
                 "จำนวนยังไม่ตรวจ": qty_pending,
                 "จำนวนทั้งหมด": total,
+                "ชื่อเครื่อง": machine,
+                "Lot Number": lot_number,
                 "สถานะ": "Sorting MC",
                 "เวลา Scrap/Rework": "",
                 "เวลา Lavage": "",
@@ -124,7 +127,7 @@ if menu == "📥 Sorting MC":
             report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
 
-# 🧾 โหมด 2: Judgement
+# 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     password = st.text_input("🔐 ใส่รหัสเพื่อเข้าสู่โหมด Judgement", type="password")
     if password == "Admin1":
@@ -134,6 +137,7 @@ elif menu == "🧾 Waiting Judgement":
             col1, col2, col3 = st.columns([2, 2, 2])
             with col1:
                 st.markdown(f"🆔 **{row['Job ID']}** - รหัส: {row['รหัสงาน']}")
+                st.markdown(f"📦 Lot: {row['Lot Number']} | 🛠 เครื่อง: {row['ชื่อเครื่อง']}")
                 st.markdown(f"❌ NG: {row['จำนวน NG']} / ⏳ ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}")
                 if isinstance(row['รูปภาพ'], str) and os.path.exists(row['รูปภาพ']):
                     st.image(row['รูปภาพ'], width=200)
@@ -152,7 +156,7 @@ elif menu == "🧾 Waiting Judgement":
     else:
         st.warning("🔒 กรุณาใส่รหัสผ่านให้ถูกต้อง")
 
-# 💧 โหมด 3: Oil Cleaning
+# 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานรอเข้ากระบวนการล้าง")
     jobs = report_df[report_df["สถานะ"] == "Rework"]
@@ -167,7 +171,7 @@ elif menu == "💧 Oil Cleaning":
                 report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                 st.rerun()
 
-# 📊 โหมด 4: รายงาน
+# 📊 รายงาน
 elif menu == "📊 รายงาน":
     st.subheader("📊 สรุปและรายงานงานทั้งหมด")
     view = st.selectbox("เลือกช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
@@ -177,20 +181,23 @@ elif menu == "📊 รายงาน":
     if view == "รายวัน":
         df = df[df["วันที่"] == now.date()]
     elif view == "รายสัปดาห์":
-        df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")  # ✅ แปลงให้เป็น datetime
-        df = df[df["วันที่"] >= now - pd.Timedelta(days=7)]  # ✅ ใช้ now แทน now.date()
+        df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
+        df = df[df["วันที่"] >= now - pd.Timedelta(days=7)]
     elif view == "รายเดือน":
         df = df[df["วันที่"].apply(lambda d: pd.to_datetime(d).month == now.month and pd.to_datetime(d).year == now.year)]
     elif view == "รายปี":
         df = df[df["วันที่"].apply(lambda d: pd.to_datetime(d).year == now.year)]
 
-    st.dataframe(df)
+    st.dataframe(df[[
+        "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
+        "จำนวน NG", "จำนวนยังไม่ตรวจ", "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage"
+    ]])
 
     scrap_summary = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
     st.markdown("📌 **สรุปงาน Scrap แยกตามรหัสงาน**")
     st.dataframe(scrap_summary)
 
-# 🛠 โหมด 5: Upload Master
+# 🛠 Upload Master
 elif menu == "🛠 Upload Master":
     password = st.text_input("🔐 ใส่รหัส Sup เพื่ออัปโหลด Master", type="password")
     if password == "Sup":
