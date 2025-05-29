@@ -2,140 +2,134 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
-from io import BytesIO
 
-st.set_page_config(page_title="Nut Sorting Process", layout="wide")
-st.title("📦 ระบบจัดการงาน Sorting โรงงานน๊อต")
+# ------------------ CONFIG ------------------
+EMP_PATH = "employee_list.xlsx"
+PART_PATH = "part_code_list.xlsx"
+REPORT_PATH = "sorting_report.xlsx"
+JUDGEMENT_PASSWORD = "Admin1"
 
-# กำหนดไฟล์รายงานหลัก
-REPORT_FILE = "sorting_report.xlsx"
-EMP_FILE = "employee_list.xlsx"
-PART_FILE = "part_code_list.xlsx"
+st.set_page_config(page_title="Sorting Process", layout="wide")
 
-# โหลด/จำค่าไฟล์ล่าสุด
-if EMP_FILE in os.listdir():
-    employee_df = pd.read_excel(EMP_FILE)
-else:
-    employee_df = pd.read_excel("/mnt/data/รายชื่อพนักงานแผนก Final Inspection.xlsx")
-    employee_df.to_excel(EMP_FILE, index=False)
+# ------------------ LOAD MASTER FILES ------------------
+@st.cache_data
+def load_excel_file(path):
+    if os.path.exists(path):
+        return pd.read_excel(path)
+    return pd.DataFrame()
 
-if PART_FILE in os.listdir():
-    part_df = pd.read_excel(PART_FILE)
-else:
-    part_df = pd.read_excel("/mnt/data/Master list SCS part name.xlsx")
-    part_df.to_excel(PART_FILE, index=False)
+employee_df = load_excel_file(EMP_PATH)
+part_df = load_excel_file(PART_PATH)
 
-# โหลดรายงานเดิมหรือสร้างใหม่
-if os.path.exists(REPORT_FILE):
-    report_df = pd.read_excel(REPORT_FILE)
-else:
-    report_df = pd.DataFrame()
+# ------------------ UPLOAD MASTER ------------------
+with st.sidebar.expander("📤 อัปโหลดไฟล์พนักงานและรหัสงาน"):
+    emp_upload = st.file_uploader("อัปโหลดรายชื่อพนักงาน", type="xlsx")
+    if emp_upload:
+        employee_df = pd.read_excel(emp_upload)
+        employee_df.to_excel(EMP_PATH, index=False)
+        st.success("อัปเดตรายชื่อพนักงานเรียบร้อยแล้ว ✅")
 
-# ===== ฟังก์ชันสร้าง Job ID =====
+    part_upload = st.file_uploader("อัปโหลดรหัสงาน", type="xlsx")
+    if part_upload:
+        part_df = pd.read_excel(part_upload)
+        part_df.to_excel(PART_PATH, index=False)
+        st.success("อัปเดตรหัสงานเรียบร้อยแล้ว ✅")
+
+employees = employee_df['ชื่อ'].dropna().unique().tolist() if 'ชื่อ' in employee_df.columns else []
+part_codes = part_df['รหัส'].dropna().unique().tolist() if 'รหัส' in part_df.columns else []
+
+# ------------------ LOAD REPORT ------------------
+def load_report():
+    if os.path.exists(REPORT_PATH):
+        return pd.read_excel(REPORT_PATH)
+    return pd.DataFrame()
+
+def save_report(df):
+    df.to_excel(REPORT_PATH, index=False)
+
+report_df = load_report()
+
+# ------------------ Job ID Generator ------------------
 def generate_job_id():
     now = datetime.datetime.now()
-    prefix = now.strftime("%y%m")  # เช่น 2505
-    if not report_df.empty and 'Job ID' in report_df.columns:
-        report_df['Job ID'] = report_df['Job ID'].astype(str)
-        existing = report_df[report_df['Job ID'].str.startswith(prefix)]
-        if not existing.empty:
-            last_seq = max([int(jid[-4:]) for jid in existing['Job ID'] if jid[-4:].isdigit()])
-        else:
-            last_seq = 0
+    prefix = now.strftime("%y%m")
+    if 'Job ID' in report_df.columns:
+        existing = report_df[report_df['Job ID'].astype(str).str.startswith(prefix)]
+        last_seq = max([int(str(jid)[-4:]) for jid in existing['Job ID']]) if not existing.empty else 0
     else:
         last_seq = 0
-    return f"{prefix}{last_seq + 1:04d}"
+    return f"{prefix}{last_seq+1:04d}"
 
-# ====== Sidebar: Upload อัปเดตข้อมูล ======
-st.sidebar.header("📂 อัปโหลดไฟล์ข้อมูลใหม่")
-emp_upload = st.sidebar.file_uploader("อัปโหลดรายชื่อพนักงาน (Excel)", type="xlsx")
-if emp_upload:
-    df = pd.read_excel(emp_upload)
-    if 'ชื่อ' in df.columns:
-        df.to_excel(EMP_FILE, index=False)
-        st.sidebar.success("อัปเดตรายชื่อพนักงานแล้ว กรุณารีเฟรชหน้า")
+# ------------------ MODE SELECTION ------------------
+mode = st.selectbox("เลือกโหมดการทำงาน", ["📦 Sorting MC", "⚖️ Waiting Judgement", "🧼 Oil Cleaning", "📊 WIP รายงาน"])
 
-part_upload = st.sidebar.file_uploader("อัปโหลดรหัสงาน (Excel)", type="xlsx")
-if part_upload:
-    df = pd.read_excel(part_upload)
-    if 'รหัส' in df.columns:
-        df.to_excel(PART_FILE, index=False)
-        st.sidebar.success("อัปเดตรหัสงานแล้ว กรุณารีเฟรชหน้า")
-
-# ====== Main Layout ======
-mode = st.selectbox("เลือกโหมดกระบวนการ", ["Sorting MC", "Waiting Judgement", "Oil Cleaning"])
-
-if mode == "Sorting MC":
+# ------------------ SORTING MODE ------------------
+if mode == "📦 Sorting MC":
+    st.header("📦 กรอกข้อมูลงาน Sorting MC")
     with st.form("sorting_form"):
-        job_id = generate_job_id()
-        st.markdown(f"### 🆔 Job ID: `{job_id}`")
-        date = st.date_input("📅 วันที่", value=datetime.date.today())
-        employee = st.selectbox("👷‍♂️ ผู้ตรวจสอบ", employee_df['ชื่อ'].dropna().unique())
-        part_code = st.selectbox("🔢 รหัสงาน", part_df['รหัส'].dropna().unique())
-        qty_checked = st.number_input("✅ จำนวนที่ตรวจ", min_value=0)
+        operator = st.selectbox("👩‍🏭 ชื่อผู้ตรวจสอบ", employees)
+        part_code = st.selectbox("🔢 รหัสงาน", part_codes)
+        qty_checked = st.number_input("✅ จำนวนที่ตรวจแล้ว", min_value=0)
         qty_ng = st.number_input("❌ จำนวน NG", min_value=0)
         qty_pending = st.number_input("⏳ จำนวนที่ยังไม่ตรวจ", min_value=0)
-        status = st.selectbox("📌 สถานะเบื้องต้น", ["รอตัดสินใจ"])
-        submitted = st.form_submit_button("💾 บันทึกข้อมูล")
-        if submitted:
-            new_row = pd.DataFrame([{
+        status = st.radio("📌 สถานะ", ["Waiting Judgement"])
+        submit = st.form_submit_button("💾 บันทึกข้อมูล")
+
+        if submit:
+            job_id = generate_job_id()
+            new_data = {
                 "Job ID": job_id,
-                "วันที่": date,
-                "ผู้ตรวจสอบ": employee,
+                "วันที่": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "ชื่อผู้ตรวจสอบ": operator,
                 "รหัสงาน": part_code,
-                "ตรวจแล้ว": qty_checked,
-                "NG": qty_ng,
-                "ยังไม่ตรวจ": qty_pending,
-                "สถานะ": status,
-                "เวลาบันทึก": datetime.datetime.now(),
-            }])
-            report_df = pd.concat([report_df, new_row], ignore_index=True)
-            report_df.to_excel(REPORT_FILE, index=False)
-            st.success(f"✅ บันทึกงานสำเร็จ: {job_id}")
+                "จำนวนที่ตรวจ": qty_checked,
+                "จำนวน NG": qty_ng,
+                "จำนวนที่ยังไม่ตรวจ": qty_pending,
+                "สถานะ": status
+            }
+            report_df = pd.concat([report_df, pd.DataFrame([new_data])], ignore_index=True)
+            save_report(report_df)
+            st.success(f"บันทึกเรียบร้อยแล้ว 🎉 (Job ID: {job_id})")
 
-elif mode == "Waiting Judgement":
-    st.markdown("## 🔍 งานที่รอตัดสินใจ (Rework / Scrap)")
-    waiting_df = report_df[report_df['สถานะ'] == 'รอตัดสินใจ'] if not report_df.empty else pd.DataFrame()
-    for _, row in waiting_df.iterrows():
-        col1, col2, col3 = st.columns([3, 2, 3])
-        with col1:
-            st.write(f"**Job ID:** {row['Job ID']} | **รหัส:** {row['รหัสงาน']} | **NG:** {row['NG']}")
-        with col2:
-            judgement_by = st.selectbox(f"ตัดสินใจโดย ({row['Job ID']})", employee_df['ชื่อ'], key=row['Job ID'])
-        with col3:
-            colA, colB = st.columns(2)
-            if colA.button("🔁 Rework", key="rework_"+row['Job ID']):
-                report_df.loc[report_df['Job ID'] == row['Job ID'], 'สถานะ'] = 'Oil Cleaning'
-                report_df.loc[report_df['Job ID'] == row['Job ID'], 'Judgement By'] = judgement_by
-                report_df.to_excel(REPORT_FILE, index=False)
-                st.experimental_rerun()
-            if colB.button("🗑️ Scrap", key="scrap_"+row['Job ID']):
-                report_df.loc[report_df['Job ID'] == row['Job ID'], 'สถานะ'] = 'Scrap'
-                report_df.loc[report_df['Job ID'] == row['Job ID'], 'Judgement By'] = judgement_by
-                report_df.to_excel(REPORT_FILE, index=False)
-                st.experimental_rerun()
+# ------------------ JUDGEMENT MODE ------------------
+elif mode == "⚖️ Waiting Judgement":
+    st.header("⚖️ ตรวจสอบสถานะ NG")
+    password = st.text_input("🔐 กรุณาใส่รหัสเพื่อเข้าใช้งาน", type="password")
+    if password == JUDGEMENT_PASSWORD:
+        waiting_jobs = report_df[report_df['สถานะ'] == "Waiting Judgement"]
+        for i, row in waiting_jobs.iterrows():
+            st.markdown(f"### 🔎 Job ID: {row['Job ID']} - รหัสงาน: {row['รหัสงาน']} - จำนวน NG: {row['จำนวน NG']}")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"🛠 Rework - {row['Job ID']}"):
+                    report_df.at[i, "สถานะ"] = "Oil Cleaning"
+                    save_report(report_df)
+                    st.success(f"เปลี่ยนสถานะ Job ID {row['Job ID']} เป็น Rework แล้ว")
+                    st.experimental_rerun()
+            with col2:
+                if st.button(f"🗑 Scrap - {row['Job ID']}"):
+                    report_df.at[i, "สถานะ"] = "Scrap"
+                    save_report(report_df)
+                    st.success(f"เปลี่ยนสถานะ Job ID {row['Job ID']} เป็น Scrap แล้ว")
+                    st.experimental_rerun()
+    else:
+        st.warning("กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน Judgement")
 
-elif mode == "Oil Cleaning":
-    st.markdown("## 🧼 งานที่อยู่ในกระบวนการล้าง")
-    oil_df = report_df[report_df['สถานะ'] == 'Oil Cleaning'] if not report_df.empty else pd.DataFrame()
-    for _, row in oil_df.iterrows():
-        col1, col2 = st.columns([6, 2])
-        with col1:
-            st.write(f"**Job ID:** {row['Job ID']} | **รหัส:** {row['รหัสงาน']} | **จาก:** {row['ผู้ตรวจสอบ']}")
-        with col2:
-            if st.button("✅ ล้างเสร็จแล้ว", key="lavage_"+row['Job ID']):
-                report_df.loc[report_df['Job ID'] == row['Job ID'], 'สถานะ'] = 'Lavage Done'
-                report_df.to_excel(REPORT_FILE, index=False)
-                st.experimental_rerun()
+# ------------------ OIL CLEANING MODE ------------------
+elif mode == "🧼 Oil Cleaning":
+    st.header("🧼 งานที่ต้องทำความสะอาด")
+    cleaning_jobs = report_df[report_df['สถานะ'] == "Oil Cleaning"]
+    for i, row in cleaning_jobs.iterrows():
+        st.markdown(f"### 🧴 Job ID: {row['Job ID']} - รหัสงาน: {row['รหัสงาน']} - จำนวน NG: {row['จำนวน NG']}")
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}"):
+            report_df.at[i, "สถานะ"] = "Lavage Done"
+            save_report(report_df)
+            st.success(f"เปลี่ยนสถานะ Job ID {row['Job ID']} เป็น Lavage Done แล้ว")
+            st.experimental_rerun()
 
-# ====== แสดง WIP และดาวน์โหลดรายงาน ======
-st.markdown("## 📊 สถานะงาน (WIP)")
-if not report_df.empty:
-    wip_df = report_df[~report_df['สถานะ'].isin(['Scrap', 'Lavage Done'])]
-    st.dataframe(wip_df)
-
-    excel_bytes = BytesIO()
-    report_df.to_excel(excel_bytes, index=False)
-    st.download_button("📥 ดาวน์โหลดรายงาน Excel", data=excel_bytes.getvalue(), file_name="sorting_report_updated.xlsx")
-else:
-    st.info("ยังไม่มีข้อมูลในระบบ")
+# ------------------ WIP MODE ------------------
+elif mode == "📊 WIP รายงาน":
+    st.header("📊 รายงานสถานะงานคงค้าง (WIP)")
+    wip = report_df[report_df['สถานะ'].isin(["Waiting Judgement", "Oil Cleaning"])]
+    st.dataframe(wip)
+    st.download_button("📥 ดาวน์โหลดรายงาน WIP", data=wip.to_csv(index=False), file_name="WIP_report.csv")
