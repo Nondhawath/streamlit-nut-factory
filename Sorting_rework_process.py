@@ -135,7 +135,7 @@ elif menu == "🧾 Waiting Judgement":
             with col1:
                 st.markdown(f"🆔 **{row['Job ID']}** - รหัส: {row['รหัสงาน']}")
                 st.markdown(f"❌ NG: {row['จำนวน NG']} / ⏳ ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}")
-                if row['รูปภาพ'] and os.path.exists(row['รูปภาพ']):
+                if isinstance(row['รูปภาพ'], str) and os.path.exists(row['รูปภาพ']):
                     st.image(row['รูปภาพ'], width=200)
             with col2:
                 if st.button("♻️ Rework", key=f"rework_{row['Job ID']}"):
