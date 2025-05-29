@@ -2,30 +2,36 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-import io
+import os
+from io import BytesIO
 
 st.set_page_config(page_title="Sorting Process App", layout="wide")
 
-# ----- File Upload Instead of Hardcoded Filenames -----
-st.header("📁 อัปโหลดข้อมูลพนักงานและรหัสงาน")
-emp_file = st.file_uploader("📤 อัปโหลดไฟล์รายชื่อพนักงาน (Excel)", type=["xlsx"])
-part_file = st.file_uploader("📤 อัปโหลดไฟล์รหัสงาน (Excel)", type=["xlsx"])
+DATA_FILE = "sorting_report_updated.xlsx"
 
-if emp_file and part_file:
+# ----- Upload Excel Files -----
+st.sidebar.header("📂 อัปโหลดไฟล์อ้างอิง")
+emp_file = st.sidebar.file_uploader("อัปโหลดรายชื่อพนักงาน (Excel)", type=["xlsx"])
+part_file = st.sidebar.file_uploader("อัปโหลดรายการรหัสงาน (Excel)", type=["xlsx"])
+
+# ----- Load Employee & Part Code Data -----
+def load_data(emp_file, part_file):
     df_emp = pd.read_excel(emp_file)
     df_part = pd.read_excel(part_file)
+    return df_emp, df_part
+
+if emp_file and part_file:
+    df_emp, df_part = load_data(emp_file, part_file)
 
     employees = df_emp['ชื่อ'].dropna().unique().tolist()
     leaders = df_emp[df_emp['ตำแหน่ง'].str.contains("Leader", na=False)]['ชื่อ'].unique().tolist()
     part_codes = df_part['รหัส'].dropna().unique().tolist()
 
     # ----- Load Existing Report or Create New -----
-    DATA_FILE = "sorting_report_updated.xlsx"
-
     def load_report():
-        try:
+        if os.path.exists(DATA_FILE):
             return pd.read_excel(DATA_FILE)
-        except:
+        else:
             columns = [
                 "Timestamp", "Employee", "Part Code", "Total Checked", "NG", "Un-Tested", "Status", 
                 "Current Process", "Rework Time", "Leader", "Oil Cleaning Time", "Sender"
@@ -61,13 +67,12 @@ if emp_file and part_file:
 
             if status == "Rework":
                 leader = st.selectbox("เลือก Leader ผู้ตัดสินใจ", leaders, key="leader_select")
-                rework = st.checkbox("📤 ส่งงานไปแผนก Oil Cleaning")
-                if rework:
+                if st.form_submit_button("📤 ส่งงานไปแผนก Oil Cleaning"):
                     rework_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            if status == "Rework" and st.checkbox("📤 ส่งงานกลับไป Sorting"):
-                oil_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            elif current_process == "Oil Cleaning":
                 sender = st.selectbox("ชื่อผู้ส่งกลับ", employees, key="sender_select")
+                if st.form_submit_button("📤 ส่งงานกลับไป Sorting"):
+                    oil_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
         if submitted:
@@ -104,21 +109,15 @@ if emp_file and part_file:
 
     # ----- Pie Chart -----
     st.subheader("📈 สัดส่วนงาน Scrap เทียบ Rework")
-    pie_df = report_df[report_df['Status'].isin(["Scrap", "Rework"])]
-    if not pie_df.empty:
-        status_counts = pie_df["Status"].value_counts()
-        fig, ax = plt.subplots()
-        ax.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
-    else:
-        st.info("ไม่มีข้อมูล Scrap หรือ Rework สำหรับแสดงกราฟ")
+    pie_data = report_df[report_df["Status"].isin(["Scrap", "Rework"])]["Status"].value_counts()
+    fig, ax = plt.subplots()
+    ax.pie(pie_data, labels=pie_data.index, autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')
+    st.pyplot(fig)
 
     # ----- Download Button -----
-    st.download_button(
-        "📥 ดาวน์โหลดรายงานเป็น Excel", 
-        data=report_df.to_excel(index=False, engine='openpyxl'), 
-        file_name="sorting_report.xlsx"
-    )
+    to_download = BytesIO()
+    report_df.to_excel(to_download, index=False, engine='openpyxl')
+    st.download_button("📥 ดาวน์โหลดรายงานเป็น Excel", data=to_download.getvalue(), file_name="sorting_report.xlsx")
 else:
-    st.warning("กรุณาอัปโหลดไฟล์พนักงานและรหัสงานก่อนเริ่มใช้งาน")
+    st.warning("⚠️ กรุณาอัปโหลดไฟล์รายชื่อพนักงาน และ รหัสงานทางแถบด้านซ้ายก่อนเริ่มใช้งาน")
