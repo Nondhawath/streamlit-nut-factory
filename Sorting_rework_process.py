@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 import os
 from PIL import Image
+
 # 📁 กำหนด path สำหรับจัดเก็บไฟล์
 DATA_DIR = "data"
 IMAGE_FOLDER = os.path.join(DATA_DIR, "images")
@@ -22,12 +23,12 @@ except Exception as e:
 # 📄 โหลดไฟล์ Master
 def load_master_data():
     try:
-        emp_df = pd.read_excel(EMP_PATH)
+        emp_df = pd.read_excel(EMP_PATH, engine="openpyxl")
     except:
         emp_df = pd.DataFrame(columns=["ชื่อพนักงาน"])
     
     try:
-        part_df = pd.read_excel(PART_PATH)
+        part_df = pd.read_excel(PART_PATH, engine="openpyxl")
     except:
         part_df = pd.DataFrame(columns=["รหัสงาน"])
 
@@ -36,8 +37,8 @@ def load_master_data():
 # 💾 บันทึกไฟล์ Master
 def save_master_file(uploaded_file, path):
     try:
-        df = pd.read_excel(uploaded_file)
-        df.to_excel(path, index=False)
+        df = pd.read_excel(uploaded_file, engine="openpyxl")
+        df.to_excel(path, index=False, engine="openpyxl")
     except Exception as e:
         st.error(f"❌ ไม่สามารถบันทึกไฟล์: {e}")
 
@@ -45,7 +46,7 @@ def save_master_file(uploaded_file, path):
 emp_df, part_df = load_master_data()
 if os.path.exists(REPORT_PATH):
     try:
-        report_df = pd.read_excel(REPORT_PATH)
+        report_df = pd.read_excel(REPORT_PATH, engine="openpyxl")
     except:
         report_df = pd.DataFrame(columns=[
             "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "จำนวน NG", "จำนวนยังไม่ตรวจ",
@@ -120,7 +121,7 @@ if menu == "📥 Sorting MC":
             }
 
             report_df = pd.concat([report_df, pd.DataFrame([new_row])], ignore_index=True)
-            report_df.to_excel(REPORT_PATH, index=False)
+            report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
 
 # 🧾 โหมด 2: Judgement
@@ -140,13 +141,13 @@ elif menu == "🧾 Waiting Judgement":
                 if st.button("♻️ Rework", key=f"rework_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Rework"
                     report_df.at[idx, "เวลา Scrap/Rework"] = datetime.now()
-                    report_df.to_excel(REPORT_PATH, index=False)
+                    report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                     st.rerun()
             with col3:
                 if st.button("🗑 Scrap", key=f"scrap_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Scrap"
                     report_df.at[idx, "เวลา Scrap/Rework"] = datetime.now()
-                    report_df.to_excel(REPORT_PATH, index=False)
+                    report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                     st.rerun()
     else:
         st.warning("🔒 กรุณาใส่รหัสผ่านให้ถูกต้อง")
@@ -163,7 +164,7 @@ elif menu == "💧 Oil Cleaning":
             if st.button("✅ ล้างเสร็จแล้ว", key=f"done_{row['Job ID']}"):
                 report_df.at[idx, "สถานะ"] = "Lavage"
                 report_df.at[idx, "เวลา Lavage"] = datetime.now()
-                report_df.to_excel(REPORT_PATH, index=False)
+                report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                 st.rerun()
 
 # 📊 โหมด 4: รายงาน
