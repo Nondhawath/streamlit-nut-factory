@@ -177,7 +177,8 @@ elif menu == "📊 รายงาน":
     if view == "รายวัน":
         df = df[df["วันที่"] == now.date()]
     elif view == "รายสัปดาห์":
-        df = df[df["วันที่"] >= now.date() - pd.Timedelta(days=7)]
+        df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")  # ✅ แปลงให้เป็น datetime
+        df = df[df["วันที่"] >= now - pd.Timedelta(days=7)]  # ✅ ใช้ now แทน now.date()
     elif view == "รายเดือน":
         df = df[df["วันที่"].apply(lambda d: pd.to_datetime(d).month == now.month and pd.to_datetime(d).year == now.year)]
     elif view == "รายปี":
