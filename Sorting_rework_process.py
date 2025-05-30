@@ -1,7 +1,8 @@
+# 📦 Import Library
 from datetime import datetime
+import os
 import pandas as pd
 import streamlit as st
-import os
 from PIL import Image
 
 # 📁 Path สำหรับไฟล์
@@ -11,7 +12,7 @@ REPORT_PATH = os.path.join(DATA_DIR, "report.xlsx")
 EMP_PATH = os.path.join(DATA_DIR, "employee_master.xlsx")
 PART_PATH = os.path.join(DATA_DIR, "part_code_master.xlsx")
 
-# 🛡 สร้างโฟลเดอร์
+# 🛡 สร้างโฟลเดอร์ที่จำเป็น
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(IMAGE_FOLDER, exist_ok=True)
@@ -20,7 +21,7 @@ except PermissionError:
 except Exception as e:
     st.error(f"❌ ไม่สามารถสร้างโฟลเดอร์: {e}")
 
-# 📄 โหลด Master
+# 🔁 โหลด Master Data
 def load_master_data():
     try:
         emp_df = pd.read_excel(EMP_PATH, engine="openpyxl")
@@ -32,23 +33,13 @@ def load_master_data():
         part_df = pd.DataFrame(columns=["รหัสงาน"])
     return emp_df, part_df
 
-# 💾 Save Master
+# 💾 Save Master File
 def save_master_file(uploaded_file, path):
     try:
         df = pd.read_excel(uploaded_file, engine="openpyxl")
         df.to_excel(path, index=False, engine="openpyxl")
     except Exception as e:
         st.error(f"❌ ไม่สามารถบันทึกไฟล์: {e}")
-
-# 🔁 Load Data
-emp_df, part_df = load_master_data()
-if os.path.exists(REPORT_PATH):
-    try:
-        report_df = pd.read_excel(REPORT_PATH, engine="openpyxl")
-    except:
-        report_df = pd.DataFrame()
-else:
-    report_df = pd.DataFrame()
 
 # 🆔 สร้าง Job ID
 def generate_job_id():
@@ -61,14 +52,26 @@ def generate_job_id():
         last_seq = 0
     return f"{prefix}{last_seq + 1:04d}"
 
-# 🌐 UI เริ่มต้น
+# 🔄 โหลดข้อมูล
+emp_df, part_df = load_master_data()
+if os.path.exists(REPORT_PATH):
+    try:
+        report_df = pd.read_excel(REPORT_PATH, engine="openpyxl")
+    except:
+        report_df = pd.DataFrame()
+else:
+    report_df = pd.DataFrame()
+
+# 🌐 ตั้งค่าหน้าเว็บ
 st.set_page_config(page_title="Sorting Process", layout="wide")
 st.title("🔧 ระบบบันทึกข้อมูล Sorting Process - SCS")
 menu = st.sidebar.selectbox("📌 เลือกโหมด", [
     "📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"
 ])
 
+# ---------------------------------------
 # 📥 โหมด 1: Sorting MC
+# ---------------------------------------
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
     with st.form("sorting_form"):
@@ -121,7 +124,9 @@ if menu == "📥 Sorting MC":
             report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
 
+# ---------------------------------------
 # 🧾 โหมด 2: Waiting Judgement
+# ---------------------------------------
 elif menu == "🧾 Waiting Judgement":
     password = st.text_input("🔐 ใส่รหัสเพื่อเข้าสู่โหมด Judgement", type="password")
     if password == "Admin1":
@@ -149,7 +154,9 @@ elif menu == "🧾 Waiting Judgement":
     else:
         st.warning("🔒 กรุณาใส่รหัสผ่านให้ถูกต้อง")
 
+# ---------------------------------------
 # 💧 โหมด 3: Oil Cleaning
+# ---------------------------------------
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานรอเข้ากระบวนการล้าง")
     jobs = report_df[report_df["สถานะ"] == "Rework"]
@@ -164,14 +171,15 @@ elif menu == "💧 Oil Cleaning":
                 report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                 st.rerun()
 
+# ---------------------------------------
 # 📊 โหมด 4: รายงาน
+# ---------------------------------------
 elif menu == "📊 รายงาน":
     st.subheader("📊 สรุปและรายงานงานทั้งหมด")
     view = st.selectbox("เลือกช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
     now = datetime.now()
     df = report_df.copy()
 
-    # 🔍 ค้นหา Lot Number
     search_lot = st.text_input("🔎 ค้นหาโดย Lot Number")
     if search_lot:
         df = df[df["Lot Number"].astype(str).str.contains(search_lot, case=False, na=False)]
@@ -191,47 +199,48 @@ elif menu == "📊 รายงาน":
     scrap_summary = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
     st.markdown("📌 **สรุปงาน Scrap แยกตามรหัสงาน**")
     st.dataframe(scrap_summary)
-    # 🔐 ล้างข้อมูลทั้งหมด (ต้องใส่รหัส)
-with st.expander("🧹 ตัวเลือกสำหรับผู้ดูแลระบบ: ล้างข้อมูลทั้งหมด"):
-    admin_pass = st.text_input("🔐 ใส่รหัสผ่านผู้ดูแลระบบ", type="password")
-    if admin_pass == "Adminfiscs":
-        if st.button("⚠️ ล้างข้อมูลทั้งหมด"):
-            confirm = st.checkbox("✅ ยืนยันว่าต้องการลบข้อมูลทั้งหมด")
-            if confirm:
-                try:
-                    # ปิดไฟล์หากถูกเปิดอยู่ เพื่อป้องกัน PermissionError
-                    if os.path.exists(REPORT_PATH):
-                        try:
-                            with open(REPORT_PATH, "r+b"):
-                                pass
-                        except PermissionError:
-                            st.warning("⚠ กรุณาปิดไฟล์ report.xlsx ที่เปิดอยู่ก่อนดำเนินการ")
 
-                    empty_df = pd.DataFrame(columns=[
-                        "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
-                        "จำนวนที่ตรวจสอบทั้งหมดของ Lot", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-                        "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
-                    ])
-                    empty_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
-                    st.success(f"✅ ลบข้อมูลทั้งหมดจากไฟล์ `{REPORT_PATH}` เรียบร้อยแล้ว")
-                    st.info("📄 ไฟล์ใหม่ถูกสร้างขึ้นแล้วพร้อมคอลัมน์ว่าง กรุณารีเฟรชหน้าจอหากยังเห็นข้อมูลเดิม")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ เกิดข้อผิดพลาดขณะล้างข้อมูล: {e}")
-    elif admin_pass:
-        st.error("❌ รหัสผ่านไม่ถูกต้อง")
+    # 🔐 ล้างข้อมูลทั้งหมด
+    with st.expander("🧹 ตัวเลือกสำหรับผู้ดูแลระบบ: ล้างข้อมูลทั้งหมด"):
+        admin_pass = st.text_input("🔐 ใส่รหัสผ่านผู้ดูแลระบบ", type="password")
+        if admin_pass == "Adminfiscs":
+            if st.button("⚠️ ล้างข้อมูลทั้งหมด"):
+                confirm = st.checkbox("✅ ยืนยันว่าต้องการลบข้อมูลทั้งหมด")
+                if confirm:
+                    try:
+                        if os.path.exists(REPORT_PATH):
+                            try:
+                                with open(REPORT_PATH, "r+b"):
+                                    pass
+                            except PermissionError:
+                                st.warning("⚠ กรุณาปิดไฟล์ report.xlsx ที่เปิดอยู่ก่อนดำเนินการ")
 
-    # 🛠 โหมด 5: Upload Master
-    elif menu == "🛠 Upload Master":
-        password = st.text_input("🔐 ใส่รหัส Sup เพื่ออัปโหลด Master", type="password")
-        if password == "Sup":
-            st.subheader("🛠 อัปโหลด Master Data")
-            emp_upload = st.file_uploader("👥 อัปโหลดรายชื่อพนักงาน", type="xlsx", key="emp")
-            part_upload = st.file_uploader("🧾 อัปโหลดรหัสงาน", type="xlsx", key="part")
-            if st.button("📤 อัปโหลด"):
-                if emp_upload:
-                    save_master_file(emp_upload, EMP_PATH)
-                if part_upload:
-                    save_master_file(part_upload, PART_PATH)
-                st.success("✅ อัปโหลดและบันทึก Master สำเร็จแล้ว")
-                st.rerun()
+                        empty_df = pd.DataFrame(columns=[
+                            "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
+                            "จำนวนที่ตรวจสอบทั้งหมดของ Lot", "จำนวน NG", "จำนวนยังไม่ตรวจ",
+                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
+                        ])
+                        empty_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
+                        st.success(f"✅ ลบข้อมูลทั้งหมดจากไฟล์ `{REPORT_PATH}` เรียบร้อยแล้ว")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ เกิดข้อผิดพลาดขณะล้างข้อมูล: {e}")
+        elif admin_pass:
+            st.error("❌ รหัสผ่านไม่ถูกต้อง")
+
+# ---------------------------------------
+# 🛠 โหมด 5: Upload Master
+# ---------------------------------------
+elif menu == "🛠 Upload Master":
+    password = st.text_input("🔐 ใส่รหัส Sup เพื่ออัปโหลด Master", type="password")
+    if password == "Sup":
+        st.subheader("🛠 อัปโหลด Master Data")
+        emp_upload = st.file_uploader("👥 อัปโหลดรายชื่อพนักงาน", type="xlsx", key="emp")
+        part_upload = st.file_uploader("🧾 อัปโหลดรหัสงาน", type="xlsx", key="part")
+        if st.button("📤 อัปโหลด"):
+            if emp_upload:
+                save_master_file(emp_upload, EMP_PATH)
+            if part_upload:
+                save_master_file(part_upload, PART_PATH)
+            st.success("✅ อัปโหลดและบันทึก Master สำเร็จแล้ว")
+            st.rerun()
