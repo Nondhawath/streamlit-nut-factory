@@ -5,6 +5,23 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
+import requests
+
+def send_telegram_message(message):
+    TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+    TELEGRAM_CHAT_ID = "-4944715716"
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        requests.post(url, data=payload)
+    except Exception as e:
+        st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
+
+
 # 📁 Path สำหรับไฟล์
 DATA_DIR = "data"
 IMAGE_FOLDER = os.path.join(DATA_DIR, "images")
@@ -116,13 +133,22 @@ if menu == "📥 Sorting MC":
                 "จำนวนทั้งหมด": total,
                 "สถานะ": "Sorting MC",
                 "เวลา Scrap/Recheck": "",
-                "เวลา Cleaned": "",
+                "เวลา Lavage": "",
                 "รูปภาพ": image_path
             }
 
             report_df = pd.concat([report_df, pd.DataFrame([new_row])], ignore_index=True)
             report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
+            msg = (
+                f"📥 <b>New Sorting</b>\n"
+                f"🆔 Job ID: <code>{job_id}</code>\n"
+                f"👷‍♂️ พนักงาน: {employee}\n"
+                f"🔩 รหัสงาน: {part_code}\n"
+                f"📦 Lot: {lot_number}\n"
+                f"❌ NG: {qty_ng} | ⏳ ยังไม่ตรวจ: {qty_pending}"
+            )
+            send_telegram_message(msg)
 
 # ---------------------------------------
 # 🧾 โหมด 2: Waiting Judgement
@@ -142,12 +168,14 @@ elif menu == "🧾 Waiting Judgement":
             with col2:
                 if st.button("♻️ Recheck", key=f"Recheck_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Recheck"
+                    send_telegram_message(f"🔁 <b>Recheck</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
                     report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
                     report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                     st.rerun()
             with col3:
                 if st.button("🗑 Scrap", key=f"scrap_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Scrap"
+                    send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
                     report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
                     report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                     st.rerun()
@@ -166,8 +194,9 @@ elif menu == "💧 Oil Cleaning":
             st.markdown(f"🆔 {row['Job ID']} - {row['รหัสงาน']} ({row['ชื่อพนักงาน']})")
         with col2:
             if st.button("✅ ล้างเสร็จแล้ว", key=f"done_{row['Job ID']}"):
-                report_df.at[idx, "สถานะ"] = "Cleaned"
-                report_df.at[idx, "เวลา Cleaned"] = datetime.now().replace(microsecond=0)
+                report_df.at[idx, "สถานะ"] = "Lavage"
+                send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
+                report_df.at[idx, "เวลา Lavage"] = datetime.now().replace(microsecond=0)
                 report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                 st.rerun()
 
@@ -218,10 +247,11 @@ elif menu == "📊 รายงาน":
                         empty_df = pd.DataFrame(columns=[
                             "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
                             "จำนวนที่ตรวจสอบทั้งหมดของ Lot", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Recheck", "เวลา Cleaned", "รูปภาพ"
+                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Recheck", "เวลา Lavage", "รูปภาพ"
                         ])
                         empty_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                         st.success(f"✅ ลบข้อมูลทั้งหมดจากไฟล์ `{REPORT_PATH}` เรียบร้อยแล้ว")
+                        send_telegram_message("⚠️ <b>ล้างข้อมูลทั้งหมดในระบบแล้ว</b> โดยผู้ดูแล")
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ เกิดข้อผิดพลาดขณะล้างข้อมูล: {e}")
