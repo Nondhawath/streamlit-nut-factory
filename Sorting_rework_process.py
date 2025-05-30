@@ -82,7 +82,7 @@ if menu == "📥 Sorting MC":
         part_code = st.selectbox("🔩 เลือกรหัสงาน", part_list)
         machine = st.selectbox("🛠 เลือกชื่อเครื่อง", [f"SM{i:02}" for i in range(1, 31)])
         lot_number = st.text_input("📦 Lot Number")
-        qty_checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมด", min_value=0)
+        qty_checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot", min_value=0)
         qty_ng = st.number_input("❌ จำนวน NG", min_value=0)
         qty_pending = st.number_input("⏳ จำนวนที่ยังไม่ตรวจ", min_value=0)
         total = qty_ng + qty_pending
@@ -107,7 +107,7 @@ if menu == "📥 Sorting MC":
                 "รหัสงาน": part_code,
                 "ชื่อเครื่อง": machine,
                 "Lot Number": lot_number,
-                "จำนวนที่ตรวจสอบทั้งหมด": qty_checked,
+                "จำนวนที่ตรวจสอบทั้งหมดของ Lot": qty_checked,
                 "จำนวน NG": qty_ng,
                 "จำนวนยังไม่ตรวจ": qty_pending,
                 "จำนวนทั้งหมด": total,
