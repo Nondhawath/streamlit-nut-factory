@@ -221,17 +221,17 @@ with st.expander("🧹 ตัวเลือกสำหรับผู้ดู
     elif admin_pass:
         st.error("❌ รหัสผ่านไม่ถูกต้อง")
 
-# 🛠 โหมด 5: Upload Master
-elif menu == "🛠 Upload Master":
-    password = st.text_input("🔐 ใส่รหัส Sup เพื่ออัปโหลด Master", type="password")
-    if password == "Sup":
-        st.subheader("🛠 อัปโหลด Master Data")
-        emp_upload = st.file_uploader("👥 อัปโหลดรายชื่อพนักงาน", type="xlsx", key="emp")
-        part_upload = st.file_uploader("🧾 อัปโหลดรหัสงาน", type="xlsx", key="part")
-        if st.button("📤 อัปโหลด"):
-            if emp_upload:
-                save_master_file(emp_upload, EMP_PATH)
-            if part_upload:
-                save_master_file(part_upload, PART_PATH)
-            st.success("✅ อัปโหลดและบันทึก Master สำเร็จแล้ว")
-            st.rerun()
+    # 🛠 โหมด 5: Upload Master
+    elif menu == "🛠 Upload Master":
+        password = st.text_input("🔐 ใส่รหัส Sup เพื่ออัปโหลด Master", type="password")
+        if password == "Sup":
+            st.subheader("🛠 อัปโหลด Master Data")
+            emp_upload = st.file_uploader("👥 อัปโหลดรายชื่อพนักงาน", type="xlsx", key="emp")
+            part_upload = st.file_uploader("🧾 อัปโหลดรหัสงาน", type="xlsx", key="part")
+            if st.button("📤 อัปโหลด"):
+                if emp_upload:
+                    save_master_file(emp_upload, EMP_PATH)
+                if part_upload:
+                    save_master_file(part_upload, PART_PATH)
+                st.success("✅ อัปโหลดและบันทึก Master สำเร็จแล้ว")
+                st.rerun()
