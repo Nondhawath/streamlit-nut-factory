@@ -17,6 +17,38 @@ def send_telegram_message(message):
             "text": message,
             "parse_mode": "HTML"
         }
+        response = requests.post(url, data=payload)
+        print("📡 Telegram Status:", response.status_code)
+        print("📡 Telegram Response:", response.text)
+    except Exception as e:
+        print("⚠️ Telegram Error:", e)
+
+def save_report(df):
+    try:
+        with open(REPORT_PATH, "r+b"):
+            pass
+    except PermissionError:
+        st.error("❌ กรุณาปิดไฟล์ report.xlsx ก่อนบันทึกข้อมูล")
+        return
+    except FileNotFoundError:
+        pass
+    try:
+        df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
+        print("💾 บันทึกข้อมูลลง report.xlsx เรียบร้อยแล้ว")
+    except Exception as e:
+        st.error(f"❌ เกิดข้อผิดพลาดขณะบันทึก: {e}")
+        print("❌ บันทึกล้มเหลว:", e)
+
+def send_telegram_message(message):
+    TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+    TELEGRAM_CHAT_ID = "-4944715716"
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        }
         requests.post(url, data=payload)
     except Exception as e:
         st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
@@ -138,7 +170,7 @@ if menu == "📥 Sorting MC":
             }
 
             report_df = pd.concat([report_df, pd.DataFrame([new_row])], ignore_index=True)
-            report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
+            save_report(report_df)
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
             msg = (
                 f"📥 <b>New Sorting</b>\n"
@@ -170,14 +202,14 @@ elif menu == "🧾 Waiting Judgement":
                     report_df.at[idx, "สถานะ"] = "Recheck"
                     send_telegram_message(f"🔁 <b>Recheck</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
                     report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
-                    report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
+                    save_report(report_df)
                     st.rerun()
             with col3:
                 if st.button("🗑 Scrap", key=f"scrap_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Scrap"
                     send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
                     report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
-                    report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
+                    save_report(report_df)
                     st.rerun()
     else:
         st.warning("🔒 กรุณาใส่รหัสผ่านให้ถูกต้อง")
@@ -197,7 +229,7 @@ elif menu == "💧 Oil Cleaning":
                 report_df.at[idx, "สถานะ"] = "Lavage"
                 send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
                 report_df.at[idx, "เวลา Lavage"] = datetime.now().replace(microsecond=0)
-                report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
+                save_report(report_df)
                 st.rerun()
 
 # ---------------------------------------
