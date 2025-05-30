@@ -116,7 +116,7 @@ if menu == "📥 Sorting MC":
                 "จำนวนทั้งหมด": total,
                 "สถานะ": "Sorting MC",
                 "เวลา Scrap/Recheck": "",
-                "เวลา Lavage": "",
+                "เวลา Cleaned": "",
                 "รูปภาพ": image_path
             }
 
@@ -166,8 +166,8 @@ elif menu == "💧 Oil Cleaning":
             st.markdown(f"🆔 {row['Job ID']} - {row['รหัสงาน']} ({row['ชื่อพนักงาน']})")
         with col2:
             if st.button("✅ ล้างเสร็จแล้ว", key=f"done_{row['Job ID']}"):
-                report_df.at[idx, "สถานะ"] = "Lavage"
-                report_df.at[idx, "เวลา Lavage"] = datetime.now().replace(microsecond=0)
+                report_df.at[idx, "สถานะ"] = "Cleaned"
+                report_df.at[idx, "เวลา Cleaned"] = datetime.now().replace(microsecond=0)
                 report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                 st.rerun()
 
@@ -218,7 +218,7 @@ elif menu == "📊 รายงาน":
                         empty_df = pd.DataFrame(columns=[
                             "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
                             "จำนวนที่ตรวจสอบทั้งหมดของ Lot", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Recheck", "เวลา Lavage", "รูปภาพ"
+                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Recheck", "เวลา Cleaned", "รูปภาพ"
                         ])
                         empty_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                         st.success(f"✅ ลบข้อมูลทั้งหมดจากไฟล์ `{REPORT_PATH}` เรียบร้อยแล้ว")
