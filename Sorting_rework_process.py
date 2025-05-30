@@ -115,7 +115,7 @@ if menu == "📥 Sorting MC":
                 "จำนวนยังไม่ตรวจ": qty_pending,
                 "จำนวนทั้งหมด": total,
                 "สถานะ": "Sorting MC",
-                "เวลา Scrap/Rework": "",
+                "เวลา Scrap/Recheck": "",
                 "เวลา Lavage": "",
                 "รูปภาพ": image_path
             }
@@ -130,7 +130,7 @@ if menu == "📥 Sorting MC":
 elif menu == "🧾 Waiting Judgement":
     password = st.text_input("🔐 ใส่รหัสเพื่อเข้าสู่โหมด Judgement", type="password")
     if password == "Admin1":
-        st.subheader("🔍 รอตัดสินใจ: Rework หรือ Scrap")
+        st.subheader("🔍 รอตัดสินใจ: Recheck หรือ Scrap")
         pending_jobs = report_df[report_df["สถานะ"] == "Sorting MC"]
         for idx, row in pending_jobs.iterrows():
             col1, col2, col3 = st.columns([2, 2, 2])
@@ -140,15 +140,15 @@ elif menu == "🧾 Waiting Judgement":
                 if isinstance(row['รูปภาพ'], str) and os.path.exists(row['รูปภาพ']):
                     st.image(row['รูปภาพ'], width=200)
             with col2:
-                if st.button("♻️ Rework", key=f"rework_{row['Job ID']}"):
-                    report_df.at[idx, "สถานะ"] = "Rework"
-                    report_df.at[idx, "เวลา Scrap/Rework"] = datetime.now().replace(microsecond=0)
+                if st.button("♻️ Recheck", key=f"Recheck_{row['Job ID']}"):
+                    report_df.at[idx, "สถานะ"] = "Recheck"
+                    report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
                     report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                     st.rerun()
             with col3:
                 if st.button("🗑 Scrap", key=f"scrap_{row['Job ID']}"):
                     report_df.at[idx, "สถานะ"] = "Scrap"
-                    report_df.at[idx, "เวลา Scrap/Rework"] = datetime.now().replace(microsecond=0)
+                    report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
                     report_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                     st.rerun()
     else:
@@ -159,7 +159,7 @@ elif menu == "🧾 Waiting Judgement":
 # ---------------------------------------
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานรอเข้ากระบวนการล้าง")
-    jobs = report_df[report_df["สถานะ"] == "Rework"]
+    jobs = report_df[report_df["สถานะ"] == "Recheck"]
     for idx, row in jobs.iterrows():
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -218,7 +218,7 @@ elif menu == "📊 รายงาน":
                         empty_df = pd.DataFrame(columns=[
                             "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
                             "จำนวนที่ตรวจสอบทั้งหมดของ Lot", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
+                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Recheck", "เวลา Lavage", "รูปภาพ"
                         ])
                         empty_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
                         st.success(f"✅ ลบข้อมูลทั้งหมดจากไฟล์ `{REPORT_PATH}` เรียบร้อยแล้ว")
