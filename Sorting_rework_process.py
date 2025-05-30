@@ -4,7 +4,7 @@ import streamlit as st
 import os
 from PIL import Image
 
-# 📁 กำหนด path สำหรับจัดเก็บไฟล์
+# 📁 Path สำหรับจัดเก็บไฟล์
 DATA_DIR = "data"
 IMAGE_FOLDER = os.path.join(DATA_DIR, "images")
 REPORT_PATH = os.path.join(DATA_DIR, "report.xlsx")
@@ -26,7 +26,7 @@ def load_master_data():
         emp_df = pd.read_excel(EMP_PATH, engine="openpyxl")
     except:
         emp_df = pd.DataFrame(columns=["ชื่อพนักงาน"])
-    
+
     try:
         part_df = pd.read_excel(PART_PATH, engine="openpyxl")
     except:
@@ -34,7 +34,7 @@ def load_master_data():
 
     return emp_df, part_df
 
-# 💾 บันทึกไฟล์ Master
+# 💾 บันทึก Master
 def save_master_file(uploaded_file, path):
     try:
         df = pd.read_excel(uploaded_file, engine="openpyxl")
@@ -42,28 +42,27 @@ def save_master_file(uploaded_file, path):
     except Exception as e:
         st.error(f"❌ ไม่สามารถบันทึกไฟล์: {e}")
 
-# 🔁 โหลด Master และ Report
+# 🔁 โหลด Report และ Master
 emp_df, part_df = load_master_data()
+
+columns = [
+    "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
+    "จำนวนที่ตรวจสอบทั้งหมด", "จำนวน NG", "จำนวนยังไม่ตรวจ", "จำนวนทั้งหมด",
+    "สถานะ", "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
+]
 
 if os.path.exists(REPORT_PATH):
     try:
         report_df = pd.read_excel(REPORT_PATH, engine="openpyxl")
+        for col in columns:
+            if col not in report_df.columns:
+                report_df[col] = ""
     except:
-        report_df = pd.DataFrame()
+        report_df = pd.DataFrame(columns=columns)
 else:
-    report_df = pd.DataFrame()
+    report_df = pd.DataFrame(columns=columns)
 
-# ✅ ตรวจสอบและเพิ่มคอลัมน์ที่ขาดหาย
-required_columns = [
-    "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
-    "จำนวน NG", "จำนวนยังไม่ตรวจ", "จำนวนทั้งหมด", "สถานะ",
-    "เวลา Scrap/Rework", "เวลา Lavage", "รูปภาพ"
-]
-for col in required_columns:
-    if col not in report_df.columns:
-        report_df[col] = ""
-
-# 🆔 สร้าง Job ID อัตโนมัติ
+# 🆔 สร้าง Job ID
 def generate_job_id():
     now = datetime.now()
     prefix = now.strftime("%y%m")
@@ -76,7 +75,7 @@ def generate_job_id():
 
 # 🖥 เริ่มต้น UI
 st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title("🔧 ระบบบันทึกข้อมูล Sorting Process โรงงานน๊อต")
+st.title("🔧 ระบบบันทึกข้อมูล Sorting Process - SCS")
 
 menu = st.sidebar.selectbox("📌 เลือกโหมด", [
     "📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"
@@ -95,11 +94,14 @@ if menu == "📥 Sorting MC":
 
         employee = st.selectbox("👷‍♂️ เลือกชื่อพนักงาน", emp_list)
         part_code = st.selectbox("🔩 เลือกรหัสงาน", part_list)
-        machine_name = st.selectbox("🛠 เลือกชื่อเครื่อง", machine_list)
+        machine = st.selectbox("🛠 เลือกชื่อเครื่อง", machine_list)
         lot_number = st.text_input("📦 Lot Number")
+
+        qty_checked = st.number_input("🔎 จำนวนที่ตรวจสอบทั้งหมด", min_value=0)
         qty_ng = st.number_input("❌ จำนวน NG", min_value=0)
         qty_pending = st.number_input("⏳ จำนวนที่ยังไม่ตรวจ", min_value=0)
         total = qty_ng + qty_pending
+
         image = st.file_uploader("📸 อัปโหลดรูปภาพ", type=["png", "jpg", "jpeg"])
 
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
@@ -119,8 +121,9 @@ if menu == "📥 Sorting MC":
                 "Job ID": job_id,
                 "ชื่อพนักงาน": employee,
                 "รหัสงาน": part_code,
-                "ชื่อเครื่อง": machine_name,
+                "ชื่อเครื่อง": machine,
                 "Lot Number": lot_number,
+                "จำนวนที่ตรวจสอบทั้งหมด": qty_checked,
                 "จำนวน NG": qty_ng,
                 "จำนวนยังไม่ตรวจ": qty_pending,
                 "จำนวนทั้งหมด": total,
@@ -194,7 +197,7 @@ elif menu == "📊 รายงาน":
     elif view == "รายปี":
         df = df[df["วันที่"].apply(lambda d: pd.to_datetime(d).year == now.year)]
 
-    st.dataframe(df[required_columns])
+    st.dataframe(df[columns])
 
     scrap_summary = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
     st.markdown("📌 **สรุปงาน Scrap แยกตามรหัสงาน**")
