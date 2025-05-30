@@ -63,7 +63,7 @@ def generate_job_id():
 
 # 🌐 UI เริ่มต้น
 st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title("🔧 ระบบบันทึกข้อมูล Sorting Process โรงงานน๊อต")
+st.title("🔧 ระบบบันทึกข้อมูล Sorting Process - SCS")
 menu = st.sidebar.selectbox("📌 เลือกโหมด", [
     "📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"
 ])
