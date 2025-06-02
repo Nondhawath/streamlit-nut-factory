@@ -5,7 +5,6 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-import uuid
 
 # ✅ Telegram Settings
 TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
@@ -17,49 +16,45 @@ def send_telegram_message(message):
         payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
         requests.post(url, data=payload)
     except Exception as e:
-        st.warning(f"⚠️ ไม่สามารถส่ง Telegram ได้: {e}")
+        st.warning(f"⚠️ Telegram error: {e}")
 
-# ⏰ Timezone
+# ⏰ เวลาไทย
 def now_th():
     return datetime.utcnow() + timedelta(hours=7)
 
-# 🔐 Google Sheet Auth
+# 🔐 Auth
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
 creds = Credentials.from_service_account_info(st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
 client = gspread.authorize(creds)
 
-# 📗 Sheets
+# 📗 Google Sheet
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
 sheet = client.open_by_url(SHEET_URL)
 worksheet = sheet.worksheet("Data")
+
+# 📥 Load Master
 try:
-    emp_sheet = sheet.worksheet("employee_master")
-    emp_data = emp_sheet.get_all_records()
+    emp_data = sheet.worksheet("employee_master").get_all_records()
     emp_master = [row["ชื่อพนักงาน"] for row in emp_data]
-    emp_password_map = {row["ชื่อพนักงาน"]: str(row["รหัส"]).strip() for row in emp_data}
+    emp_password = {row["ชื่อพนักงาน"]: str(row["รหัส"]).strip() for row in emp_data}
+    emp_role = {row["ชื่อพนักงาน"]: row["ระดับ"] for row in emp_data}
 except:
-    emp_master, emp_password_map = [], {}
+    emp_master, emp_password, emp_role = [], {}, {}
 
 try:
     part_master = sheet.worksheet("part_code_master").col_values(1)[1:]
 except:
     part_master = []
 
-# 🆔 สร้าง Job ID
+# 🆔 Job ID
 def generate_job_id():
     records = worksheet.get_all_records()
     prefix = now_th().strftime("%y%m")
     filtered = [r for r in records if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix)]
-    if filtered:
-        try:
-            last_seq = max([int(str(r["Job ID"])[-4:]) for r in filtered if str(r["Job ID"])[-4:].isdigit()])
-        except:
-            last_seq = 0
-    else:
-        last_seq = 0
+    last_seq = max([int(str(r["Job ID"])[-4:]) for r in filtered if str(r["Job ID"])[-4:].isdigit()], default=0)
     return f"{prefix}{last_seq + 1:04d}"
 
-# 🧑‍💻 Login
+# 🔐 Login
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
         st.subheader("🔐 เข้าสู่ระบบ")
@@ -67,8 +62,9 @@ if "logged_in_user" not in st.session_state:
         password = st.text_input("🔑 Password", type="password")
         submitted = st.form_submit_button("🔓 Login")
         if submitted:
-            if emp_password_map.get(username) == password:
+            if emp_password.get(username) == password:
                 st.session_state.logged_in_user = username
+                st.session_state.role = emp_role.get(username, "")
                 st.success("✅ เข้าสู่ระบบสำเร็จ")
                 st.rerun()
             else:
@@ -76,9 +72,19 @@ if "logged_in_user" not in st.session_state:
     st.stop()
 
 user = st.session_state.logged_in_user
+role = st.session_state.role
 st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title(f"🔧 Sorting Process - สวัสดี {user}")
-menu = st.sidebar.selectbox("📌 โหมด", ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"])
+st.title(f"🔧 Sorting Process - สวัสดี {user} ({role})")
+
+# 🎛 จำกัดสิทธิ์
+if role == "T1":
+    allowed_menus = ["🧾 Waiting Judgement"]
+elif role == "T7":
+    allowed_menus = ["📥 Sorting MC"]
+else:  # S1
+    allowed_menus = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
+
+menu = st.sidebar.selectbox("📌 โหมด", allowed_menus)
 
 # 📥 Sorting MC
 if menu == "📥 Sorting MC":
@@ -112,7 +118,7 @@ if menu == "📥 Sorting MC":
                 f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}"
             )
 
-# 🧾 Judgement
+# 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 ตัดสินใจ Recheck / Scrap")
     df = pd.DataFrame(worksheet.get_all_records())
@@ -126,21 +132,23 @@ elif menu == "🧾 Waiting Judgement":
         if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Recheck")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code> โดย {user}")
             st.rerun()
         if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Scrap")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code> โดย {user}")
             st.rerun()
 
-# 💧 Cleaning
+# 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานรอล้าง")
     df = pd.DataFrame(worksheet.get_all_records())
     df = df[df["สถานะ"] == "Recheck"]
     for idx, row in df.iterrows():
-        st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
+        st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
         if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Cleaned")
             worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
@@ -155,12 +163,12 @@ elif menu == "💧 Oil Cleaning":
             st.success("✅ ล้างเสร็จแล้ว")
             st.rerun()
 
-# 📊 Report
+# 📊 รายงาน
 elif menu == "📊 รายงาน":
     df = pd.DataFrame(worksheet.get_all_records())
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
-    view = st.selectbox("🗓 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
     now = now_th()
+    view = st.selectbox("📅 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
     if view == "รายวัน":
         df = df[df["วันที่"].dt.date == now.date()]
     elif view == "รายสัปดาห์":
@@ -179,15 +187,15 @@ elif menu == "🛠 Upload Master":
     password = st.text_input("🔐 รหัส Sup", type="password")
     if password == "Sup":
         st.subheader("🛠 อัปโหลด Master")
-        emp_txt = st.text_area("👥 รายชื่อพนักงาน (ชื่อ,รหัส)", height=150)
+        emp_txt = st.text_area("👥 พนักงาน (ชื่อ,รหัส,ระดับ)", height=150)
         part_txt = st.text_area("🧾 รหัสงาน", height=150)
         if st.button("📤 อัปโหลด"):
             if emp_txt:
-                emp_lines = [e.strip().split(",") for e in emp_txt.strip().split("\n") if "," in e]
-                emp_values = [["ชื่อพนักงาน", "รหัส"]] + emp_lines
-                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": emp_values})
+                emp_rows = [e.strip().split(",") for e in emp_txt.strip().split("\n") if len(e.strip().split(",")) == 3]
+                values = [["ชื่อพนักงาน", "รหัส", "ระดับ"]] + emp_rows
+                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": values})
             if part_txt:
-                part_lines = [[p.strip()] for p in part_txt.strip().split("\n") if p.strip()]
-                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_lines})
-            st.success("✅ อัปโหลด Master สำเร็จแล้ว")
+                part_rows = [[p.strip()] for p in part_txt.strip().split("\n") if p.strip()]
+                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_rows})
+            st.success("✅ อัปโหลดสำเร็จ")
             st.rerun()
