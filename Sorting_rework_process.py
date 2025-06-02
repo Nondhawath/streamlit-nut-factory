@@ -1,9 +1,7 @@
 # 📦 Import Library
 from datetime import datetime, timedelta
-import os
 import pandas as pd
 import streamlit as st
-from PIL import Image
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
@@ -24,70 +22,61 @@ def send_telegram_message(message):
     except Exception as e:
         st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
 
-# 🌐 Timezone +7
+# ⏰ ใช้เวลาประเทศไทย
 def now_th():
     return datetime.utcnow() + timedelta(hours=7)
 
-# 🔐 Auth Google Sheets
+# 🔐 เชื่อม Google Sheets
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
-creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
+creds = Credentials.from_service_account_info(
+    st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
 client = gspread.authorize(creds)
 
-# 🔗 Sheet Setting
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
 sheet = client.open_by_url(SHEET_URL)
 worksheet = sheet.worksheet("Data")
 
-# 🔐 ล็อกอิน
+# 📁 โหลด Master
 try:
-    emp_sheet = sheet.worksheet("employee_master")
-    emp_data = emp_sheet.get_all_records()
-    emp_names = [row["ชื่อพนักงาน"] for row in emp_data if row.get("ชื่อพนักงาน")]
-    emp_dict = {row["ชื่อพนักงาน"]: str(row["รหัส"]).strip() for row in emp_data if row.get("ชื่อพนักงาน") and row.get("รหัส")}
+    emp_ws = sheet.worksheet("employee_master")
+    emp_data = emp_ws.get_all_records()
+    emp_names = [e["ชื่อพนักงาน"] for e in emp_data]
+    emp_passwords = {e["ชื่อพนักงาน"]: str(e["รหัส"]) for e in emp_data}
 except:
-    st.error("❌ ไม่สามารถโหลด employee_master")
-    st.stop()
+    emp_names = []
+    emp_passwords = {}
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    with st.form("login_form"):
-        st.subheader("🔐 กรุณาเข้าสู่ระบบ")
-        selected_emp = st.selectbox("👤 เลือกชื่อพนักงาน", emp_names)
-        password = st.text_input("🔑 รหัสผ่าน", type="password")
-        submitted = st.form_submit_button("➡️ เข้าสู่ระบบ")
-
-        if submitted:
-            correct_password = emp_dict.get(selected_emp)
-            if password == correct_password:
-                st.session_state.authenticated = True
-                st.session_state.username = selected_emp
-                st.success(f"✅ ยินดีต้อนรับ {selected_emp}")
-                st.rerun()
-            else:
-                st.error("❌ รหัสผ่านไม่ถูกต้อง")
-    st.stop()
-
-# 📁 Master Data
 try:
     part_master = sheet.worksheet("part_code_master").col_values(1)[1:]
 except:
     part_master = []
 
-# 🔢 สร้าง Job ID
+# 🔐 Login
+if "login_success" not in st.session_state:
+    st.session_state.login_success = False
+
+if not st.session_state.login_success:
+    st.title("🔒 เข้าสู่ระบบ")
+    username = st.selectbox("👤 Username", emp_names)
+    password = st.text_input("🔑 Password", type="password")
+    if st.button("🔓 Login"):
+        if username in emp_passwords and password == emp_passwords[username]:
+            st.session_state.login_success = True
+            st.session_state.username = username
+            st.success("✅ เข้าสู่ระบบสำเร็จ")
+            st.experimental_rerun()
+        else:
+            st.error("❌ รหัสผ่านไม่ถูกต้อง")
+    st.stop()
+
+# 🆔 สร้าง Job ID
 def generate_job_id():
     records = worksheet.get_all_records()
     prefix = now_th().strftime("%y%m")
-    filtered = [r for r in records if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix)]
+    filtered = [r for r in records if str(r.get("Job ID", "")).startswith(prefix)]
     if filtered:
         try:
-            last_seq = max([
-                int(r["Job ID"][-4:])
-                for r in filtered
-                if r["Job ID"][-4:].isdigit()
-            ])
+            last_seq = max([int(r["Job ID"][-4:]) for r in filtered if str(r["Job ID"][-4:]).isdigit()])
         except:
             last_seq = 0
     else:
@@ -135,28 +124,22 @@ if menu == "📥 Sorting MC":
 
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
-    password = st.text_input("🔐 รหัสผ่าน (Admin1)", type="password")
-    if password == "Admin1":
-        df = pd.DataFrame(worksheet.get_all_records())
-        df = df[df["สถานะ"] == "Sorting MC"]
-        st.subheader("🔍 เลือกตัดสินใจ (Recheck / Scrap)")
-        for idx, row in df.iterrows():
-            st.markdown(
-                f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}",
-                unsafe_allow_html=True)
-            col1, col2 = st.columns(2)
-            if col1.button(f"♻️ Recheck", key=f"recheck_{idx}"):
-                worksheet.update_cell(idx + 2, 11, "Recheck")
-                worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
-                st.rerun()
-            if col2.button(f"🗑 Scrap", key=f"scrap_{idx}"):
-                worksheet.update_cell(idx + 2, 11, "Scrap")
-                worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
-                st.rerun()
-    else:
-        st.warning("🔒 กรุณาใส่รหัสผ่าน")
+    df = pd.DataFrame(worksheet.get_all_records())
+    df = df[df["สถานะ"] == "Sorting MC"]
+    st.subheader("🔍 เลือกตัดสินใจ (Recheck / Scrap)")
+    for idx, row in df.iterrows():
+        st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        if col1.button(f"♻️ Recheck", key=f"recheck_{row['Job ID']}"):
+            worksheet.update_cell(idx + 2, 11, "Recheck")
+            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
+            st.rerun()
+        if col2.button(f"🗑 Scrap", key=f"scrap_{row['Job ID']}"):
+            worksheet.update_cell(idx + 2, 11, "Scrap")
+            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
+            st.rerun()
 
 # 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
@@ -165,11 +148,17 @@ elif menu == "💧 Oil Cleaning":
     df = df[df["สถานะ"] == "Recheck"]
     for idx, row in df.iterrows():
         st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"lav_{idx}"):
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{row['Job ID']}"):
             worksheet.update_cell(idx + 2, 11, "Cleaned")
             worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
             worksheet.update_cell(idx + 2, 14, st.session_state.username)
-            send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code>")
+            send_telegram_message(
+                f"💧 <b>ล้างเสร็จแล้ว</b>\n"
+                f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
+                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"🔢 จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
+                f"👷‍♂️ ผู้ล้าง: {st.session_state.username}"
+            )
             st.success("✅ ล้างเสร็จแล้ว")
             st.rerun()
 
@@ -194,18 +183,17 @@ elif menu == "📊 รายงาน":
 
 # 🛠 Upload Master
 elif menu == "🛠 Upload Master":
-    password = st.text_input("🔐 รหัส Sup เพื่ออัปโหลด Master", type="password")
+    st.subheader("🛠 อัปโหลด Master")
+    password = st.text_input("🔐 รหัส Sup", type="password")
     if password == "Sup":
-        st.subheader("🛠 อัปโหลดรายชื่อพนักงานและรหัสงาน")
-        emp_txt = st.text_area("👥 วางรายชื่อพนักงาน + รหัส (ชื่อ|รหัส)", height=150)
-        part_txt = st.text_area("🧾 วางรหัสงาน", height=150)
+        emp_txt = st.text_area("👥 รายชื่อพนักงาน (ชื่อ|รหัส)", height=150)
+        part_txt = st.text_area("🧾 รหัสงาน", height=150)
         if st.button("📤 อัปโหลด"):
             if emp_txt:
-                rows = emp_txt.strip().split("\n")
-                values = [["ชื่อพนักงาน", "รหัส"]] + [r.split("|") for r in rows if "|" in r]
-                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": values})
+                rows = [["ชื่อพนักงาน", "รหัส"]] + [line.strip().split("|") for line in emp_txt.strip().split("\n") if "|" in line]
+                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": rows})
             if part_txt:
-                part_values = [[p] for p in part_txt.strip().split("\n") if p.strip()]
-                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_values})
+                part_values = [["รหัสงาน"]] + [[p] for p in part_txt.strip().split("\n") if p.strip()]
+                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": part_values})
             st.success("✅ อัปโหลดสำเร็จแล้ว")
             st.rerun()
