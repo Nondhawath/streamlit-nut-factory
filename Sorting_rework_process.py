@@ -1,19 +1,17 @@
 # 📦 Import Library
 from datetime import datetime, timedelta
+import os
 import pandas as pd
 import streamlit as st
+from PIL import Image
 import gspread
-import json
-import requests
 from google.oauth2.service_account import Credentials
+import requests
 
-# 🌍 ใช้ timezone GMT+7
-def now_th():
-    return datetime.utcnow() + timedelta(hours=7)
-
-# 📡 Telegram Settings
+# ✅ Telegram Settings
 TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
 TELEGRAM_CHAT_ID = "-4944715716"
+
 def send_telegram_message(message):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -24,19 +22,24 @@ def send_telegram_message(message):
         }
         requests.post(url, data=payload)
     except Exception as e:
-        st.warning(f"⚠️ Telegram Error: {e}")
+        st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
 
-# 🔐 เชื่อมต่อ Google Sheets
+# 🌐 Timezone +7
+def now_th():
+    return datetime.utcnow() + timedelta(hours=7)
+
+# 🔐 Auth Google Sheets
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
-service_account_info = json.loads(st.secrets["GOOGLE_SHEETS_CREDENTIALS"])
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # ✅ ไม่ต้อง json.loads
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
+# 🔗 Sheet Setting
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA/edit?usp=sharing"
 sheet = client.open_by_url(SHEET_URL)
-worksheet = sheet.worksheet("Data")  # ชื่อตารางหลัก
+worksheet = sheet.worksheet("Data")
 
-# 📁 โหลด master data
+# 📁 Master Data
 try:
     emp_master = sheet.worksheet("employee_master").col_values(1)[1:]
 except:
@@ -46,7 +49,7 @@ try:
 except:
     part_master = []
 
-# 🆔 สร้าง Job ID
+# 🔢 สร้าง Job ID
 def generate_job_id():
     records = worksheet.get_all_records()
     prefix = now_th().strftime("%y%m")
@@ -57,14 +60,14 @@ def generate_job_id():
         last_seq = 0
     return f"{prefix}{last_seq + 1:04d}"
 
-# 🌐 หน้าเว็บ
+# 🌐 UI
 st.set_page_config(page_title="Sorting Process", layout="wide")
 st.title("🔧 ระบบบันทึกข้อมูล Sorting Process - SCS")
 menu = st.sidebar.selectbox("📌 เลือกโหมด", [
     "📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"
 ])
 
-# 📥 โหมด 1: Sorting MC
+# 📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
     with st.form("sorting_form"):
@@ -79,7 +82,6 @@ if menu == "📥 Sorting MC":
         qty_pending = st.number_input("⏳ จำนวนที่ยังไม่ตรวจ", min_value=0)
         total = qty_ng + qty_pending
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-
         if submitted:
             new_row = [
                 now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, employee, part_code,
@@ -87,10 +89,17 @@ if menu == "📥 Sorting MC":
                 "Sorting MC", "", "", ""
             ]
             worksheet.append_row(new_row)
-            send_telegram_message(f"📥 <b>Sorting</b>\n🆔 <code>{job_id}</code>\n👷 {employee} | 🔩 {part_code}\n📦 Lot: {lot_number}\n❌ NG: {qty_ng} | ⏳ ยังไม่ตรวจ: {qty_pending}")
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
+            send_telegram_message(
+                f"📥 <b>New Sorting</b>\n"
+                f"🆔 Job ID: <code>{job_id}</code>\n"
+                f"👷‍♂️ พนักงาน: {employee}\n"
+                f"🔩 รหัสงาน: {part_code}\n"
+                f"📦 Lot: {lot_number}\n"
+                f"❌ NG: {qty_ng} | ⏳ ยังไม่ตรวจ: {qty_pending}"
+            )
 
-# 🧾 โหมด 2: Waiting Judgement
+# 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     password = st.text_input("🔐 รหัสผ่าน (Admin1)", type="password")
     if password == "Admin1":
@@ -98,24 +107,24 @@ elif menu == "🧾 Waiting Judgement":
         df = df[df["สถานะ"] == "Sorting MC"]
         st.subheader("🔍 เลือกตัดสินใจ (Recheck / Scrap)")
         for idx, row in df.iterrows():
-            st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}", unsafe_allow_html=True)
+            st.markdown(
+                f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}",
+                unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"♻️ Recheck - {row['Job ID']}"):
-                    worksheet.update_cell(idx + 2, 11, "Recheck")
-                    worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                    send_telegram_message(f"🔁 <b>Recheck</b>: <code>{row['Job ID']}</code> - {row['รหัสงาน']}")
-                    st.rerun()
-            with col2:
-                if st.button(f"🗑 Scrap - {row['Job ID']}"):
-                    worksheet.update_cell(idx + 2, 11, "Scrap")
-                    worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                    send_telegram_message(f"🗑 <b>Scrap</b>: <code>{row['Job ID']}</code> - {row['รหัสงาน']}")
-                    st.rerun()
+            if col1.button(f"♻️ Recheck - {row['Job ID']}"):
+                worksheet.update_cell(idx + 2, 11, "Recheck")
+                worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+                send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
+                st.rerun()
+            if col2.button(f"🗑 Scrap - {row['Job ID']}"):
+                worksheet.update_cell(idx + 2, 11, "Scrap")
+                worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+                send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
+                st.rerun()
     else:
         st.warning("🔒 กรุณาใส่รหัสผ่าน")
 
-# 💧 โหมด 3: Oil Cleaning
+# 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานที่รอการล้าง")
     df = pd.DataFrame(worksheet.get_all_records())
@@ -130,10 +139,11 @@ elif menu == "💧 Oil Cleaning":
                 worksheet.update_cell(idx + 2, 11, "Lavage")
                 worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
                 worksheet.update_cell(idx + 2, 14, employee_done)
-                send_telegram_message(f"💧 <b>Lavage</b>: <code>{row['Job ID']}</code> - {row['รหัสงาน']} โดย {employee_done}")
+                send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code>")
+                st.success("✅ ล้างเสร็จแล้ว")
                 st.rerun()
 
-# 📊 โหมด 4: รายงาน
+# 📊 รายงาน
 elif menu == "📊 รายงาน":
     df = pd.DataFrame(worksheet.get_all_records())
     view = st.selectbox("📅 เลือกช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
@@ -152,7 +162,7 @@ elif menu == "📊 รายงาน":
     st.markdown("📌 สรุป Scrap แยกรหัสงาน")
     st.dataframe(scrap_sum)
 
-# 🛠 โหมด 5: Upload Master
+# 🛠 Upload Master
 elif menu == "🛠 Upload Master":
     password = st.text_input("🔐 รหัส Sup เพื่ออัปโหลด Master", type="password")
     if password == "Sup":
