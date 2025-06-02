@@ -65,7 +65,7 @@ if not st.session_state.authenticated:
                 st.session_state.authenticated = True
                 st.session_state.username = selected_emp
                 st.success(f"✅ ยินดีต้อนรับ {selected_emp}")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ รหัสผ่านไม่ถูกต้อง")
     st.stop()
