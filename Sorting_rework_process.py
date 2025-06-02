@@ -1,6 +1,5 @@
 # 📦 Import Library
 from datetime import datetime, timedelta
-import os
 import pandas as pd
 import streamlit as st
 import gspread
@@ -27,7 +26,7 @@ def send_telegram_message(message):
 def now_th():
     return datetime.utcnow() + timedelta(hours=7)
 
-# 🔐 Auth Google Sheets
+# 🔐 Google Sheets Auth
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
 service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
@@ -48,7 +47,7 @@ try:
 except:
     part_master = []
 
-# 🔢 สร้าง Job ID
+# 🔢 Generate Job ID
 def generate_job_id():
     records = worksheet.get_all_records()
     prefix = now_th().strftime("%y%m")
@@ -56,9 +55,8 @@ def generate_job_id():
     if filtered:
         try:
             last_seq = max([
-                int(r["Job ID"][-4:]) 
-                for r in filtered 
-                if isinstance(r.get("Job ID"), str) and r["Job ID"][-4:].isdigit()
+                int(r["Job ID"][-4:])
+                for r in filtered if r["Job ID"][-4:].isdigit()
             ])
         except:
             last_seq = 0
@@ -115,14 +113,15 @@ elif menu == "🧾 Waiting Judgement":
         for idx, row in df.iterrows():
             st.markdown(
                 f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}",
-                unsafe_allow_html=True)
+                unsafe_allow_html=True
+            )
             col1, col2 = st.columns(2)
-            if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}"):
+            if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}_{idx}"):
                 worksheet.update_cell(idx + 2, 11, "Recheck")
                 worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
                 send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
                 st.rerun()
-            if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{row['Job ID']}"):
+            if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{row['Job ID']}_{idx}"):
                 worksheet.update_cell(idx + 2, 11, "Scrap")
                 worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
                 send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
@@ -137,17 +136,17 @@ elif menu == "💧 Oil Cleaning":
     df = df[df["สถานะ"] == "Recheck"]
     employee_done = st.selectbox("👷‍♂️ ผู้ล้าง:", emp_master)
     for idx, row in df.iterrows():
-        st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"done_{row['Job ID']}"):
-            if not employee_done:
-                st.warning("⚠️ กรุณาเลือกชื่อผู้ล้างก่อนกดปุ่ม")
-            else:
-                worksheet.update_cell(idx + 2, 11, "Cleaned")
-                worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                worksheet.update_cell(idx + 2, 14, employee_done)
-                send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code>")
-                st.success("✅ ล้างเสร็จแล้ว")
-                st.rerun()
+        st.markdown(
+            f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}",
+            unsafe_allow_html=True
+        )
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{row['Job ID']}_{idx}"):
+            worksheet.update_cell(idx + 2, 11, "Cleaned")
+            worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 14, employee_done)
+            send_telegram_message(f"✅ <b>Cleaned</b>: Job ID <code>{row['Job ID']}</code>")
+            st.success("✅ ล้างเสร็จแล้ว")
+            st.rerun()
 
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
