@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 import gspread
 import requests
+import uuid
 from google.oauth2.service_account import Credentials
 
 # ✅ Telegram Settings
@@ -155,7 +156,7 @@ elif menu == "💧 Oil Cleaning":
     user = st.session_state["user"]
     for idx, row in df.iterrows():
         st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{row['Job ID']}"):
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Cleaned")
             worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
             worksheet.update_cell(idx + 2, 14, user)
