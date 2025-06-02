@@ -33,7 +33,10 @@ def generate_job_id():
     records = worksheet.get_all_records()
     prefix = datetime.now().strftime("%y%m")
     filtered = [r for r in records if str(r.get("Job ID", "")).startswith(prefix)]
-    last = max([int(r["Job ID"][-4:]) for r in filtered if str(r["Job ID"][-4:]).isdigit()], default=0)
+    last = max(
+    [int(str(r.get("Job ID", ""))[-4:]) for r in filtered if str(r.get("Job ID", ""))[-4:].isdigit()],
+    default=0
+)
     return f"{prefix}{last + 1:04d}"
 
 # 🌐 ตั้งค่าหน้าเว็บ
