@@ -53,9 +53,16 @@ except:
 def generate_job_id():
     records = worksheet.get_all_records()
     prefix = now_th().strftime("%y%m")
-    filtered = [r for r in records if str(r.get("Job ID", "")).startswith(prefix)]
+    filtered = [r for r in records if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix)]
     if filtered:
-        last_seq = max([int(r["Job ID"][-4:]) for r in filtered if r["Job ID"][-4:].isdigit()])
+        try:
+            last_seq = max([
+                int(r["Job ID"][-4:]) 
+                for r in filtered 
+                if isinstance(r.get("Job ID"), str) and r["Job ID"][-4:].isdigit()
+            ])
+        except:
+            last_seq = 0
     else:
         last_seq = 0
     return f"{prefix}{last_seq + 1:04d}"
