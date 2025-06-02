@@ -143,8 +143,8 @@ elif menu == "🧾 Waiting Judgement":
                 f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
                 f"📦 จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👤 โดย: {user}"
-    )
-    st.rerun()
+            )
+            st.rerun()
 
         if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Scrap")
