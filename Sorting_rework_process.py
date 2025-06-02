@@ -140,9 +140,9 @@ elif menu == "🧾 Waiting Judgement":
             send_telegram_message(
                 f"♻️ <b>Recheck</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
-                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"🔩 รหัสc: {row['รหัสงาน']}\n"
                 f"📦 จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
-                f"👤 โดย: {user}"
+                f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
 
@@ -153,8 +153,8 @@ elif menu == "🧾 Waiting Judgement":
             send_telegram_message(
                 f"🗑 <b>Scrap</b>:\n"
                 f"🆔Job ID <code>{row['Job ID']}</code>\n"
-                f"🔩 รหัส: {row['รหัสงาน']}\n"
-                f"❌ จำนวน: {row['จำนวนทั้งหมด']}\n"
+                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"❌ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
