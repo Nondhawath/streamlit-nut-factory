@@ -5,3 +5,8 @@ pandas
 openpyxl
 Pillow
 requests
+gspread
+google-auth
+pandas
+streamlit
+openpyxl
