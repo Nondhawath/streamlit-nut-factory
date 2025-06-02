@@ -59,7 +59,7 @@ if "user" not in st.session_state:
     if st.button("➡️ เข้าสู่ระบบ"):
         if emp_pass_dict.get(username) == password:
             st.session_state.user = username
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("❌ รหัสผ่านไม่ถูกต้อง")
     st.stop()
