@@ -7,9 +7,9 @@ from PIL import Image
 import gspread
 from google.oauth2.service_account import Credentials
 import json
+from google.oauth2.service_account import Credentials
 
-# 📌 เชื่อมต่อ Google Sheets
-SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
 service_account_info = json.loads(st.secrets["GOOGLE_SHEETS_CREDENTIALS"])
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 
