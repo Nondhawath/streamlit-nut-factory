@@ -4,41 +4,11 @@ import os
 import pandas as pd
 import streamlit as st
 from PIL import Image
-
 import requests
+import gspread
+from google.oauth2.service_account import Credentials
 
-def send_telegram_message(message):
-    TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
-    TELEGRAM_CHAT_ID = "-4944715716"
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-        response = requests.post(url, data=payload)
-        print("📡 Telegram Status:", response.status_code)
-        print("📡 Telegram Response:", response.text)
-    except Exception as e:
-        print("⚠️ Telegram Error:", e)
-
-def save_report(df):
-    try:
-        with open(REPORT_PATH, "r+b"):
-            pass
-    except PermissionError:
-        st.error("❌ กรุณาปิดไฟล์ report.xlsx ก่อนบันทึกข้อมูล")
-        return
-    except FileNotFoundError:
-        pass
-    try:
-        df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
-        print("💾 บันทึกข้อมูลลง report.xlsx เรียบร้อยแล้ว")
-    except Exception as e:
-        st.error(f"❌ เกิดข้อผิดพลาดขณะบันทึก: {e}")
-        print("❌ บันทึกล้มเหลว:", e)
-
+# 📡 Telegram Function
 def send_telegram_message(message):
     TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
     TELEGRAM_CHAT_ID = "-4944715716"
@@ -51,258 +21,183 @@ def send_telegram_message(message):
         }
         requests.post(url, data=payload)
     except Exception as e:
-        st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
+        st.warning(f"⚠️ ไม่สามารถส่ง Telegram: {e}")
 
-
-# 📁 Path สำหรับไฟล์
+# 📁 Path
 DATA_DIR = "data"
 IMAGE_FOLDER = os.path.join(DATA_DIR, "images")
-REPORT_PATH = os.path.join(DATA_DIR, "report.xlsx")
 EMP_PATH = os.path.join(DATA_DIR, "employee_master.xlsx")
 PART_PATH = os.path.join(DATA_DIR, "part_code_master.xlsx")
+GSPREAD_JSON = os.path.join(DATA_DIR, "upheld-modem-461701-h1-295195eda574.json")  # อัปโหลดไฟล์นี้
+GSHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
 
-# 🛡 สร้างโฟลเดอร์ที่จำเป็น
-try:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    os.makedirs(IMAGE_FOLDER, exist_ok=True)
-except PermissionError:
-    st.error("❌ ไม่มีสิทธิ์ในการสร้างโฟลเดอร์")
-except Exception as e:
-    st.error(f"❌ ไม่สามารถสร้างโฟลเดอร์: {e}")
+# 🔐 GSheet Setup
+scope = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_file(GSPREAD_JSON, scopes=scope)
+client = gspread.authorize(creds)
+sheet = client.open_by_url(GSHEET_URL)
+ws = sheet.worksheet("Sheet1")
 
-# 🔁 โหลด Master Data
-def load_master_data():
+# 🛡 Folder
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
+
+# 📄 Load Master
+def load_master():
     try:
-        emp_df = pd.read_excel(EMP_PATH, engine="openpyxl")
+        emp = pd.read_excel(EMP_PATH)
     except:
-        emp_df = pd.DataFrame(columns=["ชื่อพนักงาน"])
+        emp = pd.DataFrame(columns=["ชื่อพนักงาน"])
     try:
-        part_df = pd.read_excel(PART_PATH, engine="openpyxl")
+        part = pd.read_excel(PART_PATH)
     except:
-        part_df = pd.DataFrame(columns=["รหัสงาน"])
-    return emp_df, part_df
+        part = pd.DataFrame(columns=["รหัสงาน"])
+    return emp, part
 
-# 💾 Save Master File
-def save_master_file(uploaded_file, path):
-    try:
-        df = pd.read_excel(uploaded_file, engine="openpyxl")
-        df.to_excel(path, index=False, engine="openpyxl")
-    except Exception as e:
-        st.error(f"❌ ไม่สามารถบันทึกไฟล์: {e}")
-
-# 🆔 สร้าง Job ID
-def generate_job_id():
+# 🆔 Job ID
+def generate_job_id(df):
     now = datetime.now()
     prefix = now.strftime("%y%m")
-    existing = report_df[report_df['Job ID'].astype(str).str.startswith(prefix)] if 'Job ID' in report_df.columns else []
     try:
-        last_seq = max([int(str(jid)[-4:]) for jid in existing['Job ID'] if str(jid)[-4:].isdigit()], default=0)
+        existing = df[df['Job ID'].astype(str).str.startswith(prefix)]
+        last_seq = max([int(j[-4:]) for j in existing['Job ID']], default=0)
     except:
         last_seq = 0
     return f"{prefix}{last_seq + 1:04d}"
 
-# 🔄 โหลดข้อมูล
-emp_df, part_df = load_master_data()
-if os.path.exists(REPORT_PATH):
-    try:
-        report_df = pd.read_excel(REPORT_PATH, engine="openpyxl")
-    except:
-        report_df = pd.DataFrame()
-else:
-    report_df = pd.DataFrame()
+# 🔁 Load report
+try:
+    df = pd.DataFrame(ws.get_all_records())
+    if not df.empty and "วันที่" in df.columns:
+        df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
+except:
+    df = pd.DataFrame()
 
-# 🌐 ตั้งค่าหน้าเว็บ
+emp_df, part_df = load_master()
+
+# 🌐 Streamlit UI
 st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title("🔧 ระบบบันทึกข้อมูล Sorting Process - SCS")
-menu = st.sidebar.selectbox("📌 เลือกโหมด", [
-    "📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"
-])
+st.title("🔧 ระบบบันทึกข้อมูล Sorting Process - Google Sheets")
 
-# ---------------------------------------
-# 📥 โหมด 1: Sorting MC
-# ---------------------------------------
+menu = st.sidebar.selectbox("📌 เลือกโหมด", ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"])
+
+# 📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
-    with st.form("sorting_form"):
-        job_id = generate_job_id()
+    with st.form("form_sort"):
+        job_id = generate_job_id(df)
         st.markdown(f"**🆔 Job ID:** `{job_id}`")
+        emp_list = emp_df["ชื่อพนักงาน"].dropna().unique()
+        part_list = part_df["รหัสงาน"].dropna().unique()
 
-        emp_list = emp_df['ชื่อพนักงาน'].dropna().unique() if 'ชื่อพนักงาน' in emp_df.columns else []
-        part_list = part_df['รหัสงาน'].dropna().unique() if 'รหัสงาน' in part_df.columns else []
-
-        employee = st.selectbox("👷‍♂️ เลือกชื่อพนักงาน", emp_list)
-        part_code = st.selectbox("🔩 เลือกรหัสงาน", part_list)
-        machine = st.selectbox("🛠 เลือกชื่อเครื่อง", [f"SM{i:02}" for i in range(1, 31)])
-        lot_number = st.text_input("📦 Lot Number")
-        qty_checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot", min_value=0)
-        qty_ng = st.number_input("❌ จำนวน NG", min_value=0)
-        qty_pending = st.number_input("⏳ จำนวนที่ยังไม่ตรวจ", min_value=0)
+        employee = st.selectbox("👷‍♂️ พนักงาน", emp_list)
+        part_code = st.selectbox("🔩 รหัสงาน", part_list)
+        machine = st.selectbox("🛠 เครื่อง", [f"SM{i:02}" for i in range(1, 31)])
+        lot = st.text_input("📦 Lot Number")
+        qty_all = st.number_input("🔍 จำนวนตรวจ", 0)
+        qty_ng = st.number_input("❌ NG", 0)
+        qty_pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         total = qty_ng + qty_pending
-        image = st.file_uploader("📸 อัปโหลดรูปภาพ", type=["png", "jpg", "jpeg"])
+        image = st.file_uploader("📸 รูป", type=["jpg", "jpeg", "png"])
 
-        submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-        if submitted:
+        submit = st.form_submit_button("✅ บันทึก")
+        if submit:
+            now = datetime.now().replace(microsecond=0)
             image_path = ""
             if image:
-                try:
-                    image_path = os.path.join(IMAGE_FOLDER, f"{job_id}.jpg")
-                    with open(image_path, "wb") as f:
-                        f.write(image.read())
-                except Exception as e:
-                    st.error(f"❌ ไม่สามารถบันทึกรูปภาพ: {e}")
-                    image_path = ""
+                image_path = os.path.join(IMAGE_FOLDER, f"{job_id}.jpg")
+                with open(image_path, "wb") as f:
+                    f.write(image.read())
 
-            new_row = {
-                "วันที่": datetime.now().replace(microsecond=0),
-                "Job ID": job_id,
-                "ชื่อพนักงาน": employee,
-                "รหัสงาน": part_code,
-                "ชื่อเครื่อง": machine,
-                "Lot Number": lot_number,
-                "จำนวนที่ตรวจสอบทั้งหมดของ Lot": qty_checked,
-                "จำนวน NG": qty_ng,
-                "จำนวนยังไม่ตรวจ": qty_pending,
-                "จำนวนทั้งหมด": total,
-                "สถานะ": "Sorting MC",
-                "เวลา Scrap/Recheck": "",
-                "เวลา Lavage": "",
-                "รูปภาพ": image_path
-            }
+            row = [
+                now.strftime("%Y-%m-%d %H:%M:%S"),
+                job_id, employee, part_code, machine, lot,
+                qty_all, qty_ng, qty_pending, total,
+                "Sorting MC", "", "", image_path
+            ]
+            try:
+                ws.append_row(row)
+                st.success("✅ บันทึกแล้ว")
+                send_telegram_message(f"📥 <b>New Sorting</b>\n🆔 <code>{job_id}</code>\n👷 {employee}\n🔩 {part_code}\n📦 Lot: {lot}\n❌ NG: {qty_ng} | ⏳ ยังไม่ตรวจ: {qty_pending}")
+            except Exception as e:
+                st.error(f"❌ บันทึกลง GSheet ล้มเหลว: {e}")
 
-            report_df = pd.concat([report_df, pd.DataFrame([new_row])], ignore_index=True)
-            save_report(report_df)
-            st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
-            msg = (
-                f"📥 <b>New Sorting</b>\n"
-                f"🆔 Job ID: <code>{job_id}</code>\n"
-                f"👷‍♂️ พนักงาน: {employee}\n"
-                f"🔩 รหัสงาน: {part_code}\n"
-                f"📦 Lot: {lot_number}\n"
-                f"❌ NG: {qty_ng} | ⏳ ยังไม่ตรวจ: {qty_pending}"
-            )
-            send_telegram_message(msg)
-
-# ---------------------------------------
-# 🧾 โหมด 2: Waiting Judgement
-# ---------------------------------------
+# 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
-    password = st.text_input("🔐 ใส่รหัสเพื่อเข้าสู่โหมด Judgement", type="password")
-    if password == "Admin1":
-        st.subheader("🔍 รอตัดสินใจ: Recheck หรือ Scrap")
-        pending_jobs = report_df[report_df["สถานะ"] == "Sorting MC"]
-        for idx, row in pending_jobs.iterrows():
-            col1, col2, col3 = st.columns([2, 2, 2])
+    st.subheader("🧾 รอการตัดสินใจ")
+    pw = st.text_input("🔐 รหัสผ่าน", type="password")
+    if pw == "Admin1":
+        pending = df[df["สถานะ"] == "Sorting MC"]
+        for idx, row in pending.iterrows():
+            col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.markdown(f"🆔 **{row['Job ID']}** - รหัส: {row['รหัสงาน']}")
-                st.markdown(f"❌ NG: {row['จำนวน NG']} / ⏳ ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}")
-                if isinstance(row['รูปภาพ'], str) and os.path.exists(row['รูปภาพ']):
-                    st.image(row['รูปภาพ'], width=200)
+                st.markdown(f"🆔 {row['Job ID']} - {row['รหัสงาน']} ({row['ชื่อพนักงาน']})")
+                st.text(f"❌ {row['จำนวน NG']} | ⏳ {row['จำนวนยังไม่ตรวจ']}")
             with col2:
-                if st.button("♻️ Recheck", key=f"Recheck_{row['Job ID']}"):
-                    report_df.at[idx, "สถานะ"] = "Recheck"
-                    send_telegram_message(f"🔁 <b>Recheck</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
-                    report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
-                    save_report(report_df)
+                if st.button("♻️ Recheck", key=f"rc_{idx}"):
+                    ws.update_cell(idx + 2, 11, "Recheck")
+                    ws.update_cell(idx + 2, 12, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    send_telegram_message(f"🔁 <b>Recheck</b>: <code>{row['Job ID']}</code>")
                     st.rerun()
             with col3:
-                if st.button("🗑 Scrap", key=f"scrap_{row['Job ID']}"):
-                    report_df.at[idx, "สถานะ"] = "Scrap"
-                    send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
-                    report_df.at[idx, "เวลา Scrap/Recheck"] = datetime.now().replace(microsecond=0)
-                    save_report(report_df)
+                if st.button("🗑 Scrap", key=f"sp_{idx}"):
+                    ws.update_cell(idx + 2, 11, "Scrap")
+                    ws.update_cell(idx + 2, 12, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    send_telegram_message(f"🗑 <b>Scrap</b>: <code>{row['Job ID']}</code>")
                     st.rerun()
-    else:
-        st.warning("🔒 กรุณาใส่รหัสผ่านให้ถูกต้อง")
 
-# ---------------------------------------
-# 💧 โหมด 3: Oil Cleaning
-# ---------------------------------------
+# 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
-    st.subheader("💧 งานรอเข้ากระบวนการล้าง")
-    jobs = report_df[report_df["สถานะ"] == "Recheck"]
+    st.subheader("💧 ล้างงานที่ Recheck")
+    jobs = df[df["สถานะ"] == "Recheck"]
+    emp_list = emp_df["ชื่อพนักงาน"].dropna().unique()
+    operator = st.selectbox("👤 พนักงานล้าง", [""] + list(emp_list))
     for idx, row in jobs.iterrows():
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.markdown(f"🆔 {row['Job ID']} - {row['รหัสงาน']} ({row['ชื่อพนักงาน']})")
+            st.markdown(f"🆔 {row['Job ID']} - {row['รหัสงาน']} ({row['ชื่อพนักงาน']})\n- 📦 Lot: {row['Lot Number']} | 📊 รวม: {row['จำนวนทั้งหมด']}")
         with col2:
-            if st.button("✅ ล้างเสร็จแล้ว", key=f"done_{row['Job ID']}"):
-                report_df.at[idx, "สถานะ"] = "Lavage"
-                send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code> รหัส {row['รหัสงาน']}")
-                report_df.at[idx, "เวลา Lavage"] = datetime.now().replace(microsecond=0)
-                save_report(report_df)
-                st.rerun()
+            if st.button("✅ ล้างเสร็จแล้ว", key=f"lav_{idx}"):
+                if operator:
+                    ws.update_cell(idx + 2, 11, "Lavage")
+                    ws.update_cell(idx + 2, 13, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: <code>{row['Job ID']}</code> โดย {operator}")
+                    st.rerun()
+                else:
+                    st.warning("⚠ กรุณาเลือกชื่อพนักงานก่อนกดปุ่ม")
 
-# ---------------------------------------
-# 📊 โหมด 4: รายงาน
-# ---------------------------------------
+# 📊 รายงาน
 elif menu == "📊 รายงาน":
-    st.subheader("📊 สรุปและรายงานงานทั้งหมด")
-    view = st.selectbox("เลือกช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
+    st.subheader("📊 รายงานทั้งหมด")
+    view = st.selectbox("📆 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
+    view_df = df.copy()
     now = datetime.now()
-    df = report_df.copy()
-
-    search_lot = st.text_input("🔎 ค้นหาโดย Lot Number")
-    if search_lot:
-        df = df[df["Lot Number"].astype(str).str.contains(search_lot, case=False, na=False)]
 
     if view == "รายวัน":
-        df = df[df["วันที่"].dt.date == now.date()]
+        view_df = view_df[view_df["วันที่"].dt.date == now.date()]
     elif view == "รายสัปดาห์":
-        df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
-        df = df[df["วันที่"] >= now - pd.Timedelta(days=7)]
+        view_df = view_df[view_df["วันที่"] >= now - pd.Timedelta(days=7)]
     elif view == "รายเดือน":
-        df = df[df["วันที่"].dt.month == now.month]
+        view_df = view_df[view_df["วันที่"].dt.month == now.month]
     elif view == "รายปี":
-        df = df[df["วันที่"].dt.year == now.year]
+        view_df = view_df[view_df["วันที่"].dt.year == now.year]
 
-    st.dataframe(df)
-
-    scrap_summary = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
-    st.markdown("📌 **สรุปงาน Scrap แยกตามรหัสงาน**")
+    st.dataframe(view_df)
+    scrap_summary = view_df[view_df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
+    st.markdown("📌 **ยอด Scrap แยกรหัสงาน**")
     st.dataframe(scrap_summary)
 
-    # 🔐 ล้างข้อมูลทั้งหมด
-    with st.expander("🧹 ตัวเลือกสำหรับผู้ดูแลระบบ: ล้างข้อมูลทั้งหมด"):
-        admin_pass = st.text_input("🔐 ใส่รหัสผ่านผู้ดูแลระบบ", type="password")
-        if admin_pass == "Adminfiscs":
-            if st.button("⚠️ ล้างข้อมูลทั้งหมด"):
-                confirm = st.checkbox("✅ ยืนยันว่าต้องการลบข้อมูลทั้งหมด")
-                if confirm:
-                    try:
-                        if os.path.exists(REPORT_PATH):
-                            try:
-                                with open(REPORT_PATH, "r+b"):
-                                    pass
-                            except PermissionError:
-                                st.warning("⚠ กรุณาปิดไฟล์ report.xlsx ที่เปิดอยู่ก่อนดำเนินการ")
-
-                        empty_df = pd.DataFrame(columns=[
-                            "วันที่", "Job ID", "ชื่อพนักงาน", "รหัสงาน", "ชื่อเครื่อง", "Lot Number",
-                            "จำนวนที่ตรวจสอบทั้งหมดของ Lot", "จำนวน NG", "จำนวนยังไม่ตรวจ",
-                            "จำนวนทั้งหมด", "สถานะ", "เวลา Scrap/Recheck", "เวลา Lavage", "รูปภาพ"
-                        ])
-                        empty_df.to_excel(REPORT_PATH, index=False, engine="openpyxl")
-                        st.success(f"✅ ลบข้อมูลทั้งหมดจากไฟล์ `{REPORT_PATH}` เรียบร้อยแล้ว")
-                        send_telegram_message("⚠️ <b>ล้างข้อมูลทั้งหมดในระบบแล้ว</b> โดยผู้ดูแล")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ เกิดข้อผิดพลาดขณะล้างข้อมูล: {e}")
-        elif admin_pass:
-            st.error("❌ รหัสผ่านไม่ถูกต้อง")
-
-# ---------------------------------------
-# 🛠 โหมด 5: Upload Master
-# ---------------------------------------
+# 🛠 Upload Master
 elif menu == "🛠 Upload Master":
-    password = st.text_input("🔐 ใส่รหัส Sup เพื่ออัปโหลด Master", type="password")
-    if password == "Sup":
-        st.subheader("🛠 อัปโหลด Master Data")
-        emp_upload = st.file_uploader("👥 อัปโหลดรายชื่อพนักงาน", type="xlsx", key="emp")
-        part_upload = st.file_uploader("🧾 อัปโหลดรหัสงาน", type="xlsx", key="part")
-        if st.button("📤 อัปโหลด"):
-            if emp_upload:
-                save_master_file(emp_upload, EMP_PATH)
-            if part_upload:
-                save_master_file(part_upload, PART_PATH)
-            st.success("✅ อัปโหลดและบันทึก Master สำเร็จแล้ว")
+    st.subheader("🛠 อัปโหลดรายชื่อ / รหัสงาน")
+    pw = st.text_input("รหัสผ่าน", type="password")
+    if pw == "Sup":
+        emp_file = st.file_uploader("👥 พนักงาน", type="xlsx")
+        part_file = st.file_uploader("🧾 รหัสงาน", type="xlsx")
+        if st.button("📤 บันทึก"):
+            if emp_file:
+                pd.read_excel(emp_file).to_excel(EMP_PATH, index=False)
+            if part_file:
+                pd.read_excel(part_file).to_excel(PART_PATH, index=False)
+            st.success("✅ บันทึก Master สำเร็จ")
             st.rerun()
