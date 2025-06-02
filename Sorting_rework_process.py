@@ -70,7 +70,7 @@ if "logged_in_user" not in st.session_state:
             if emp_password_map.get(username) == password:
                 st.session_state.logged_in_user = username
                 st.success("✅ เข้าสู่ระบบสำเร็จ")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ รหัสผ่านไม่ถูกต้อง")
     st.stop()
@@ -127,12 +127,12 @@ elif menu == "🧾 Waiting Judgement":
             worksheet.update_cell(idx + 2, 11, "Recheck")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
             send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
-            st.experimental_rerun()
+            st.rerun()
         if col2.button("🗑 Scrap", key=f"scrap_{row['Job ID']}_{uuid.uuid4()}"):
             worksheet.update_cell(idx + 2, 11, "Scrap")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
             send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
-            st.experimental_rerun()
+            st.rerun()
 
 # 💧 Cleaning
 elif menu == "💧 Oil Cleaning":
@@ -153,7 +153,7 @@ elif menu == "💧 Oil Cleaning":
                 f"👤 โดย: {user}"
             )
             st.success("✅ ล้างเสร็จแล้ว")
-            st.experimental_rerun()
+            st.rerun()
 
 # 📊 Report
 elif menu == "📊 รายงาน":
@@ -190,4 +190,4 @@ elif menu == "🛠 Upload Master":
                 part_lines = [[p.strip()] for p in part_txt.strip().split("\n") if p.strip()]
                 sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_lines})
             st.success("✅ อัปโหลด Master สำเร็จแล้ว")
-            st.experimental_rerun()
+            st.rerun()
