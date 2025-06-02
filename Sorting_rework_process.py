@@ -1,173 +1,180 @@
-# 📦 Import
+# 📦 Import Library
 from datetime import datetime, timedelta
-import streamlit as st
 import pandas as pd
+import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
 
-# ✅ Telegram
-TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
-CHAT_ID = "-4944715716"
+# ✅ Telegram Settings
+TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+TELEGRAM_CHAT_ID = "-4944715716"
 
-def send_telegram(msg):
+def send_telegram_message(message):
     try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": msg, "parse_mode": "HTML"}
-        requests.post(url, data=data)
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+        requests.post(url, data=payload)
     except Exception as e:
-        st.warning(f"❌ Telegram error: {e}")
+        st.warning(f"⚠️ Telegram Error: {e}")
 
 # ⏰ Timezone
 def now_th():
     return datetime.utcnow() + timedelta(hours=7)
 
-# 🔐 Auth
+# 🔐 Google Sheet Auth
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
 creds = Credentials.from_service_account_info(st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
 client = gspread.authorize(creds)
-sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA")
-ws_data = sheet.worksheet("Data")
 
-# 📚 Load master
+# 📗 Sheets
+sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA")
+worksheet = sheet.worksheet("Data")
+
+# 🔁 Load Master
 try:
-    emp_df = pd.DataFrame(sheet.worksheet("employee_master").get_all_records())
-    emp_names = emp_df["ชื่อพนักงาน"].tolist()
-    emp_levels = dict(zip(emp_df["ชื่อพนักงาน"], emp_df["ระดับ"]))
-    emp_pass = dict(zip(emp_df["ชื่อพนักงาน"], emp_df["รหัส"].astype(str)))
+    emp_data = sheet.worksheet("employee_master").get_all_records()
+    emp_master = [row["ชื่อพนักงาน"] for row in emp_data]
+    emp_password_map = {row["ชื่อพนักงาน"]: str(row["รหัส"]).strip() for row in emp_data}
+    emp_level_map = {row["ชื่อพนักงาน"]: str(row["ระดับ"]).strip() for row in emp_data}
 except:
-    emp_names, emp_levels, emp_pass = [], {}, {}
+    emp_master, emp_password_map, emp_level_map = [], {}, {}
 
 try:
     part_master = sheet.worksheet("part_code_master").col_values(1)[1:]
 except:
     part_master = []
 
-# 🧑 Login
-if "user" not in st.session_state:
+# 🆔 สร้าง Job ID ปลอดภัย
+def generate_job_id():
+    records = worksheet.get_all_records()
+    prefix = now_th().strftime("%y%m")
+    filtered = [
+        r for r in records
+        if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
+    ]
+    last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
+    return f"{prefix}{last_seq + 1:04d}"
+
+# 🔐 Login
+if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
         st.subheader("🔐 เข้าสู่ระบบ")
-        user = st.selectbox("👤 ชื่อพนักงาน", emp_names)
-        pw = st.text_input("🔑 รหัสผ่าน", type="password")
-        login = st.form_submit_button("✅ Login")
-        if login:
-            if emp_pass.get(user) == pw:
-                st.session_state["user"] = user
-                st.session_state["level"] = emp_levels.get(user, "")
-                st.success("✅ เข้าสู่ระบบสำเร็จ")
+        username = st.selectbox("👤 Username", emp_master)
+        password = st.text_input("🔑 Password", type="password")
+        submitted = st.form_submit_button("🔓 Login")
+        if submitted:
+            if emp_password_map.get(username) == password:
+                st.session_state.logged_in_user = username
+                st.session_state.user_level = emp_level_map.get(username, "")
                 st.rerun()
             else:
                 st.error("❌ รหัสผ่านไม่ถูกต้อง")
     st.stop()
 
-user = st.session_state["user"]
-level = st.session_state["level"]
+user = st.session_state.logged_in_user
+user_level = st.session_state.user_level
 st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title(f"🔧 Sorting Process - สวัสดี {user} ({level})")
+st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
 
-# 🛡 Permission
-mode_options = []
-if level in ["S1"]:
-    mode_options = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
-elif level == "T1":
-    mode_options = ["🧾 Waiting Judgement"]
-elif level == "T7":
-    mode_options = ["📥 Sorting MC"]
-elif level == "T8":
-    mode_options = ["💧 Oil Cleaning"]
-else:
-    st.error("❌ ไม่สามารถระบุสิทธิ์การเข้าใช้งาน")
-    st.stop()
+# 🔐 สิทธิ์เข้าใช้งาน
+allowed_modes = []
+if user_level == "S1":
+    allowed_modes = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
+elif user_level == "T1":
+    allowed_modes = ["🧾 Waiting Judgement"]
+elif user_level == "T7":
+    allowed_modes = ["📥 Sorting MC"]
+elif user_level == "T8":
+    allowed_modes = ["💧 Oil Cleaning"]
 
-menu = st.sidebar.selectbox("📌 เลือกโหมด", mode_options)
-
-# 🆔 Job ID
-def generate_job_id():
-    records = ws_data.get_all_records()
-    prefix = now_th().strftime("%y%m")
-    seq = [
-        int(str(r["Job ID"])[-4:])
-        for r in records if str(r.get("Job ID", "")).startswith(prefix) and str(r.get("Job ID", "")[-4:]).isdigit()
-    ]
-    return f"{prefix}{(max(seq)+1) if seq else 1:04d}"
+menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
 # 📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
     with st.form("sorting_form"):
         job_id = generate_job_id()
-        st.markdown(f"🆔 Job ID: `{job_id}`")
-        part = st.selectbox("🔩 รหัสงาน", part_master)
+        st.markdown(f"**🆔 Job ID:** `{job_id}`")
+        part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 เครื่อง", [f"SM{i:02}" for i in range(1, 31)])
-        lot = st.text_input("📦 Lot")
-        checked = st.number_input("🔍 จำนวนตรวจ", min_value=0)
-        ng = st.number_input("❌ NG", min_value=0)
-        pending = st.number_input("⏳ ยังไม่ตรวจ", min_value=0)
+        lot = st.text_input("📦 Lot Number")
+        checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
+        ng = st.number_input("❌ NG", 0)
+        pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         total = ng + pending
-        submit = st.form_submit_button("✅ บันทึก")
-        if submit:
+        submitted = st.form_submit_button("✅ บันทึกข้อมูล")
+        if submitted:
             row = [
-                now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part,
+                now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
                 machine, lot, checked, ng, pending, total,
                 "Sorting MC", "", "", ""
             ]
-            ws_data.append_row(row)
+            worksheet.append_row(row)
             st.success("✅ บันทึกเรียบร้อย")
-            send_telegram(
+            send_telegram_message(
                 f"📥 <b>New Sorting</b>\n"
                 f"🆔 Job ID: <code>{job_id}</code>\n"
-                f"👷‍♂️ {user} | 🔩 {part} | 🛠 {machine} | 📦 Lot: {lot}\n"
+                f"👷‍♂️ พนักงาน: {user}\n"
+                f"🔩 รหัสงาน: {part_code}\n"
+                f"🛠 เครื่อง: {machine}\n"
+                f"📦 Lot: {lot}\n"
                 f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}"
             )
 
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
-    st.subheader("🧾 ตัดสินใจ Scrap / Recheck")
-    df = pd.DataFrame(ws_data.get_all_records())
+    st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
+    df = pd.DataFrame(worksheet.get_all_records())
     df = df[df["สถานะ"] == "Sorting MC"]
-    for i, row in df.iterrows():
-        st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ⏳ {row['จำนวนยังไม่ตรวจ']}", unsafe_allow_html=True)
+    for idx, row in df.iterrows():
+        st.markdown(
+            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}",
+            unsafe_allow_html=True
+        )
         col1, col2 = st.columns(2)
-        if col1.button("♻️ Recheck", key=f"re_{row['Job ID']}_{i}"):
-            ws_data.update_cell(i+2, 11, "Recheck")
-            ws_data.update_cell(i+2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            ws_data.update_cell(i+2, 14, user)
-            send_telegram(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code> โดย {user}")
+        if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{idx}"):
+            worksheet.update_cell(idx + 2, 11, "Recheck")
+            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code> โดย {user}")
             st.rerun()
-        if col2.button("🗑 Scrap", key=f"sc_{row['Job ID']}_{i}"):
-            ws_data.update_cell(i+2, 11, "Scrap")
-            ws_data.update_cell(i+2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            ws_data.update_cell(i+2, 14, user)
-            send_telegram(
+        if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
+            worksheet.update_cell(idx + 2, 11, "Scrap")
+            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(
                 f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>\n"
-                f"🔩 {row['รหัสงาน']} | จำนวน: {row['จำนวนทั้งหมด']} | 👷‍♂️ โดย {user}"
+                f"🔩 รหัส: {row['รหัสงาน']} | ❌ จำนวน: {row['จำนวนทั้งหมด']}\n"
+                f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
 
 # 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
-    st.subheader("💧 ล้างงาน")
-    df = pd.DataFrame(ws_data.get_all_records())
+    st.subheader("💧 งานที่รอการล้าง")
+    df = pd.DataFrame(worksheet.get_all_records())
     df = df[df["สถานะ"] == "Recheck"]
-    for i, row in df.iterrows():
-        st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button("✅ ล้างเสร็จแล้ว", key=f"done_{row['Job ID']}_{i}"):
-            ws_data.update_cell(i+2, 11, "Cleaned")
-            ws_data.update_cell(i+2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            ws_data.update_cell(i+2, 14, user)
-            send_telegram(
-                f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code>\n"
-                f"🔩 {row['รหัสงาน']} | จำนวน: {row['จำนวนทั้งหมด']} | 👷‍♂️ โดย {user}"
+    for idx, row in df.iterrows():
+        st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{idx}"):
+            worksheet.update_cell(idx + 2, 11, "Cleaned")
+            worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(
+                f"💧 <b>ล้างเสร็จแล้ว</b>\n"
+                f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
+                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
+                f"👤 โดย: {user}"
             )
-            st.success("✅ ล้างเสร็จแล้ว")
             st.rerun()
 
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
-    df = pd.DataFrame(ws_data.get_all_records())
+    df = pd.DataFrame(worksheet.get_all_records())
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
-    st.subheader("📊 รายงานข้อมูล")
-    view = st.selectbox("📆 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
+    view = st.selectbox("🗓 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
     now = now_th()
     if view == "รายวัน":
         df = df[df["วันที่"].dt.date == now.date()]
@@ -178,24 +185,24 @@ elif menu == "📊 รายงาน":
     elif view == "รายปี":
         df = df[df["วันที่"].dt.year == now.year]
     st.dataframe(df)
-    scrap = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
-    st.markdown("📌 สรุป Scrap")
-    st.dataframe(scrap)
+    scrap_sum = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
+    st.markdown("📌 สรุป Scrap แยกรหัสงาน")
+    st.dataframe(scrap_sum)
 
 # 🛠 Upload Master
 elif menu == "🛠 Upload Master":
-    password = st.text_input("รหัส Sup", type="password")
+    password = st.text_input("🔐 รหัส Sup", type="password")
     if password == "Sup":
         st.subheader("🛠 อัปโหลด Master")
-        emp_txt = st.text_area("👥 รายชื่อ (ชื่อ,รหัส,ระดับ)", height=150)
+        emp_txt = st.text_area("👥 ชื่อพนักงาน (ชื่อ,รหัส,ระดับ)", height=150)
         part_txt = st.text_area("🧾 รหัสงาน", height=150)
         if st.button("📤 อัปโหลด"):
             if emp_txt:
-                lines = [l.split(",") for l in emp_txt.strip().split("\n") if "," in l]
-                values = [["ชื่อพนักงาน", "รหัส", "ระดับ"]] + lines
-                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": values})
+                emp_lines = [e.strip().split(",") for e in emp_txt.strip().split("\n") if len(e.strip().split(",")) == 3]
+                emp_values = [["ชื่อพนักงาน", "รหัส", "ระดับ"]] + emp_lines
+                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": emp_values})
             if part_txt:
-                parts = [[p] for p in part_txt.strip().split("\n") if p]
-                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + parts})
-            st.success("✅ อัปโหลดสำเร็จ")
+                part_lines = [[p.strip()] for p in part_txt.strip().split("\n") if p.strip()]
+                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_lines})
+            st.success("✅ อัปโหลด Master สำเร็จแล้ว")
             st.rerun()
