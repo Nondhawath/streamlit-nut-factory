@@ -6,10 +6,13 @@ import streamlit as st
 from PIL import Image
 import gspread
 from google.oauth2.service_account import Credentials
+import json
 
 # 📌 เชื่อมต่อ Google Sheets
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
+service_account_info = json.loads(st.secrets["GOOGLE_SHEETS_CREDENTIALS"])
+creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
+
 client = gspread.authorize(creds)
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA/edit?usp=sharing"
