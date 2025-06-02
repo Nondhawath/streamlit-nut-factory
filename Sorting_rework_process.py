@@ -12,7 +12,7 @@ SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis
 creds = Credentials.from_service_account_info(st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
 client = gspread.authorize(creds)
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA/edit#gid=0"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA/edit?usp=sharing"
 sheet = client.open_by_url(SHEET_URL)
 worksheet = sheet.worksheet("Data")  # โปรดสร้างแท็บชื่อ "Data" ใน Google Sheets
 
