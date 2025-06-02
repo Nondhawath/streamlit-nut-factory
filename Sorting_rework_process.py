@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 import os
 import pandas as pd
 import streamlit as st
-from PIL import Image
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
@@ -15,7 +14,11 @@ TELEGRAM_CHAT_ID = "-4944715716"
 def send_telegram_message(message):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        }
         requests.post(url, data=payload)
     except Exception as e:
         st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
@@ -31,7 +34,7 @@ creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE
 client = gspread.authorize(creds)
 
 # 🔗 Sheet Setting
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA/edit?usp=sharing"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
 sheet = client.open_by_url(SHEET_URL)
 worksheet = sheet.worksheet("Data")
 
@@ -53,8 +56,8 @@ def generate_job_id():
     if filtered:
         try:
             last_seq = max([
-                int(r["Job ID"][-4:])
-                for r in filtered
+                int(r["Job ID"][-4:]) 
+                for r in filtered 
                 if isinstance(r.get("Job ID"), str) and r["Job ID"][-4:].isdigit()
             ])
         except:
@@ -114,12 +117,12 @@ elif menu == "🧾 Waiting Judgement":
                 f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}",
                 unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            if col1.button(f"♻️ Recheck - {row['Job ID']}"):
+            if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}"):
                 worksheet.update_cell(idx + 2, 11, "Recheck")
                 worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
                 send_telegram_message(f"♻️ <b>Recheck</b>: Job ID <code>{row['Job ID']}</code>")
                 st.rerun()
-            if col2.button(f"🗑 Scrap - {row['Job ID']}"):
+            if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{row['Job ID']}"):
                 worksheet.update_cell(idx + 2, 11, "Scrap")
                 worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
                 send_telegram_message(f"🗑 <b>Scrap</b>: Job ID <code>{row['Job ID']}</code>")
@@ -135,7 +138,7 @@ elif menu == "💧 Oil Cleaning":
     employee_done = st.selectbox("👷‍♂️ ผู้ล้าง:", emp_master)
     for idx, row in df.iterrows():
         st.markdown(f"🆔 <b>{row['Job ID']}</b> | {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}"):
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"done_{row['Job ID']}"):
             if not employee_done:
                 st.warning("⚠️ กรุณาเลือกชื่อผู้ล้างก่อนกดปุ่ม")
             else:
