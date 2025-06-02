@@ -64,7 +64,7 @@ if not st.session_state.login_success:
             st.session_state.login_success = True
             st.session_state.username = username
             st.success("✅ เข้าสู่ระบบสำเร็จ")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("❌ รหัสผ่านไม่ถูกต้อง")
     st.stop()
