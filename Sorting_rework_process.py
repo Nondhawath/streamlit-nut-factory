@@ -15,11 +15,7 @@ TELEGRAM_CHAT_ID = "-4944715716"
 def send_telegram_message(message):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        }
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
         requests.post(url, data=payload)
     except Exception as e:
         st.warning(f"⚠️ ไม่สามารถส่งข้อความ Telegram ได้: {e}")
@@ -30,7 +26,7 @@ def now_th():
 
 # 🔐 Auth Google Sheets
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # ✅ ไม่ต้อง json.loads
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
@@ -57,8 +53,8 @@ def generate_job_id():
     if filtered:
         try:
             last_seq = max([
-                int(r["Job ID"][-4:]) 
-                for r in filtered 
+                int(r["Job ID"][-4:])
+                for r in filtered
                 if isinstance(r.get("Job ID"), str) and r["Job ID"][-4:].isdigit()
             ])
         except:
@@ -143,7 +139,7 @@ elif menu == "💧 Oil Cleaning":
             if not employee_done:
                 st.warning("⚠️ กรุณาเลือกชื่อผู้ล้างก่อนกดปุ่ม")
             else:
-                worksheet.update_cell(idx + 2, 11, "Lavage")
+                worksheet.update_cell(idx + 2, 11, "Cleaned")
                 worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
                 worksheet.update_cell(idx + 2, 14, employee_done)
                 send_telegram_message(f"💧 <b>ล้างเสร็จแล้ว</b>: Job ID <code>{row['Job ID']}</code>")
