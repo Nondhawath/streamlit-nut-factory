@@ -99,10 +99,10 @@ if menu == "📥 Sorting MC":
                 f"🆔 Job ID: <code>{job_id}</code>\n"
                 f"👷‍♂️ พนักงาน: {employee}\n"
                 f"🔩 รหัสงาน: {part_code}\n"
+                f"🛠 เครื่อง: {machine}\n"
                 f"📦 Lot: {lot_number}\n"
                 f"❌ NG: {qty_ng} | ⏳ ยังไม่ตรวจ: {qty_pending}"
             )
-
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     password = st.text_input("🔐 รหัสผ่าน (Admin1)", type="password")
