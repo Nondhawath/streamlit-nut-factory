@@ -141,7 +141,7 @@ elif menu == "🧾 Waiting Judgement":
                 f"♻️ <b>Recheck</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
                 f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
-                f"📦 จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
+                f"♻️ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
