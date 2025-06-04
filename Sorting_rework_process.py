@@ -31,24 +31,24 @@ client = gspread.authorize(creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA")
 worksheet = sheet.worksheet("Data")
 
-# 🔁 Load Master
+# 🔁 Load Master Data
 try:
     emp_data = sheet.worksheet("employee_master").get_all_records()
     emp_master = [row["ชื่อพนักงาน"] for row in emp_data]
     emp_password_map = {row["ชื่อพนักงาน"]: str(row["รหัส"]).strip() for row in emp_data}
     emp_level_map = {row["ชื่อพนักงาน"]: str(row["ระดับ"]).strip() for row in emp_data}
-except:
+except Exception:
     emp_master, emp_password_map, emp_level_map = [], {}, {}
 
 try:
     part_master = sheet.worksheet("part_code_master").col_values(1)[1:]
-except:
+except Exception:
     part_master = []
 
 try:
     reason_sheet = sheet.worksheet("Reason NG")
     reason_list = reason_sheet.col_values(reason_sheet.find("Reason").col)[1:]
-except:
+except Exception:
     reason_list = []
 
 # 🆔 สร้าง Job ID ปลอดภัย
@@ -73,13 +73,14 @@ if "logged_in_user" not in st.session_state:
             if emp_password_map.get(username) == password:
                 st.session_state.logged_in_user = username
                 st.session_state.user_level = emp_level_map.get(username, "")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("❌ รหัสผ่านไม่ถูกต้อง")
     st.stop()
 
 user = st.session_state.logged_in_user
 user_level = st.session_state.user_level
+
 st.set_page_config(page_title="Sorting Process", layout="wide")
 st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
 
@@ -105,9 +106,9 @@ if menu == "📥 Sorting MC":
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 เครื่อง", [f"SM{i:02}" for i in range(1, 31)])
         lot = st.text_input("📦 Lot Number")
-        checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
-        ng = st.number_input("❌ NG", 0)
-        pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
+        checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", min_value=0)
+        ng = st.number_input("❌ NG", min_value=0)
+        pending = st.number_input("⏳ ยังไม่ตรวจ", min_value=0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         total = ng + pending
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
@@ -145,9 +146,9 @@ elif menu == "🧾 Waiting Judgement":
         )
         col1, col2 = st.columns(2)
         if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}_{idx}"):
-            worksheet.update_cell(idx + 2, 11, "Recheck")
-            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            worksheet.update_cell(idx + 2, 14, user)
+            worksheet.update_cell(idx + 2, 11, "Recheck")  # update "สถานะ" col 11 (K)
+            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))  # update "เวลาสถานะ" col 12 (L)
+            worksheet.update_cell(idx + 2, 14, user)  # update "ผู้บันทึก" col 14 (N)
             send_telegram_message(
                 f"♻️ <b>Recheck</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
@@ -156,7 +157,7 @@ elif menu == "🧾 Waiting Judgement":
                 f"♻️ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👷‍♂️ โดย: {user}"
             )
-            st.rerun()
+            st.experimental_rerun()
         if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Scrap")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
@@ -169,7 +170,7 @@ elif menu == "🧾 Waiting Judgement":
                 f"❌ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👷‍♂️ โดย: {user}"
             )
-            st.rerun()
+            st.experimental_rerun()
 
 # 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
@@ -180,7 +181,7 @@ elif menu == "💧 Oil Cleaning":
         st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
         if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Cleaned")
-            worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))  # สมมุติ col 13 = เวลาล้างเสร็จ
             worksheet.update_cell(idx + 2, 14, user)
             send_telegram_message(
                 f"💧 <b>ล้างเสร็จแล้ว</b>\n"
@@ -189,7 +190,7 @@ elif menu == "💧 Oil Cleaning":
                 f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
                 f"👤 โดย: {user}"
             )
-            st.rerun()
+            st.experimental_rerun()
 
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
@@ -209,7 +210,6 @@ elif menu == "📊 รายงาน":
     scrap_sum = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
     st.markdown("📌 สรุป Scrap แยกรหัสงาน")
     st.dataframe(scrap_sum)
-
 # 🛠 Upload Master
 elif menu == "🛠 Upload Master":
     password = st.text_input("🔐 รหัส Sup", type="password")
