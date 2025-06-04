@@ -18,6 +18,7 @@ def send_telegram_message(message):
     except Exception as e:
         st.warning(f"⚠️ Telegram Error: {e}")
 
+# ⏰ Timezone
 def now_th():
     return datetime.utcnow() + timedelta(hours=7)
 
@@ -44,16 +45,20 @@ try:
 except:
     part_master = []
 
-# 🆔 สร้าง Job ID ต่อเนื่อง
+# 🆔 Generate Job ID (Robust)
 def generate_job_id():
-    records = worksheet.get_all_records()
-    prefix = now_th().strftime("%y%m")
-    filtered = [
-        r for r in records
-        if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
-    ]
-    last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
-    return f"{prefix}{last_seq + 1:04d}"
+    try:
+        records = worksheet.get_all_records()
+        prefix = now_th().strftime("%y%m")
+        last_seq = 0
+        for r in records:
+            job_id = str(r.get("Job ID", "")).strip()
+            if job_id.startswith(prefix) and job_id[-4:].isdigit():
+                last_seq = max(last_seq, int(job_id[-4:]))
+        return f"{prefix}{last_seq + 1:04d}"
+    except Exception as e:
+        st.warning(f"⚠️ เกิดข้อผิดพลาดในการสร้าง Job ID: {e}")
+        return f"{now_th().strftime('%y%m')}0001"
 
 # 🔐 Login
 if "logged_in_user" not in st.session_state:
@@ -73,12 +78,10 @@ if "logged_in_user" not in st.session_state:
 
 user = st.session_state.logged_in_user
 user_level = st.session_state.user_level
-
-# 🌐 UI
 st.set_page_config(page_title="Sorting Process", layout="wide")
 st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
 
-# 🎛 สิทธิ์เมนูตามระดับ
+# 🔐 สิทธิ์การเข้าถึง
 allowed_modes = []
 if user_level == "S1":
     allowed_modes = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
@@ -128,11 +131,14 @@ elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
     df = pd.DataFrame(worksheet.get_all_records())
     if "สถานะ" not in df.columns:
-        st.error("❌ ไม่พบคอลัมน์ 'สถานะ'")
+        st.warning("⚠️ ไม่มีข้อมูลสถานะใน Google Sheet")
         st.stop()
     df = df[df["สถานะ"] == "Sorting MC"]
     for idx, row in df.iterrows():
-        st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}", unsafe_allow_html=True)
+        st.markdown(
+            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']}",
+            unsafe_allow_html=True
+        )
         col1, col2 = st.columns(2)
         if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Recheck")
@@ -142,11 +148,11 @@ elif menu == "🧾 Waiting Judgement":
                 f"♻️ <b>Recheck</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
                 f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
-                f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
+                f"♻️ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
-        if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{row['Job ID']}_{idx}"):
+        if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Scrap")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
             worksheet.update_cell(idx + 2, 14, user)
@@ -154,7 +160,7 @@ elif menu == "🧾 Waiting Judgement":
                 f"🗑 <b>Scrap</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
                 f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
-                f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
+                f"❌ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
                 f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
@@ -163,13 +169,10 @@ elif menu == "🧾 Waiting Judgement":
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานที่รอการล้าง")
     df = pd.DataFrame(worksheet.get_all_records())
-    if "สถานะ" not in df.columns:
-        st.error("❌ ไม่พบคอลัมน์ 'สถานะ'")
-        st.stop()
     df = df[df["สถานะ"] == "Recheck"]
     for idx, row in df.iterrows():
         st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{row['Job ID']}_{idx}"):
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Cleaned")
             worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
             worksheet.update_cell(idx + 2, 14, user)
