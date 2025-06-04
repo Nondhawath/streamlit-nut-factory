@@ -34,16 +34,19 @@ st.title("🔒 เข้าสู่ระบบ")
 
 if not st.session_state.logged_in:
     user_id = st.text_input("รหัสพนักงาน", type="password")
-    if st.button("Login"):
-        user_id = user_id.strip()  # ตัดช่องว่าง
+    login_clicked = st.button("Login")
+    if login_clicked:
+        user_id = user_id.strip()
         if user_id in users:
             st.session_state.logged_in = True
             st.session_state.user_name = users[user_id]
             st.success(f"✅ ยินดีต้อนรับคุณ {users[user_id]}")
-            st.experimental_rerun()
+            # **ไม่เรียก st.experimental_rerun() ทันที**
         else:
             st.error("❌ รหัสไม่ถูกต้อง กรุณาลองใหม่")
-    st.stop()
+    st.stop()  # หยุดรันส่วนล่างก่อน login เสร็จ
+else:
+    st.success(f"✅ ยินดีต้อนรับคุณ {st.session_state.user_name}")
 
 # ---------------- MAIN APP ---------------- #
 st.title("📦 ระบบบันทึกข้อมูลการรับงาน และส่งซ่อม")
