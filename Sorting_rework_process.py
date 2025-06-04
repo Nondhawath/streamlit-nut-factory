@@ -24,11 +24,10 @@ def now_th():
     return datetime.utcnow() + timedelta(hours=7)
 
 # 🔐 Google Sheet Auth
-SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]  # แนะนำเพิ่ม drive scope ด้วย
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
+SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
-
 # 📗 Sheets
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA")
 worksheet = sheet.worksheet("Data")
