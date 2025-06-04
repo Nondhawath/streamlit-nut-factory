@@ -25,16 +25,19 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_name = ""
 
+st.title("🔒 เข้าสู่ระบบ")
+
 if not st.session_state.logged_in:
-    st.title("🔒 เข้าสู่ระบบ")
     user_id = st.text_input("รหัสพนักงาน", type="password")
-    if user_id in users:
-        st.success(f"ยินดีต้อนรับคุณ {users[user_id]}")
-        st.session_state.logged_in = True
-        st.session_state.user_name = users[user_id]
-    else:
-        st.warning("กรุณากรอกรหัสให้ถูกต้อง")
+    if st.button("Login"):
+        if user_id in users:
+            st.session_state.logged_in = True
+            st.session_state.user_name = users[user_id]
+            st.success(f"✅ ยินดีต้อนรับคุณ {users[user_id]}")
+        else:
+            st.error("❌ รหัสไม่ถูกต้อง กรุณาลองใหม่")
     st.stop()
+
 
 # ---------------- MAIN APP ---------------- #
 st.title("📦 ระบบบันทึกข้อมูลการรับงาน และส่งซ่อม")
