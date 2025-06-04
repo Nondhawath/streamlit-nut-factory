@@ -21,10 +21,6 @@ job_codes = part_code_sheet.col_values(1)[1:]  # ข้าม header
 # ดึง user/pass และแปลงรหัสเป็น string พร้อมตัดช่องว่าง
 employee_data = login_sheet.get_all_records()
 users = {str(emp["รหัส"]).strip(): emp["ชื่อ"] for emp in employee_data}
-
-# Debug ดูข้อมูลที่ดึงมา
-st.write("ข้อมูลพนักงานที่โหลดจาก Google Sheets:", users)
-
 # ---------------- LOGIN ---------------- #
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
