@@ -1,77 +1,70 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import pandas as pd
+import json
 
-# ตั้งค่า credentials และเชื่อมต่อ Google Sheets
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
-client = gspread.authorize(creds)
+# โหลด credentials จาก secrets
+creds_dict = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+    creds_dict,
+    ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets"]
+)
+client = gspread.authorize(credentials)
 
+# Key ของ Google Sheet
 SPREADSHEET_KEY = "1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE"
 
-# เปิดชีทต่าง ๆ
-data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("Data")
-part_code_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OS_part_code_master")
-login_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("ชื่อและรหัสพนักงาน")
+# Load worksheets
+try:
+    data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("Data")
+    user_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("ชื่อและรหัสพนักงาน")
+    part_code_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OS_part_code_master")
+except Exception as e:
+    st.error(f"ไม่สามารถโหลดข้อมูลจาก Google Sheets ได้: {e}")
+    st.stop()
 
-# ดึงรหัสงาน
-job_codes = part_code_sheet.col_values(1)[1:]  # ข้าม header
+# โหลดข้อมูลผู้ใช้
+user_data = user_sheet.get_all_records()
+user_dict = {str(row["รหัส"]): row["ชื่อ"] for row in user_data if row.get("รหัส") and row.get("ชื่อ")}
 
-# ดึง user/pass และแปลงรหัสเป็น string พร้อมตัดช่องว่าง
-employee_data = login_sheet.get_all_records()
-users = {str(emp["รหัส"]).strip(): emp["ชื่อ"] for emp in employee_data}
-# ---------------- LOGIN ---------------- #
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user_name = ""
+# โหลดรหัสงาน
+try:
+    job_codes = part_code_sheet.col_values(1)[1:]  # ข้าม header
+except Exception as e:
+    st.error(f"ไม่สามารถโหลดรหัสงานได้: {e}")
+    st.stop()
 
-st.title("🔒 เข้าสู่ระบบ")
-
-if not st.session_state.logged_in:
-    user_id = st.text_input("รหัสพนักงาน", type="password")
-    login_clicked = st.button("Login")
-    if login_clicked:
-        user_id = user_id.strip()
-        if user_id in users:
-            st.session_state.logged_in = True
-            st.session_state.user_name = users[user_id]
-            st.success(f"✅ ยินดีต้อนรับคุณ {users[user_id]}")
-            # **ไม่เรียก st.experimental_rerun() ทันที**
+# ------------------- UI -------------------
+if "user_name" not in st.session_state:
+    st.title("🔒 เข้าสู่ระบบ")
+    user_code = st.text_input("รหัสพนักงาน", type="password")
+    if st.button("เข้าสู่ระบบ"):
+        if user_code in user_dict:
+            st.session_state.user_name = user_dict[user_code]
+            st.experimental_rerun()
         else:
             st.error("❌ รหัสไม่ถูกต้อง กรุณาลองใหม่")
-    st.stop()  # หยุดรันส่วนล่างก่อน login เสร็จ
-else:
-    st.success(f"✅ ยินดีต้อนรับคุณ {st.session_state.user_name}")
+    st.stop()
 
-# ---------------- MAIN APP ---------------- #
-st.title("📦 ระบบบันทึกข้อมูลการรับงาน และส่งซ่อม")
+# ------------------- หน้าหลัก -------------------
+st.title(f"✅ ยินดีต้อนรับคุณ {st.session_state.user_name}")
 
-mode = st.sidebar.selectbox("โหมด", ["รับงานและบันทึก OK/NG", "ส่งซ่อม", "สรุปประวัติการส่งซ่อม"])
+mode = st.radio("เลือกโหมดการทำงาน", ["รับงานเข้า", "บันทึกงาน OK/NG"])
 
-if mode == "รับงานและบันทึก OK/NG":
-    job = st.selectbox("เลือกชื่องาน", job_codes)
-    qty_in = st.number_input("จำนวนรับเข้า", min_value=0, step=1)
-    ok_qty = st.number_input("จำนวน OK", min_value=0, step=1)
-    ng_qty = st.number_input("จำนวน NG", min_value=0, step=1)
-    if st.button("บันทึกข้อมูล"):
-        data_sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            job, qty_in, st.session_state.user_name, ok_qty, ng_qty, "", ""
-        ])
+selected_job = st.selectbox("เลือกรหัสงาน", job_codes)
+now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+if mode == "รับงานเข้า":
+    qty_in = st.number_input("จำนวนที่รับเข้า", min_value=1, step=1)
+    if st.button("📥 บันทึกงานเข้า"):
+        data_sheet.append_row([now, st.session_state.user_name, selected_job, "รับงานเข้า", qty_in, "", ""])
         st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
 
-elif mode == "ส่งซ่อม":
-    job = st.selectbox("เลือกชื่องาน", job_codes)
-    qty_repair = st.number_input("จำนวนที่ส่งซ่อม", min_value=1, step=1)
-    if st.button("บันทึกการส่งซ่อม"):
-        data_sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            job, "", "", "", "", st.session_state.user_name, qty_repair
-        ])
-        st.success("✅ บันทึกการส่งซ่อมเรียบร้อย")
-
-elif mode == "สรุปประวัติการส่งซ่อม":
-    records = data_sheet.get_all_records()
-    repair_data = [r for r in records if r.get("ผู้ส่งซ่อม")]
-    st.dataframe(repair_data)
+elif mode == "บันทึกงาน OK/NG":
+    qty_ok = st.number_input("จำนวน OK", min_value=0, step=1)
+    qty_ng = st.number_input("จำนวน NG", min_value=0, step=1)
+    if st.button("📝 บันทึกผลการตรวจสอบ"):
+        data_sheet.append_row([now, st.session_state.user_name, selected_job, "บันทึกงาน OK/NG", "", qty_ok, qty_ng])
+        st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
