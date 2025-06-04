@@ -45,20 +45,22 @@ try:
 except:
     part_master = []
 
-# 🆔 Generate Job ID (Robust)
+try:
+    reason_sheet = sheet.worksheet("Reason NG")
+    reason_list = reason_sheet.col_values(reason_sheet.find("Reason").col)[1:]
+except:
+    reason_list = []
+
+# 🆔 สร้าง Job ID ปลอดภัย
 def generate_job_id():
-    try:
-        records = worksheet.get_all_records()
-        prefix = now_th().strftime("%y%m")
-        last_seq = 0
-        for r in records:
-            job_id = str(r.get("Job ID", "")).strip()
-            if job_id.startswith(prefix) and job_id[-4:].isdigit():
-                last_seq = max(last_seq, int(job_id[-4:]))
-        return f"{prefix}{last_seq + 1:04d}"
-    except Exception as e:
-        st.warning(f"⚠️ เกิดข้อผิดพลาดในการสร้าง Job ID: {e}")
-        return f"{now_th().strftime('%y%m')}0001"
+    records = worksheet.get_all_records()
+    prefix = now_th().strftime("%y%m")
+    filtered = [
+        r for r in records
+        if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
+    ]
+    last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
+    return f"{prefix}{last_seq + 1:04d}"
 
 # 🔐 Login
 if "logged_in_user" not in st.session_state:
@@ -81,7 +83,7 @@ user_level = st.session_state.user_level
 st.set_page_config(page_title="Sorting Process", layout="wide")
 st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
 
-# 🔐 สิทธิ์การเข้าถึง
+# 🔐 สิทธิ์เข้าใช้งาน
 allowed_modes = []
 if user_level == "S1":
     allowed_modes = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
@@ -106,13 +108,14 @@ if menu == "📥 Sorting MC":
         checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
         pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
+        reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         total = ng + pending
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
         if submitted:
             row = [
                 now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
                 machine, lot, checked, ng, pending, total,
-                "Sorting MC", "", "", ""
+                "Sorting MC", "", "", "", reason_ng
             ]
             worksheet.append_row(row)
             st.success("✅ บันทึกเรียบร้อย")
@@ -123,7 +126,8 @@ if menu == "📥 Sorting MC":
                 f"🔩 รหัสงาน: {part_code}\n"
                 f"🛠 เครื่อง: {machine}\n"
                 f"📦 Lot: {lot}\n"
-                f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}"
+                f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}\n"
+                f"📋 หัวข้องานเสีย: {reason_ng}"
             )
 
 # 🧾 Waiting Judgement
