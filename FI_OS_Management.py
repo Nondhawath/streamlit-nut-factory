@@ -2,69 +2,96 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import pandas as pd
 import json
 
-# โหลด credentials จาก secrets
+# ตั้งค่า credentials และเชื่อมต่อ Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds_dict = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
-credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-    creds_dict,
-    ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets"]
-)
-client = gspread.authorize(credentials)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
 
-# Key ของ Google Sheet
+# Spreadsheet key
 SPREADSHEET_KEY = "1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE"
 
-# Load worksheets
-try:
-    data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("Data")
-    user_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("ชื่อและรหัสพนักงาน")
-    part_code_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OS_part_code_master")
-except Exception as e:
-    st.error(f"ไม่สามารถโหลดข้อมูลจาก Google Sheets ได้: {e}")
-    st.stop()
+# โหลด worksheets
+data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("Data")
+login_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("ชื่อและรหัสพนักงาน")
+part_code_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OS_part_code_master")
 
-# โหลดข้อมูลผู้ใช้
-user_data = user_sheet.get_all_records()
-user_dict = {str(row["รหัส"]): row["ชื่อ"] for row in user_data if row.get("รหัส") and row.get("ชื่อ")}
+# โหลดข้อมูลสำหรับ login
+login_data = login_sheet.get_all_records()
+users = {str(row['รหัส']): row['ชื่อ'] for row in login_data}
 
 # โหลดรหัสงาน
-try:
-    job_codes = part_code_sheet.col_values(1)[1:]  # ข้าม header
-except Exception as e:
-    st.error(f"ไม่สามารถโหลดรหัสงานได้: {e}")
-    st.stop()
+job_codes = part_code_sheet.col_values(1)[1:]
 
-# ------------------- UI -------------------
-if "user_name" not in st.session_state:
+# สร้าง session state สำหรับ login
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = ""
+
+# --- หน้า Login ---
+if not st.session_state.logged_in:
     st.title("🔒 เข้าสู่ระบบ")
-    user_code = st.text_input("รหัสพนักงาน", type="password")
+    emp_id = st.text_input("รหัสพนักงาน", type="password")
+
     if st.button("เข้าสู่ระบบ"):
-        if user_code in user_dict:
-            st.session_state.user_name = user_dict[user_code]
+        if emp_id in users:
+            st.session_state.logged_in = True
+            st.session_state.username = users[emp_id]
+            st.success(f"✅ ยินดีต้อนรับคุณ {users[emp_id]}")
             st.experimental_rerun()
         else:
             st.error("❌ รหัสไม่ถูกต้อง กรุณาลองใหม่")
     st.stop()
 
-# ------------------- หน้าหลัก -------------------
-st.title(f"✅ ยินดีต้อนรับคุณ {st.session_state.user_name}")
+# --- โหมดหลัก ---
+st.title("📋 ระบบจัดการ OS")
 
-mode = st.radio("เลือกโหมดการทำงาน", ["รับงานเข้า", "บันทึกงาน OK/NG"])
+mode = st.selectbox("เลือกโหมด", ["รับงานเข้า / บันทึก OK-NG", "รับงานซ่อมเข้า"])
 
-selected_job = st.selectbox("เลือกรหัสงาน", job_codes)
-now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+if mode == "รับงานเข้า / บันทึก OK-NG":
+    st.subheader("🛠 รับงานใหม่ หรือบันทึกผล OK/NG")
 
-if mode == "รับงานเข้า":
-    qty_in = st.number_input("จำนวนที่รับเข้า", min_value=1, step=1)
-    if st.button("📥 บันทึกงานเข้า"):
-        data_sheet.append_row([now, st.session_state.user_name, selected_job, "รับงานเข้า", qty_in, "", ""])
-        st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
+    job_code = st.selectbox("เลือกรหัสงาน", job_codes)
+    quantity = st.number_input("จำนวนงาน", min_value=1, step=1)
+    result = st.radio("สถานะงาน", ["OK", "NG"])
+    remark = st.text_input("หมายเหตุเพิ่มเติม (ถ้ามี)")
+    if st.button("บันทึกข้อมูล"):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        job_id = f"{job_code}-{int(datetime.now().timestamp())}"
+        new_row = [timestamp, st.session_state.username, job_code, quantity, result, remark, job_id, "รับงาน"]
+        data_sheet.append_row(new_row)
+        st.success(f"✅ บันทึกข้อมูลแล้ว | Job ID: {job_id}")
 
-elif mode == "บันทึกงาน OK/NG":
-    qty_ok = st.number_input("จำนวน OK", min_value=0, step=1)
-    qty_ng = st.number_input("จำนวน NG", min_value=0, step=1)
-    if st.button("📝 บันทึกผลการตรวจสอบ"):
-        data_sheet.append_row([now, st.session_state.user_name, selected_job, "บันทึกงาน OK/NG", "", qty_ok, qty_ng])
-        st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
+elif mode == "รับงานซ่อมเข้า":
+    st.subheader("🔧 รับงานซ่อมกลับเข้า")
+
+    job_id_input = st.text_input("กรุณาใส่ Job ID ของงานซ่อมที่ส่งออกไป")
+
+    if job_id_input:
+        records = data_sheet.get_all_records()
+        matched_job = None
+        for row in records:
+            if str(row.get("Job ID", "")).strip() == job_id_input.strip() and row.get("สถานะ", "") == "ส่งงานซ่อม":
+                matched_job = row
+                break
+
+        if matched_job:
+            st.markdown(f"""
+                ✅ พบข้อมูล Job ID:
+                - ชื่อผู้ส่ง: **{matched_job['ชื่อผู้ใช้']}**
+                - รหัสงาน: **{matched_job['รหัสงาน']}**
+                - จำนวน: **{matched_job['จำนวน']}**
+                - หมายเหตุ: _{matched_job['หมายเหตุ']}_""")
+
+            remark = st.text_input("หมายเหตุเพิ่มเติม (ถ้ามี)", key="repair_remark")
+
+            if st.button("บันทึกการรับงานซ่อมกลับเข้า"):
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                new_row = [timestamp, st.session_state.username, matched_job['รหัสงาน'], matched_job['จำนวน'], "รับซ่อมเข้า", remark, job_id_input, "รับงานซ่อมเข้า"]
+                data_sheet.append_row(new_row)
+                st.success(f"✅ รับงานซ่อมกลับเข้าเรียบร้อยแล้ว | Job ID: {job_id_input}")
+        else:
+            st.error("❌ ไม่พบ Job ID ที่เคยส่งงานซ่อม หรือสถานะไม่ถูกต้อง")
