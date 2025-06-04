@@ -2,25 +2,37 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import json
 
-# ตั้งค่า credentials
+# --- Google service account credentials (ใส่ข้อมูลจริงของคุณที่นี่) ---
+credentials_json = {
+  "type": "service_account",
+  "project_id": "upheld-modem-461701-h1",
+  "private_key_id": "295195eda574489ba07bdd1fd566c93d9ef6a14a",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANB...\n-----END PRIVATE KEY-----\n",
+  "client_email": "sorting-service@upheld-modem-461701-h1.iam.gserviceaccount.com",
+  "client_id": "103066540725350718650",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sorting-service%40upheld-modem-461701-h1.iam.gserviceaccount.com"
+}
+
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credentials = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_json, scope)
 client = gspread.authorize(credentials)
 
-# เปิด Google Sheets
+# --- เปิด Google Sheets ---
 SPREADSHEET_KEY = "1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE"
-data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("Data")
+data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OSmanagementdata")
 part_code_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OS_part_code_master")
 user_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("ชื่อและรหัสพนักงาน")
 
-# ดึงข้อมูลรหัสงานและพนักงาน
+# --- ดึงข้อมูลรหัสงานและพนักงาน ---
 job_codes = part_code_sheet.col_values(1)[1:]
 user_data_raw = user_sheet.get_all_records()
 user_dict = {str(row["รหัส"]): row["ชื่อ"] for row in user_data_raw}
 
-# เริ่มต้นแอป
+# --- เริ่มต้นแอป ---
 st.set_page_config(page_title="FI_OS_Management", layout="centered")
 
 if "authenticated" not in st.session_state:
