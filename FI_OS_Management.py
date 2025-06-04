@@ -1,111 +1,79 @@
 import streamlit as st
-from datetime import datetime, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
-import pandas as pd
+from datetime import datetime
 
-# เวลาไทย
-def now_th():
-    return datetime.utcnow() + timedelta(hours=7)
-
-# Google Sheets Auth
-SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
+# ตั้งค่า credentials
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_info(st.secrets["GOOGLE_SHEETS_CREDENTIALS"], scopes=SCOPE)
 client = gspread.authorize(creds)
 
-sheet_url = "https://docs.google.com/spreadsheets/d/1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE"
-sheet = client.open_by_url(sheet_url)
-worksheet = sheet.worksheet("Data")  # ใช้ชีทชื่อ Data
+# เปิดชีทต่าง ๆ
+data_sheet = client.open_by_key("1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE").worksheet("Data")
+part_code_sheet = client.open_by_key("1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE").worksheet("OS_part_code_master")
+login_sheet = client.open_by_key("1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE").worksheet("ชื่อและรหัสพนักงาน")
 
-st.set_page_config(page_title="ระบบ Sorting & ซ่อม", layout="wide")
-st.title("📦 ระบบจัดการงาน Sorting & ซ่อม")
+# ดึงรหัสงาน
+job_codes = part_code_sheet.col_values(1)[1:]  # ข้าม header
 
-# โหลดข้อมูล Google Sheet เป็น DataFrame
-@st.cache_data(ttl=60)
-def load_data():
-    data = worksheet.get_all_records()
-    df = pd.DataFrame(data)
-    return df
+# ดึง user/pass
+employee_data = login_sheet.get_all_records()
+users = {emp["รหัส"]: emp["ชื่อ"] for emp in employee_data}
 
-df = load_data()
+# ---------------- LOGIN ---------------- #
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user_name = ""
 
-# เลือกโหมด
-menu = st.sidebar.selectbox("🔍 เลือกโหมด", [
-    "1️⃣ รับงานเข้า",
-    "2️⃣ รับงานซ่อมกลับ",
-    "3️⃣ สรุปประวัติการส่งซ่อม"
-])
-
-# โหมด 1: รับงานเข้า
-if menu == "1️⃣ รับงานเข้า":
-    st.header("📥 รับงานเข้า")
-    with st.form("form_receive_job"):
-        job_name = st.text_input("📌 ชื่องาน")
-        qty_in = st.number_input("📥 จำนวนรับเข้า", min_value=0)
-        received_by = st.text_input("👷‍♂️ ผู้รับเข้า")
-        qty_ok = st.number_input("✅ จำนวน OK", min_value=0, max_value=qty_in)
-        qty_ng = st.number_input("❌ จำนวน NG", min_value=0, max_value=qty_in - qty_ok)
-        repair_by = st.text_input("🔧 ส่งซ่อมโดย (ถ้ามี)")
-        qty_repair = st.number_input("🔁 จำนวนส่งซ่อม", min_value=0, max_value=qty_ng)
-        submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-
-        if submitted:
-            row = [
-                now_th().strftime("%Y-%m-%d %H:%M:%S"),
-                job_name,
-                qty_in,
-                received_by,
-                qty_ok,
-                qty_ng,
-                repair_by,
-                qty_repair,
-                "",  # รับกลับซ่อมแล้วโดย (ว่างตอนนี้)
-                ""   # เวลาได้รับคืน (ว่างตอนนี้)
-            ]
-            worksheet.append_row(row)
-            st.success("✅ บันทึกข้อมูลเรียบร้อย")
-
-# โหมด 2: รับงานซ่อมกลับ
-elif menu == "2️⃣ รับงานซ่อมกลับ":
-    st.header("🔄 รับงานที่ส่งซ่อมกลับ")
-    if "รับกลับซ่อมแล้วโดย" not in df.columns or "เวลาได้รับคืน" not in df.columns:
-        st.error("❌ Google Sheet ต้องมีคอลัมน์ 'รับกลับซ่อมแล้วโดย' และ 'เวลาได้รับคืน'")
+if not st.session_state.logged_in:
+    st.title("🔒 เข้าสู่ระบบ")
+    user_id = st.text_input("รหัสพนักงาน", type="password")
+    if user_id in users:
+        st.success(f"ยินดีต้อนรับคุณ {users[user_id]}")
+        st.session_state.logged_in = True
+        st.session_state.user_name = users[user_id]
     else:
-        df_pending = df[(df["ส่งซ่อมโดย"] != "") & ((df["รับกลับซ่อมแล้วโดย"].isna()) | (df["รับกลับซ่อมแล้วโดย"] == ""))]
-        if df_pending.empty:
-            st.info("📭 ยังไม่มีงานที่รอรับกลับจากซ่อม")
-        else:
-            options = [
-                f"{row['ชื่องาน']} | ส่งซ่อมโดย: {row['ส่งซ่อมโดย']} | จำนวนส่งซ่อม: {row['จำนวนส่งซ่อม']}"
-                for idx, row in df_pending.iterrows()
-            ]
-            selected = st.selectbox("🧾 เลือกงานที่รับกลับจากซ่อม", options)
-            selected_idx = df_pending.index[options.index(selected)]
+        st.warning("กรุณากรอกรหัสให้ถูกต้อง")
+    st.stop()
 
-            repair_received_by = st.text_input("👷‍♂️ ผู้รับกลับจากซ่อม")
-            if st.button("📥 รับกลับเข้าระบบ"):
-                if not repair_received_by:
-                    st.warning("กรุณาระบุชื่อผู้รับกลับจากซ่อม")
-                else:
-                    row_number = selected_idx + 2
-                    worksheet.update_cell(row_number, df.columns.get_loc("รับกลับซ่อมแล้วโดย") + 1, repair_received_by)
-                    worksheet.update_cell(row_number, df.columns.get_loc("เวลาได้รับคืน") + 1, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                    st.success("✅ บันทึกข้อมูลการรับกลับจากซ่อมเรียบร้อย")
-                    st.experimental_rerun()
+# ---------------- MAIN APP ---------------- #
+st.title("📦 ระบบบันทึกข้อมูลการรับงาน และส่งซ่อม")
 
-# โหมด 3: สรุปประวัติการส่งซ่อม
-elif menu == "3️⃣ สรุปประวัติการส่งซ่อม":
-    st.header("📊 สรุปประวัติการส่งซ่อม")
-    if "ส่งซ่อมโดย" not in df.columns or "จำนวนส่งซ่อม" not in df.columns:
-        st.error("❌ Google Sheet ต้องมีคอลัมน์ 'ส่งซ่อมโดย' และ 'จำนวนส่งซ่อม'")
-    else:
-        df_repair = df[df["ส่งซ่อมโดย"] != ""]
-        if df_repair.empty:
-            st.info("📭 ยังไม่มีประวัติการส่งซ่อม")
-        else:
-            st.dataframe(df_repair[[
-                "วันที่", "ชื่องาน", "จำนวนส่งซ่อม", "ส่งซ่อมโดย", "รับกลับซ่อมแล้วโดย", "เวลาได้รับคืน"
-            ]])
-            summary = df_repair.groupby("ส่งซ่อมโดย")["จำนวนส่งซ่อม"].sum().reset_index()
-            st.markdown("### 📌 สรุปจำนวนส่งซ่อมแยกตามผู้ส่งซ่อม")
-            st.dataframe(summary)
+mode = st.sidebar.selectbox("โหมด", ["รับงานเข้า", "บันทึกงาน OK/NG", "ส่งซ่อม", "สรุปประวัติการส่งซ่อม"])
+
+if mode == "รับงานเข้า":
+    job = st.selectbox("เลือกชื่องาน", job_codes)
+    qty = st.number_input("จำนวนรับเข้า", min_value=1)
+    if st.button("บันทึก"):
+        data_sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Time stamp
+            job, qty, st.session_state.user_name, "", "", "", "", ""  # ช่องอื่นเว้นว่าง
+        ])
+        st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว")
+
+elif mode == "บันทึกงาน OK/NG":
+    job = st.selectbox("เลือกชื่องาน", job_codes)
+    ok_qty = st.number_input("จำนวน OK", min_value=0)
+    ng_qty = st.number_input("จำนวน NG", min_value=0)
+    if st.button("บันทึกผล"):
+        data_sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            job, "", "", ok_qty, ng_qty, "", ""  # ช่องอื่นเว้นว่าง
+        ])
+        st.success("✅ บันทึกผลการตรวจเรียบร้อย")
+
+elif mode == "ส่งซ่อม":
+    job = st.selectbox("เลือกชื่องาน", job_codes)
+    qty_repair = st.number_input("จำนวนที่ส่งซ่อม", min_value=1)
+    if st.button("บันทึกการส่งซ่อม"):
+        data_sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            job, "", "", "", "", st.session_state.user_name, qty_repair
+        ])
+        st.success("✅ บันทึกการส่งซ่อมเรียบร้อย")
+
+elif mode == "สรุปประวัติการส่งซ่อม":
+    records = data_sheet.get_all_records()
+    repair_data = [r for r in records if r.get("ผู้ส่งซ่อม")]
+    st.dataframe(repair_data)
+
