@@ -25,7 +25,7 @@ def now_th():
 
 # 🔐 Google Sheet Auth
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]  # แนะนำเพิ่ม drive scope ด้วย
-service_account_info = json.loads(st.secrets["GOOGLE_SHEETS_CREDENTIALS"])  # แปลง JSON string เป็น dict
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
