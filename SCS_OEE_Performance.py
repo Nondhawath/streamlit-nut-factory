@@ -8,21 +8,28 @@ from datetime import date
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 client = gspread.authorize(credentials)
-
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1gIBZmGn86zzJWECO7Kzy5c0ibOdN1N_3Ys58M80b0kk")
 
-# โหลดชีตต่างๆ
+# โหลดข้อมูลจากชีตต่าง ๆ
 machines_df = pd.DataFrame(sheet.worksheet("Machines").get_all_records())
 employees_df = pd.DataFrame(sheet.worksheet("Employees").get_all_records())
 breakdowns_df = pd.DataFrame(sheet.worksheet("Breakdowns").get_all_records())
 oee_log_df = pd.DataFrame(sheet.worksheet("OEE_Log").get_all_records())
 
-# ส่วน UI
+# ฟังก์ชันคำนวณ OEE
+def calculate_oee(df):
+    df["Availability"] = df["Runtime"] / (df["Runtime"] + df["Downtime"])
+    df["Performance"] = df["Runtime"] / (df["TotalProduced"].replace(0, 1) * 1)  # สมมุติ Cycle time = 1 นาที
+    df["Quality"] = (df["TotalProduced"] - df["Defects"]) / df["TotalProduced"].replace(0, 1)
+    df["OEE"] = df["Availability"] * df["Performance"] * df["Quality"]
+    return df
+
+# UI Layout
 st.title("SCS OEE Performance")
 
-tab1, tab2 = st.tabs(["📝 บันทึก OEE", "📊 ข้อมูลทั้งหมด"])
+tab1, tab2, tab3 = st.tabs(["📝 บันทึก OEE", "📊 ดูข้อมูลทั้งหมด", "📈 Dashboard OEE"])
 
-# 📝 Tab 1: ฟอร์มบันทึกข้อมูล
+# TAB 1: ฟอร์มบันทึก OEE
 with tab1:
     with st.form("log_oee_form"):
         col1, col2 = st.columns(2)
@@ -45,7 +52,7 @@ with tab1:
             oee_sheet.append_row(new_row)
             st.success("✅ บันทึกข้อมูลสำเร็จแล้ว!")
 
-# 📊 Tab 2: แสดงข้อมูลทั้งหมด
+# TAB 2: ดูข้อมูลทั้งหมด
 with tab2:
     st.subheader("เครื่องจักร")
     st.dataframe(machines_df)
@@ -58,3 +65,19 @@ with tab2:
 
     st.subheader("OEE Log")
     st.dataframe(oee_log_df)
+
+# TAB 3: Dashboard วิเคราะห์ OEE
+with tab3:
+    if not oee_log_df.empty:
+        df = oee_log_df.copy()
+        numeric_cols = ["Runtime", "Downtime", "Defects", "TotalProduced"]
+        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
+
+        df = calculate_oee(df)
+        st.subheader("ตารางวิเคราะห์ OEE")
+        st.dataframe(df[["Date", "MachineID", "Availability", "Performance", "Quality", "OEE"]])
+
+        avg_oee = df["OEE"].mean() * 100
+        st.metric("📊 ค่าเฉลี่ย OEE", f"{avg_oee:.2f}%")
+    else:
+        st.warning("ยังไม่มีข้อมูลใน OEE_Log")
