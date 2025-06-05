@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+from pytz import timezone
 
 # ✅ โหลด credentials จาก secrets
 creds_dict = st.secrets["GOOGLE_CREDENTIALS"]
@@ -47,9 +48,11 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# ✅ แบบฟอร์ม
+# ✅ UI ฟอร์ม
 st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
-date = st.date_input("📅 วันที่", value=datetime.today())
+now = datetime.now(timezone("Asia/Bangkok"))  # Timestamp GMT+7
+st.info(f"🕓 เวลา: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
 inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
 shift = st.selectbox("🕐 กะ", ["D", "N"])
 process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
@@ -64,7 +67,7 @@ machine = st.selectbox("🛠 เลือกเครื่องจักร", 
 
 st.markdown("---")
 
-# ✅ แสดง Checklist
+# ✅ รายการ Checklist
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
@@ -75,14 +78,14 @@ for item in checklist:
         reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
         results.append((item, result, reason))
 
-# ✅ ปุ่มบันทึก (ไม่บันทึกแผนกแล้ว)
+# ✅ ปุ่มบันทึก
 if st.button("📤 บันทึกลง Google Sheets"):
     if not machine:
         st.error("⚠️ กรุณาเลือกเครื่องจักรก่อนบันทึก")
         st.stop()
 
     row_data = [
-        date.strftime("%Y-%m-%d"),
+        now.strftime("%Y-%m-%d %H:%M:%S"),
         inspector,
         shift,
         process,
