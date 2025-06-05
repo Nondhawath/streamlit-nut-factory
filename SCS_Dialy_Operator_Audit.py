@@ -17,12 +17,20 @@ SCOPE = [
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
 client = gspread.authorize(creds)
 
-# ✅ เชื่อม Google Sheet
+# ✅ เชื่อม Google Sheets
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1z52GqjoO7NWiuxZNfoZrEcb8Sx_ZkpTa3InwweKXH5w/edit#gid=0"
 spreadsheet = client.open_by_url(SHEET_URL)
-sheet = spreadsheet.worksheet("Checklist")
 
-# ✅ Checklist
+# ✅ โหลดชีตต่าง ๆ
+sheet = spreadsheet.worksheet("Checklist")
+machines_sheet = spreadsheet.worksheet("Machines")
+emp_sheet = spreadsheet.worksheet("Employees")
+
+# ✅ โหลดข้อมูลเครื่องจักรและพนักงาน
+machines_df = pd.DataFrame(machines_sheet.get_all_records())
+emp_df = pd.DataFrame(emp_sheet.get_all_records())
+
+# ✅ หัวข้อ Checklist
 checklist = [
     "1.1 สวมใส่ PPE ครบถ้วนและถูกต้อง",
     "1.2 ทวนสอบความพร้อมของพนักงาน (ไม่เจ็บป่วย)",
@@ -39,27 +47,28 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# ✅ UI ฟอร์ม
+# ✅ แบบฟอร์มส่วนหัว
 st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
 date = st.date_input("📅 วันที่", value=datetime.today())
 inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
 shift = st.selectbox("🕐 กะ", ["D", "N"])
 process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
-# ✅ โหลดเครื่องจักรจากชีต Machines ตามกระบวนการ
-machines_sheet = spreadsheet.worksheet("Machines")
-machines_df = pd.DataFrame(machines_sheet.get_all_records())
-filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
+# ✅ เลือกพนักงาน
+emp_names = emp_df["ชื่อพนักงาน"].tolist()
+employee = st.selectbox("👷‍♂️ พนักงานที่ตรวจ", emp_names)
 
-if not filtered_machines:
-    st.warning("⚠️ ไม่พบเครื่องจักรในกระบวนการนี้")
-    machine = ""
-else:
-    machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines)
+# ✅ แสดงแผนกจากข้อมูล
+department = emp_df[emp_df["ชื่อพนักงาน"] == employee]["แผนก"].values[0]
+st.text_input("🏢 แผนก", department, disabled=True)
+
+# ✅ เลือกเครื่องจักร
+filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
+machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines) if filtered_machines else ""
 
 st.markdown("---")
 
-# ✅ แสดง Checklist
+# ✅ รายการ Checklist
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
@@ -70,17 +79,25 @@ for item in checklist:
         reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
         results.append((item, result, reason))
 
-# ✅ บันทึกลง Google Sheets
+# ✅ บันทึกแบบแนวนอน
 if st.button("📤 บันทึกลง Google Sheets"):
-    for item, result, reason in results:
-        sheet.append_row([
-            date.strftime("%Y-%m-%d"),
-            inspector,
-            shift,
-            process,
-            machine,
-            item,
-            "ผ่าน" if result == "✔️ ผ่าน" else "ไม่ผ่าน",
-            reason
-        ])
+    if not machine:
+        st.error("⚠️ กรุณาเลือกเครื่องจักรก่อนบันทึก")
+        st.stop()
+
+    row_data = [
+        date.strftime("%Y-%m-%d"),
+        inspector,
+        shift,
+        process,
+        machine,
+        employee,
+        department
+    ]
+
+    # เพิ่มผลลัพธ์ของ checklist
+    for _, result, reason in results:
+        row_data.append("✔️" if result == "✔️ ผ่าน" else f"❌ ({reason})")
+
+    sheet.append_row(row_data)
     st.success("✅ บันทึกเรียบร้อยแล้ว!")
