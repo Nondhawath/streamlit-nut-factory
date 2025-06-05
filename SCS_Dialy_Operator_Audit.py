@@ -4,7 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# ✅ โหลด credentials จาก secrets (dict style)
+# ✅ โหลด credentials จาก secrets
 creds_dict = st.secrets["GOOGLE_CREDENTIALS"]
 
 # ✅ ตั้งค่า Scope และเชื่อมต่อ
@@ -47,7 +47,7 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# ✅ แบบฟอร์มส่วนหัว
+# ✅ แบบฟอร์ม
 st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
 date = st.date_input("📅 วันที่", value=datetime.today())
 inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
@@ -58,17 +58,13 @@ process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 emp_names = emp_df["ชื่อพนักงาน"].tolist()
 employee = st.selectbox("👷‍♂️ พนักงานที่ตรวจ", emp_names)
 
-# ✅ แสดงแผนกจากข้อมูล
-department = emp_df[emp_df["ชื่อพนักงาน"] == employee]["แผนก"].values[0]
-st.text_input("🏢 แผนก", department, disabled=True)
-
-# ✅ เลือกเครื่องจักร
+# ✅ เลือกเครื่องจักรจาก process
 filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
 machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines) if filtered_machines else ""
 
 st.markdown("---")
 
-# ✅ รายการ Checklist
+# ✅ แสดง Checklist
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
@@ -79,7 +75,7 @@ for item in checklist:
         reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
         results.append((item, result, reason))
 
-# ✅ บันทึกแบบแนวนอน
+# ✅ ปุ่มบันทึก (ไม่บันทึกแผนกแล้ว)
 if st.button("📤 บันทึกลง Google Sheets"):
     if not machine:
         st.error("⚠️ กรุณาเลือกเครื่องจักรก่อนบันทึก")
@@ -91,11 +87,9 @@ if st.button("📤 บันทึกลง Google Sheets"):
         shift,
         process,
         machine,
-        employee,
-        department
+        employee
     ]
 
-    # ✅ เพิ่มผลลัพธ์ของ checklist แบบข้อความเต็ม
     for _, result, reason in results:
         if result == "✔️ ผ่าน":
             row_data.append("✅ ผ่าน")
