@@ -3,11 +3,14 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import json
+from io import StringIO
 
-# ✅ ใช้ dict ตรงจาก st.secrets (ไม่ต้อง json.load)
-creds_dict = st.secrets["GOOGLE_CREDENTIALS"]
+# ✅ โหลด credentials จาก secrets (แบบ string → dict)
+creds_json = st.secrets["GOOGLE_CREDENTIALS"]
+creds_dict = json.load(StringIO(creds_json))
 
-# เชื่อมต่อ Google Sheets
+# ✅ สร้าง Credentials object
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/spreadsheets",
@@ -17,12 +20,12 @@ SCOPE = [
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
 client = gspread.authorize(creds)
 
-# 🔗 ลิงก์ Google Sheet และ Worksheet
+# ✅ เชื่อม Google Sheet
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1z52GqjoO7NWiuxZNfoZrEcb8Sx_ZkpTa3InwweKXH5w/edit#gid=0"
 spreadsheet = client.open_by_url(SHEET_URL)
 sheet = spreadsheet.worksheet("Checklist")
 
-# ✅ รายการ Checklist
+# ✅ Checklist
 checklist = [
     "1.1 สวมใส่ PPE ครบถ้วนและถูกต้อง",
     "1.2 ทวนสอบความพร้อมของพนักงาน (ไม่เจ็บป่วย)",
@@ -39,7 +42,7 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# ✅ ส่วน UI
+# ✅ UI แบบฟอร์ม
 st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
 date = st.date_input("📅 วันที่", value=datetime.today())
 inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
@@ -58,7 +61,7 @@ for item in checklist:
         reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
         results.append((item, result, reason))
 
-# ✅ บันทึกข้อมูล
+# ✅ ปุ่มบันทึก
 if st.button("📤 บันทึกลง Google Sheets"):
     for item, result, reason in results:
         sheet.append_row([
