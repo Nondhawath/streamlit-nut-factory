@@ -4,10 +4,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# ✅ โหลด credentials จาก secrets (แบบ dict)
+# ✅ โหลด credentials จาก secrets (dict style)
 creds_dict = st.secrets["GOOGLE_CREDENTIALS"]
 
-# ✅ สร้าง Credentials object
+# ✅ ตั้งค่า Scope และเชื่อมต่อ
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/spreadsheets",
@@ -39,15 +39,27 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# ✅ UI แบบฟอร์ม
+# ✅ UI ฟอร์ม
 st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
 date = st.date_input("📅 วันที่", value=datetime.today())
 inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
 shift = st.selectbox("🕐 กะ", ["D", "N"])
 process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
+# ✅ โหลดเครื่องจักรจากชีต Machines ตามกระบวนการ
+machines_sheet = spreadsheet.worksheet("Machines")
+machines_df = pd.DataFrame(machines_sheet.get_all_records())
+filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
+
+if not filtered_machines:
+    st.warning("⚠️ ไม่พบเครื่องจักรในกระบวนการนี้")
+    machine = ""
+else:
+    machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines)
+
 st.markdown("---")
 
+# ✅ แสดง Checklist
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
@@ -58,7 +70,7 @@ for item in checklist:
         reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
         results.append((item, result, reason))
 
-# ✅ ปุ่มบันทึก
+# ✅ บันทึกลง Google Sheets
 if st.button("📤 บันทึกลง Google Sheets"):
     for item, result, reason in results:
         sheet.append_row([
@@ -66,6 +78,7 @@ if st.button("📤 บันทึกลง Google Sheets"):
             inspector,
             shift,
             process,
+            machine,
             item,
             "ผ่าน" if result == "✔️ ผ่าน" else "ไม่ผ่าน",
             reason
