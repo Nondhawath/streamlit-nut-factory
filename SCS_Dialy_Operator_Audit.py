@@ -95,9 +95,12 @@ if st.button("📤 บันทึกลง Google Sheets"):
         department
     ]
 
-    # เพิ่มผลลัพธ์ของ checklist
+    # ✅ เพิ่มผลลัพธ์ของ checklist แบบข้อความเต็ม
     for _, result, reason in results:
-        row_data.append("✔️" if result == "✔️ ผ่าน" else f"❌ ({reason})")
+        if result == "✔️ ผ่าน":
+            row_data.append("✅ ผ่าน")
+        else:
+            row_data.append(f"❌ ไม่ผ่าน เหตุผล: {reason}")
 
     sheet.append_row(row_data)
     st.success("✅ บันทึกเรียบร้อยแล้ว!")
