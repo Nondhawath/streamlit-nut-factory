@@ -133,21 +133,28 @@ if menu == "📥 Sorting MC":
                 f"📋 หัวข้องานเสีย: {reason_ng}"
             )
 
-# 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
     df = pd.DataFrame(worksheet.get_all_records())
-    if "สถานะ" not in df.columns:
-        st.warning("⚠️ ไม่มีข้อมูลสถานะใน Google Sheet")
+
+    if "สถานะ" not in df.columns or "วันที่" not in df.columns:
+        st.warning("⚠️ ไม่มีข้อมูลสถานะหรือวันที่ใน Google Sheet")
         st.stop()
+
     df = df[df["สถานะ"] == "Sorting MC"]
+
+    # เรียงลำดับจากรายการล่าสุด
+    df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
+    df = df.sort_values(by="วันที่", ascending=False)
+
     for idx, row in df.iterrows():
-    timestamp = row.get("วันที่", "")
-    st.markdown(
-        f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']} "
-        f"| 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
-        unsafe_allow_html=True
-    )
+        timestamp = row.get("วันที่", "")
+        st.markdown(
+            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']} "
+            f"| 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
+            unsafe_allow_html=True
+        )
+
         col1, col2 = st.columns(2)
         if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Recheck")
@@ -162,6 +169,7 @@ elif menu == "🧾 Waiting Judgement":
                 f"👷‍♂️ โดย: {user}"
             )
             st.rerun()
+
         if col2.button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Scrap")
             worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
