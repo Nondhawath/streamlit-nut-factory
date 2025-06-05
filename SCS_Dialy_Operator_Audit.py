@@ -8,7 +8,7 @@ from pytz import timezone
 # ✅ โหลด credentials จาก secrets
 creds_dict = st.secrets["GOOGLE_CREDENTIALS"]
 
-# ✅ ตั้งค่า Scope และเชื่อมต่อ
+# ✅ เชื่อมต่อ Google Sheets
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/spreadsheets",
@@ -18,11 +18,10 @@ SCOPE = [
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
 client = gspread.authorize(creds)
 
-# ✅ เชื่อม Google Sheets
+# ✅ เปิด Spreadsheet
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1z52GqjoO7NWiuxZNfoZrEcb8Sx_ZkpTa3InwweKXH5w/edit#gid=0"
 spreadsheet = client.open_by_url(SHEET_URL)
 
-# ✅ โหลดชีตต่าง ๆ
 sheet = spreadsheet.worksheet("Checklist")
 machines_sheet = spreadsheet.worksheet("Machines")
 emp_sheet = spreadsheet.worksheet("Employees")
@@ -48,26 +47,26 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# ✅ UI ฟอร์ม
+# ✅ ฟอร์ม
 st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
-now = datetime.now(timezone("Asia/Bangkok"))  # Timestamp GMT+7
+now = datetime.now(timezone("Asia/Bangkok"))
 st.info(f"🕓 เวลา: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
 inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
 shift = st.selectbox("🕐 กะ", ["D", "N"])
 process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
-# ✅ เลือกพนักงาน
+# ✅ พนักงาน
 emp_names = emp_df["ชื่อพนักงาน"].tolist()
 employee = st.selectbox("👷‍♂️ พนักงานที่ตรวจ", emp_names)
 
-# ✅ เลือกเครื่องจักรจาก process
+# ✅ เครื่องจักร
 filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
 machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines) if filtered_machines else ""
 
 st.markdown("---")
 
-# ✅ รายการ Checklist
+# ✅ Checklist
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
@@ -75,11 +74,19 @@ for item in checklist:
         st.markdown(f"**{item}**")
     with col2:
         result = st.radio("ผล", ["✔️ ผ่าน", "❌ ไม่ผ่าน"], key=item)
-        reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
+        if result == "❌ ไม่ผ่าน":
+            selected_reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason")
+            if selected_reason == "อื่น ๆ":
+                custom_reason = st.text_input("กรุณาระบุเหตุผล", key=f"{item}_custom_reason")
+                reason = f"อื่น ๆ: {custom_reason}" if custom_reason else "อื่น ๆ"
+            else:
+                reason = selected_reason
+        else:
+            reason = ""
         results.append((item, result, reason))
 
-# ✅ ปุ่มบันทึก
-if st.button("📤 บันทึกข้อมูล"):
+# ✅ บันทึกแนวนอน
+if st.button("📤 บันทึกลง Google Sheets"):
     if not machine:
         st.error("⚠️ กรุณาเลือกเครื่องจักรก่อนบันทึก")
         st.stop()
