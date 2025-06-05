@@ -3,26 +3,26 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import json
-from io import StringIO
 
-# โหลด credentials จาก secrets
-creds_json = st.secrets["GOOGLE_CREDENTIALS"]
-creds_dict = json.load(StringIO(creds_json))
+# ✅ ใช้ dict ตรงจาก st.secrets (ไม่ต้อง json.load)
+creds_dict = st.secrets["GOOGLE_CREDENTIALS"]
 
 # เชื่อมต่อ Google Sheets
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
-         "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive"
+]
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
 client = gspread.authorize(creds)
 
-# เปิดชีตที่ต้องการ
+# 🔗 ลิงก์ Google Sheet และ Worksheet
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1z52GqjoO7NWiuxZNfoZrEcb8Sx_ZkpTa3InwweKXH5w/edit#gid=0"
 spreadsheet = client.open_by_url(SHEET_URL)
 sheet = spreadsheet.worksheet("Checklist")
 
-# หัวข้อ Checklist
+# ✅ รายการ Checklist
 checklist = [
     "1.1 สวมใส่ PPE ครบถ้วนและถูกต้อง",
     "1.2 ทวนสอบความพร้อมของพนักงาน (ไม่เจ็บป่วย)",
@@ -39,27 +39,26 @@ checklist = [
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
-# Input ฟิลด์
-st.title("แบบฟอร์ม Check Sheet พนักงาน")
-date = st.date_input("วันที่", value=datetime.today())
-inspector = st.text_input("ชื่อผู้ตรวจสอบ")
-shift = st.selectbox("กะ", ["D", "N"])
-process = st.selectbox("กระบวนการ", ["FM", "TP", "FI"])
+# ✅ ส่วน UI
+st.title("📋 แบบฟอร์ม Check Sheet พนักงาน")
+date = st.date_input("📅 วันที่", value=datetime.today())
+inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
+shift = st.selectbox("🕐 กะ", ["D", "N"])
+process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
 st.markdown("---")
 
-# รายการตรวจ
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
     with col1:
         st.markdown(f"**{item}**")
     with col2:
-        result = st.radio("", ["✔️ ผ่าน", "❌ ไม่ผ่าน"], key=item)
+        result = st.radio("ผล", ["✔️ ผ่าน", "❌ ไม่ผ่าน"], key=item)
         reason = st.selectbox("เหตุผล", fail_reasons, key=f"{item}_reason") if result == "❌ ไม่ผ่าน" else ""
         results.append((item, result, reason))
 
-# กดบันทึก
+# ✅ บันทึกข้อมูล
 if st.button("📤 บันทึกลง Google Sheets"):
     for item, result, reason in results:
         sheet.append_row([
