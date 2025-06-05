@@ -6,17 +6,19 @@ from datetime import datetime
 import json
 from io import StringIO
 
-# ✅ โหลด credentials จาก secrets (แบบ string → dict)
+# ✅ โหลดและแปลง GOOGLE_CREDENTIALS จาก Secrets
 creds_json = st.secrets["GOOGLE_CREDENTIALS"]
 creds_dict = json.load(StringIO(creds_json))
 
-# ✅ สร้าง Credentials object
+# ✅ กำหนด SCOPE ก่อนใช้งาน
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive"
 ]
+
+# ✅ สร้าง Credentials object
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
 client = gspread.authorize(creds)
 
