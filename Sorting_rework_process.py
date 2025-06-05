@@ -148,7 +148,6 @@ elif menu == "🧾 Waiting Judgement":
         f"| 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
         unsafe_allow_html=True
     )
-        )
         col1, col2 = st.columns(2)
         if col1.button(f"♻️ Recheck - {row['Job ID']}", key=f"recheck_{row['Job ID']}_{idx}"):
             worksheet.update_cell(idx + 2, 11, "Recheck")
