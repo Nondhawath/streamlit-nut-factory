@@ -13,7 +13,7 @@ credentials = Credentials.from_service_account_info(
 )
 
 client = gspread.authorize(credentials)
-sheet = client.open("SCS_OEE_Data")
+sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1gIBZmGn86zzJWECO7Kzy5c0ibOdN1N_3Ys58M80b0kk")
 
 # อ่านข้อมูลจากชีตต่างๆ
 machines_df = pd.DataFrame(sheet.worksheet("Machines").get_all_records())
