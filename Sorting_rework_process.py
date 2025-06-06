@@ -28,11 +28,12 @@ SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis
 service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
+
 # 📗 Sheets
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA")
 worksheet = sheet.worksheet("Data")
 
-# 🔁 Load Master
+# 🔁 Load Master Data
 try:
     emp_data = sheet.worksheet("employee_master").get_all_records()
     emp_master = [row["ชื่อพนักงาน"] for row in emp_data]
@@ -51,13 +52,13 @@ try:
     reason_list = reason_sheet.col_values(reason_sheet.find("Reason").col)[1:]
 except:
     reason_list = []
+
+# 🔧 Machines Data
 try:
     machines_data = sheet.worksheet("machines").get_all_records()
     machines_list = [row["machines_name"] for row in machines_data]
 except:
     machines_list = []
-
-# (ต่อโค้ดส่วนอื่น ๆ เหมือนเดิม)
 
 # 🆔 สร้าง Job ID ปลอดภัย
 def generate_job_id():
@@ -70,7 +71,7 @@ def generate_job_id():
     last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
     return f"{prefix}{last_seq + 1:04d}"
 
-# 🔐 Login
+# 🔐 Login Process
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
         st.subheader("🔐 เข้าสู่ระบบ")
@@ -138,6 +139,7 @@ if menu == "📥 Sorting MC":
                 f"📋 หัวข้องานเสีย: {reason_ng}"
             )
 
+# 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
     df = pd.DataFrame(worksheet.get_all_records())
