@@ -58,7 +58,7 @@ process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
 # ✅ พนักงาน
 emp_names = emp_df["ชื่อพนักงาน"].tolist()
-employee = st.selectbox("👷‍♂️ พนักงานที่รับการตรวจ", emp_names)
+employee = st.selectbox("👷‍♂️ พนักงานที่รับการตรวจสอบ", emp_names)
 
 # ✅ เครื่องจักร
 filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
