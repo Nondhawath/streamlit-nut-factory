@@ -51,6 +51,11 @@ try:
     reason_list = reason_sheet.col_values(reason_sheet.find("Reason").col)[1:]
 except:
     reason_list = []
+try:
+    machines_data = sheet.worksheet("machines").get_all_records()
+    machines_list = [row["machines_name"] for row in machines_data]
+except:
+    machines_list = []
 
 # (ต่อโค้ดส่วนอื่น ๆ เหมือนเดิม)
 
@@ -106,7 +111,7 @@ if menu == "📥 Sorting MC":
         job_id = generate_job_id()
         st.markdown(f"**🆔 Job ID:** `{job_id}`")
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
-        machine = st.selectbox("🛠 เครื่อง", [f"SM{i:02}" for i in range(1, 31)])
+        machine = st.selectbox("🛠 เครื่อง", machines_list)  # ใช้เครื่องจักรจาก machines_list
         lot = st.text_input("📦 Lot Number")
         checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
