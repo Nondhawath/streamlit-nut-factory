@@ -30,8 +30,13 @@ creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA")
-worksheet = sheet.worksheet("Data")
+sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
+try:
+    sheet = client.open_by_key(sheet_id)
+    worksheet = sheet.worksheet("Data")
+except gspread.exceptions.APIError as e:
+    st.error(f"⚠️ Error accessing Google Sheets: {e}")
+    st.stop()
 
 # 🔁 Load Master Data
 def load_master_data():
