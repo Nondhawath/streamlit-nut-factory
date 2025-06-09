@@ -1,60 +1,44 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from datetime import datetime
 
-# เพิ่มข้อความต้อนรับ
-st.title("Manufacturing Job Assignment System")
-st.markdown("Welcome to the job assignment system. Please input the job details, assign it to a machine, and track the utilization.")
+# สร้างข้อมูลงานจำลอง (มากกว่า 20 งาน) และจำนวนที่สุ่ม
+job_names = [f"Job {i}" for i in range(1, 21)]  # สร้างชื่องานให้มากกว่า 20 งาน
+quantities = np.random.randint(10000, 100000, size=len(job_names))  # สุ่มจำนวนหลักหมื่นถึงหลักแสน
 
-# สร้างข้อมูลจำลองสำหรับเครื่องจักร
-machines_data = pd.DataFrame({
-    "machines_name": ["Machine A", "Machine B", "Machine C", "Machine D"],
-    "status": ["Idle", "Running", "Idle", "Running"]
+# สร้าง DataFrame จำลองสำหรับงาน
+jobs_data = pd.DataFrame({
+    "Job Name": job_names,
+    "Quantity": quantities,
+    "Delivery Date": pd.date_range(start=datetime.today(), periods=len(job_names), freq='D')
 })
 
-# แสดงข้อมูลเครื่องจักรในตารางที่ดูดี
-st.subheader("Available Machines")
-st.write("Below are the available machines:")
-st.dataframe(machines_data.style.highlight_max(axis=0))  # Highlight max values for better UX
+# สร้าง Dashboard ที่แสดงข้อมูลงาน
+st.title("Manufacturing Job Dashboard")
+st.markdown("This is the job dashboard where you can select a job, assign it to a machine, and track utilization.")
 
-# ฟอร์มการอัปโหลดแผนงาน
-st.subheader("Upload Job Plan")
+# แสดงตารางงานที่มีข้อมูลจำลอง
+st.subheader("Available Jobs")
+st.write("Below are the available jobs with quantity and delivery date:")
+st.dataframe(jobs_data.style.highlight_max(axis=0))  # ใช้ style เพื่อไฮไลท์ค่ามากที่สุด
 
-# ให้ผู้ใช้กรอกข้อมูลแผนงาน
-job_name = st.text_input("Job Name", placeholder="Enter the job name")
-quantity = st.number_input("Quantity", min_value=1, step=1, placeholder="Enter the quantity")
-delivery_date = st.date_input("Delivery Date", min_value=datetime.today())
-
-# เพิ่มไอคอนและข้อความแนะนำ
-st.markdown("### Job Information")
-st.markdown("Fill in the job details and click `Upload Plan` to add it to the job list.")
-
-# การอัปโหลดแผนงานไปยัง DataFrame
-if st.button("Upload Plan"):
-    plan_data = {
-        'Job Name': job_name,
-        'Quantity': quantity,
-        'Delivery Date': str(delivery_date)
-    }
-    
-    # สร้าง DataFrame จำลองสำหรับแผนงาน
-    plan_df = pd.DataFrame([plan_data])
-
-    # แสดงแผนงานในรูปแบบที่สวยงาม
-    st.markdown("### Uploaded Plan")
-    st.write(plan_df)
-    st.success("Plan uploaded successfully!", icon="✅")
-
-# เพิ่มการเลือกเครื่องจักรจากตาราง
+# ฟอร์มการเลือกงานจากตาราง
 st.subheader("Assign Job to Machine")
-selected_machine = st.selectbox("Select Machine", machines_data['machines_name'])
+selected_job = st.selectbox("Select Job", jobs_data['Job Name'])
 
-# การแสดงข้อความเมื่อเลือกเครื่องจักร
-if selected_machine:
-    st.write(f"Job will be assigned to: **{selected_machine}**")
+# การแสดงข้อมูลของงานที่เลือก
+if selected_job:
+    job_details = jobs_data[jobs_data['Job Name'] == selected_job].iloc[0]
+    st.write(f"**Job Name**: {job_details['Job Name']}")
+    st.write(f"**Quantity**: {job_details['Quantity']}")
+    st.write(f"**Delivery Date**: {job_details['Delivery Date']}")
+
+    # เลือกเครื่องจักรที่จะแต่งตั้งงาน
+    selected_machine = st.selectbox("Select Machine", ["Machine A", "Machine B", "Machine C", "Machine D"])
+
+    # เลือกเวลาสำหรับการทำงาน
     st.markdown("### Set Start and End Time for the Job")
-
-    # บันทึกเวลา Start และ End สำหรับการทำงาน
     start_time = st.time_input("Start Time", datetime(2025, 6, 9, 8, 0))
     end_time = st.time_input("End Time", datetime(2025, 6, 9, 16, 0))
 
@@ -64,19 +48,15 @@ if selected_machine:
     else:
         duration = 0
 
-    # เพิ่มปุ่ม Start และ End
     if st.button("Start Job"):
         st.write(f"Job started at {start_time}, duration: {duration} hours", icon="🕒")
 
     if st.button("End Job"):
         st.write(f"Job ended at {end_time}, duration: {duration} hours", icon="⏹️")
 
-    # แสดง % Utilization ของเครื่องจักร
+    # คำนวณ % Utilization ของเครื่องจักร
     total_available_time = 8  # เวลาเครื่องจักรสามารถทำงานได้ใน 1 วัน
-    assignments = [
-        {'machine': selected_machine, 'job': job_name, 'start_time': start_time, 'end_time': end_time, 'duration': duration}
-    ]
-    total_active_time = sum([assignment['duration'] for assignment in assignments])
+    total_active_time = duration  # ระยะเวลาในการทำงานที่กำหนด
     utilization = (total_active_time / total_available_time) * 100
 
     # แสดงผล % Utilization ด้วยกราฟ
