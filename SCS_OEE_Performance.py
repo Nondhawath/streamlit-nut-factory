@@ -5,17 +5,9 @@ import json
 # ดึงข้อมูล Google API Credentials จาก Streamlit Secrets
 google_credentials = st.secrets["gcp_service_account"]
 
-# สร้างข้อมูลใหม่จาก google_credentials โดยลบข้อมูลที่ไม่สามารถแปลงเป็น JSON ได้
-google_credentials_filtered = {
-    key: value for key, value in google_credentials.items() if key != "private_key"
-}
-
-# ใส่ข้อความแทนที่ private_key
-google_credentials_filtered["private_key"] = "REDACTED"  # แทนที่ private_key ด้วยคำว่า REDACTED
-
-# เปลี่ยนข้อมูล JSON ของ Credentials ให้เป็นไฟล์ชั่วคราว
+# บันทึกไฟล์ JSON ของ Credentials ไว้ในไฟล์ชั่วคราว
 with open("/tmp/google-api-credentials.json", "w") as f:
-    f.write(json.dumps(google_credentials_filtered))
+    f.write(json.dumps(google_credentials))
 
 # เชื่อมต่อกับ Google Sheets โดยใช้ไฟล์ credentials
 gc = pygsheets.authorize(service_file='/tmp/google-api-credentials.json')
