@@ -133,6 +133,19 @@ if menu == "📥 Sorting MC":
         pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         total = ng + pending
+
+        # ตรวจสอบว่ามีข้อมูลซ้ำหรือไม่
+        existing_data = worksheet.get_all_records()
+        duplicate_found = False
+        for row in existing_data:
+            if row['รหัสงาน'] == part_code and row['เครื่อง'] == machine and row['Lot Number'] == lot:
+                duplicate_found = True
+                break
+
+        if duplicate_found:
+            st.error("⚠️ ข้อมูลนี้ถูกป้อนแล้วในระบบ ไม่สามารถบันทึกซ้ำได้!")
+            st.stop()
+
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
         if submitted:
             row = [
