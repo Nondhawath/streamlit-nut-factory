@@ -1,29 +1,32 @@
 import streamlit as st
-import pandas as pd
 import pygsheets
-from datetime import datetime
+import json
 
-# เชื่อมต่อกับ Google Sheets
-gc = pygsheets.authorize(service_file='your-google-api-credentials.json')
+# ใช้ Streamlit Secrets เพื่อดึงข้อมูล Google API Credentials
+google_credentials = st.secrets["gcp_service_account"]
+
+# เปลี่ยนข้อมูล JSON ของ Credentials ให้เป็นไฟล์ชั่วคราว
+with open("/tmp/google-api-credentials.json", "w") as f:
+    f.write(json.dumps(google_credentials))
+
+# เชื่อมต่อกับ Google Sheets โดยใช้ไฟล์ credentials
+gc = pygsheets.authorize(service_file='/tmp/google-api-credentials.json')
 
 # เปิดไฟล์ Google Sheets
 sh = gc.open('Assign_Job_FI')
 
-# เลือกชีทที่มีข้อมูลเครื่องจักร
+# อ่านข้อมูลจาก Google Sheets
 worksheet = sh.worksheet('title', 'Machines')
-
-# ดึงข้อมูลเครื่องจักร
 machines_data = worksheet.get_all_records()
-machines = [row['machines_name'] for row in machines_data]
 
-# ฟังก์ชันการคำนวณ % Utilization
-def calculate_utilization(assignments, total_available_time):
-    total_active_time = sum([assignment['duration'] for assignment in assignments])
-    utilization = (total_active_time / total_available_time) * 100
-    return utilization
+# แสดงข้อมูลเครื่องจักรใน Streamlit
+st.title("Machine List")
+st.write(machines_data)
 
 # ฟอร์มการอัปโหลดแผนงาน
-st.title("Assign Job to Machines")
+st.subheader("Upload Plan")
+
+# ให้ผู้ใช้กรอกข้อมูลแผนงาน
 job_name = st.text_input("Job Name")
 quantity = st.number_input("Quantity", min_value=1)
 delivery_date = st.date_input("Delivery Date", min_value=datetime.today())
@@ -41,7 +44,7 @@ if st.button("Upload Plan"):
     st.success("Plan uploaded successfully!")
 
 # แสดงเครื่องจักรที่สามารถเลือกเพื่อ Assign งาน
-selected_machine = st.selectbox("Select Machine", machines)
+selected_machine = st.selectbox("Select Machine", [machine['machines_name'] for machine in machines_data])
 
 # การ Assign งานให้เครื่องจักร
 if selected_machine:
@@ -68,5 +71,6 @@ total_available_time = 8  # เวลาเครื่องจักรสา�
 assignments = [
     {'machine': selected_machine, 'job': job_name, 'start_time': start_time, 'end_time': end_time, 'duration': duration}
 ]
-utilization = calculate_utilization(assignments, total_available_time)
+total_active_time = sum([assignment['duration'] for assignment in assignments])
+utilization = (total_active_time / total_available_time) * 100
 st.write(f"Machine Utilization: {utilization:.2f}%")
