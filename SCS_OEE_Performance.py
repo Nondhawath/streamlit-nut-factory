@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from datetime import datetime
 
 # สร้างข้อมูลงานจำลอง (มากกว่า 20 งาน) และจำนวนที่สุ่ม
-job_names = [f"Job {i}" for i in range(1, 21)]  # สร้างชื่องานให้มากกว่า 20 งาน
+job_names = [f"Job {i}" for i in range(1, 51)]  # สร้างชื่องานให้มากกว่า 50 งาน
 quantities = np.random.randint(10000, 100000, size=len(job_names))  # สุ่มจำนวนหลักหมื่นถึงหลักแสน
 
 # สร้าง DataFrame จำลองสำหรับงาน
@@ -14,14 +16,14 @@ jobs_data = pd.DataFrame({
     "Delivery Date": pd.date_range(start=datetime.today(), periods=len(job_names), freq='D')
 })
 
-# สร้าง Dashboard ที่แสดงข้อมูลงาน
+# แสดงข้อมูล Dashboard
 st.title("Manufacturing Job Dashboard")
-st.markdown("This is the job dashboard where you can select a job, assign it to a machine, and track utilization.")
+st.markdown("Welcome to the Job Dashboard. Select a job to assign it to a machine and track utilization.")
 
 # แสดงตารางงานที่มีข้อมูลจำลอง
 st.subheader("Available Jobs")
 st.write("Below are the available jobs with quantity and delivery date:")
-st.dataframe(jobs_data.style.highlight_max(axis=0))  # ใช้ style เพื่อไฮไลท์ค่ามากที่สุด
+st.dataframe(jobs_data.style.highlight_max(axis=0))  # ใช้ style เพื่อไฮไลท์ค่ามากที่สุดในแต่ละคอลัมน์
 
 # ฟอร์มการเลือกงานจากตาราง
 st.subheader("Assign Job to Machine")
@@ -64,3 +66,9 @@ if selected_job:
     st.progress(int(utilization))  # ใช้ progress bar แทนการแสดงเปอร์เซ็นต์ที่ง่าย
 
     st.write(f"Machine Utilization: {utilization:.2f}%")
+
+    # สร้างกราฟแสดงผลการทำงานของเครื่องจักร
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.pie([utilization, 100-utilization], labels=["Utilized", "Idle"], autopct='%1.1f%%', colors=["#4CAF50", "#FFC107"])
+    ax.set_title(f"Utilization of {selected_machine}")
+    st.pyplot(fig)
