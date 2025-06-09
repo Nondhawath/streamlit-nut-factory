@@ -7,18 +7,6 @@ from google.oauth2.service_account import Credentials
 import requests
 import json  # เพิ่ม
 
-# ✅ Telegram Settings
-TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
-TELEGRAM_CHAT_ID = "-4944715716"
-
-def send_telegram_message(message):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
-        requests.post(url, data=payload)
-    except Exception as e:
-        st.warning(f"⚠️ Telegram Error: {e}")
-
 # ⏰ Timezone
 def now_th():
     return datetime.utcnow() + timedelta(hours=7)
@@ -31,14 +19,24 @@ client = gspread.authorize(creds)
 
 # 📗 Sheets
 sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
-try:
-    sheet = client.open_by_key(sheet_id)
-    worksheet = sheet.worksheet("Data")
-except gspread.exceptions.APIError as e:
-    st.error(f"⚠️ Error accessing Google Sheets: {e}")
-    st.stop()
 
-# 🔁 Load Master Data
+# ตั้งค่าหน้าจอ Streamlit ให้อยู่ในบรรทัดแรกสุด
+st.set_page_config(page_title="Sorting Process", layout="wide")
+
+# ✅ Telegram Settings
+TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+TELEGRAM_CHAT_ID = "-4944715716"
+
+def send_telegram_message(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+        requests.post(url, data=payload)
+    except Exception as e:
+        st.warning(f"⚠️ Telegram Error: {e}")
+
+# 🔁 Load Master Data with Caching (เพื่อป้องกันการร้องขอซ้ำ)
+@st.cache(ttl=60*5)  # Cache data for 5 minutes
 def load_master_data():
     try:
         # Employee Data
