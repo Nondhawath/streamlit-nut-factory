@@ -1,74 +1,49 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import datetime
 
-# สร้างข้อมูลงานจำลอง (มากกว่า 20 งาน) และจำนวนที่สุ่ม
-job_names = [f"Job {i}" for i in range(1, 51)]  # สร้างชื่องานให้มากกว่า 50 งาน
-quantities = np.random.randint(10000, 100000, size=len(job_names))  # สุ่มจำนวนหลักหมื่นถึงหลักแสน
-
-# สร้าง DataFrame จำลองสำหรับงาน
-jobs_data = pd.DataFrame({
-    "Job Name": job_names,
-    "Quantity": quantities,
-    "Delivery Date": pd.date_range(start=datetime.today(), periods=len(job_names), freq='D')
+# สร้างข้อมูลจำลองสำหรับเครื่องจักร
+machines_data = pd.DataFrame({
+    "Machine Name": [f"Machine {i}" for i in range(1, 6)],
+    "Status": ["Idle", "Running", "Idle", "Running", "Maintenance"],
+    "Current Job": ["Job 1", "Job 2", "Job 3", "Job 4", "Job 5"],
+    "Job Progress": [75, 60, 100, 40, 20]  # เปอร์เซ็นต์การทำงาน
 })
 
-# แสดงข้อมูล Dashboard
+# สร้าง Dashboard
 st.title("Manufacturing Job Dashboard")
-st.markdown("Welcome to the Job Dashboard. Select a job to assign it to a machine and track utilization.")
+st.markdown("### Overview of all Machines")
 
-# แสดงตารางงานที่มีข้อมูลจำลอง
-st.subheader("Available Jobs")
-st.write("Below are the available jobs with quantity and delivery date:")
-st.dataframe(jobs_data.style.highlight_max(axis=0))  # ใช้ style เพื่อไฮไลท์ค่ามากที่สุดในแต่ละคอลัมน์
+# แสดงเครื่องจักรทั้งหมดในตาราง
+st.dataframe(machines_data)
 
-# ฟอร์มการเลือกงานจากตาราง
-st.subheader("Assign Job to Machine")
-selected_job = st.selectbox("Select Job", jobs_data['Job Name'])
+# เพิ่มไอคอนให้คลิกเพื่อดูรายละเอียดงานของเครื่องจักร
+for i, row in machines_data.iterrows():
+    machine_name = row['Machine Name']
+    status = row['Status']
+    current_job = row['Current Job']
+    job_progress = row['Job Progress']
 
-# การแสดงข้อมูลของงานที่เลือก
-if selected_job:
-    job_details = jobs_data[jobs_data['Job Name'] == selected_job].iloc[0]
-    st.write(f"**Job Name**: {job_details['Job Name']}")
-    st.write(f"**Quantity**: {job_details['Quantity']}")
-    st.write(f"**Delivery Date**: {job_details['Delivery Date']}")
+    # ใช้ st.markdown สำหรับการแสดงไอคอนที่สามารถคลิกได้
+    if st.button(f"🔧 {machine_name} - {status}", key=machine_name):
+        st.subheader(f"Details for {machine_name}")
+        st.write(f"**Status**: {status}")
+        st.write(f"**Current Job**: {current_job}")
+        st.write(f"**Job Progress**: {job_progress}%")
+        st.write("### Set Start and End Time for the Job")
+        
+        # ฟอร์มการตั้งเวลาเริ่มต้นและสิ้นสุดสำหรับการทำงาน
+        start_time = st.time_input(f"Start Time for {machine_name}", datetime(2025, 6, 9, 8, 0))
+        end_time = st.time_input(f"End Time for {machine_name}", datetime(2025, 6, 9, 16, 0))
 
-    # เลือกเครื่องจักรที่จะแต่งตั้งงาน
-    selected_machine = st.selectbox("Select Machine", ["Machine A", "Machine B", "Machine C", "Machine D"])
+        # คำนวณระยะเวลา
+        if end_time > start_time:
+            duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).seconds / 3600
+        else:
+            duration = 0
 
-    # เลือกเวลาสำหรับการทำงาน
-    st.markdown("### Set Start and End Time for the Job")
-    start_time = st.time_input("Start Time", datetime(2025, 6, 9, 8, 0))
-    end_time = st.time_input("End Time", datetime(2025, 6, 9, 16, 0))
-
-    # คำนวณระยะเวลา
-    if end_time > start_time:
-        duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).seconds / 3600
-    else:
-        duration = 0
-
-    if st.button("Start Job"):
-        st.write(f"Job started at {start_time}, duration: {duration} hours", icon="🕒")
-
-    if st.button("End Job"):
-        st.write(f"Job ended at {end_time}, duration: {duration} hours", icon="⏹️")
-
-    # คำนวณ % Utilization ของเครื่องจักร
-    total_available_time = 8  # เวลาเครื่องจักรสามารถทำงานได้ใน 1 วัน
-    total_active_time = duration  # ระยะเวลาในการทำงานที่กำหนด
-    utilization = (total_active_time / total_available_time) * 100
-
-    # แสดงผล % Utilization ด้วยกราฟ
-    st.markdown("### Machine Utilization")
-    st.progress(int(utilization))  # ใช้ progress bar แทนการแสดงเปอร์เซ็นต์ที่ง่าย
-
-    st.write(f"Machine Utilization: {utilization:.2f}%")
-
-    # สร้างกราฟแสดงผลการทำงานของเครื่องจักร
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.pie([utilization, 100-utilization], labels=["Utilized", "Idle"], autopct='%1.1f%%', colors=["#4CAF50", "#FFC107"])
-    ax.set_title(f"Utilization of {selected_machine}")
-    st.pyplot(fig)
+        st.write(f"**Duration**: {duration} hours")
+        st.progress(job_progress)  # แสดงเปอร์เซ็นต์ความคืบหน้า
+        st.write(f"Job Progress for {machine_name}: {job_progress}%")
+        st.write(f"Machine Utilization: {duration / 8 * 100:.2f}%")
