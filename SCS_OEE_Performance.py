@@ -1,32 +1,12 @@
 import streamlit as st
-import pygsheets
-import json
+import pandas as pd
 from datetime import datetime
 
-# ดึงข้อมูล Google API Credentials จาก Streamlit Secrets
-google_credentials = st.secrets["gcp_service_account"]
-
-# สร้างไฟล์ JSON ที่ไม่รวม private_key ซึ่งไม่สามารถแปลงได้
-google_credentials_filtered = {
-    key: value for key, value in google_credentials.items() if key != "private_key"
-}
-
-# แทนที่ private_key ด้วยคำว่า REDACTED
-google_credentials_filtered["private_key"] = "REDACTED"
-
-# บันทึกไฟล์ JSON ของ Credentials ไว้ในไฟล์ชั่วคราว
-with open("/tmp/google-api-credentials.json", "w") as f:
-    f.write(json.dumps(google_credentials_filtered))
-
-# เชื่อมต่อกับ Google Sheets โดยใช้ไฟล์ credentials
-gc = pygsheets.authorize(service_file='/tmp/google-api-credentials.json')
-
-# เปิดไฟล์ Google Sheets
-sh = gc.open('Assign_Job_FI')
-
-# อ่านข้อมูลจาก Google Sheets
-worksheet = sh.worksheet('title', 'Machines')
-machines_data = worksheet.get_all_records()
+# สร้างข้อมูลจำลองสำหรับเครื่องจักร
+machines_data = pd.DataFrame({
+    "machines_name": ["Machine A", "Machine B", "Machine C", "Machine D"],
+    "status": ["Idle", "Running", "Idle", "Running"]
+})
 
 # แสดงข้อมูลเครื่องจักรใน Streamlit
 st.title("Machine List")
@@ -40,20 +20,23 @@ job_name = st.text_input("Job Name")
 quantity = st.number_input("Quantity", min_value=1)
 delivery_date = st.date_input("Delivery Date", min_value=datetime.today())
 
-# การอัปโหลดแผนงานไปยัง Google Sheets
+# การอัปโหลดแผนงานไปยัง "Plan"
 if st.button("Upload Plan"):
     plan_data = {
         'Job Name': job_name,
         'Quantity': quantity,
         'Delivery Date': str(delivery_date)
     }
-    # เพิ่มแผนงานในชีทที่ชื่อว่า 'Plan'
-    plan_worksheet = sh.worksheet('title', 'Plan')
-    plan_worksheet.append_table([plan_data['Job Name'], plan_data['Quantity'], plan_data['Delivery Date']])
+    # สร้าง DataFrame จำลองสำหรับแผนงาน
+    plan_df = pd.DataFrame([plan_data])
+
+    # แสดงแผนงานใน Streamlit
+    st.write("Uploaded Plan:")
+    st.write(plan_df)
     st.success("Plan uploaded successfully!")
 
 # แสดงเครื่องจักรที่สามารถเลือกเพื่อ Assign งาน
-selected_machine = st.selectbox("Select Machine", [machine['machines_name'] for machine in machines_data])
+selected_machine = st.selectbox("Select Machine", machines_data['machines_name'])
 
 # การ Assign งานให้เครื่องจักร
 if selected_machine:
