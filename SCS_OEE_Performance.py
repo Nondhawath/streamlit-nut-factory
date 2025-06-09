@@ -1,63 +1,72 @@
 import streamlit as st
 import pandas as pd
+import pygsheets
 from datetime import datetime
 
-# ข้อมูลเครื่องจักร
-machines = ['Machine 1', 'Machine 2', 'Machine 3']
+# เชื่อมต่อกับ Google Sheets
+gc = pygsheets.authorize(service_file='your-google-api-credentials.json')
 
-# ข้อมูลงานที่ต้องทำ
-jobs = ['Job A', 'Job B', 'Job C']
+# เปิดไฟล์ Google Sheets
+sh = gc.open('Assign_Job_FI')
 
-# บันทึกข้อมูลการ Assign งาน
-assignments = []
+# เลือกชีทที่มีข้อมูลเครื่องจักร
+worksheet = sh.worksheet('title', 'Machines')
 
-# ฟังก์ชันในการคำนวณ % Utilization
+# ดึงข้อมูลเครื่องจักร
+machines_data = worksheet.get_all_records()
+machines = [row['machines_name'] for row in machines_data]
+
+# ฟังก์ชันการคำนวณ % Utilization
 def calculate_utilization(assignments, total_available_time):
     total_active_time = sum([assignment['duration'] for assignment in assignments])
     utilization = (total_active_time / total_available_time) * 100
     return utilization
 
-# แสดง UI ใน Streamlit
-st.title("Assign Job to Machines and Calculate Utilization")
+# ฟอร์มการอัปโหลดแผนงาน
+st.title("Assign Job to Machines")
+job_name = st.text_input("Job Name")
+quantity = st.number_input("Quantity", min_value=1)
+delivery_date = st.date_input("Delivery Date", min_value=datetime.today())
 
-# เลือกเครื่องจักร
+# การอัปโหลดแผนงานไปยัง Google Sheets
+if st.button("Upload Plan"):
+    plan_data = {
+        'Job Name': job_name,
+        'Quantity': quantity,
+        'Delivery Date': str(delivery_date)
+    }
+    # เพิ่มแผนงานในชีทที่ชื่อว่า 'Plan'
+    plan_worksheet = sh.worksheet('title', 'Plan')
+    plan_worksheet.append_table([plan_data['Job Name'], plan_data['Quantity'], plan_data['Delivery Date']])
+    st.success("Plan uploaded successfully!")
+
+# แสดงเครื่องจักรที่สามารถเลือกเพื่อ Assign งาน
 selected_machine = st.selectbox("Select Machine", machines)
 
-# เลือกงานที่ต้องการ Assign
-selected_job = st.selectbox("Select Job", jobs)
+# การ Assign งานให้เครื่องจักร
+if selected_machine:
+    st.write(f"Assigning Job to {selected_machine}")
 
-# กำหนดเวลาเริ่มต้นและเวลาสิ้นสุด
+# การบันทึกเวลา Start และ End สำหรับการทำงาน
 start_time = st.time_input("Start Time", datetime(2025, 6, 9, 8, 0))
 end_time = st.time_input("End Time", datetime(2025, 6, 9, 16, 0))
 
-# คำนวณระยะเวลาในการทำงาน (เป็นชั่วโมง)
+# คำนวณระยะเวลา
 if end_time > start_time:
     duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).seconds / 3600
 else:
-    duration = 0  # หากเวลาสิ้นสุดก่อนเวลาเริ่มต้น ให้ไม่คำนวณ
+    duration = 0
 
-# เพิ่มข้อมูลการ Assign
-if st.button("Assign Job"):
-    assignments.append({
-        'machine': selected_machine,
-        'job': selected_job,
-        'start_time': start_time,
-        'end_time': end_time,
-        'duration': duration
-    })
-    st.success(f"Assigned {selected_job} to {selected_machine} for {duration} hours")
+if st.button("Start Job"):
+    st.write(f"Job started at {start_time}, duration: {duration} hours")
 
-# กำหนดเวลาเปิด-ปิดของเครื่องจักร
-total_available_time = 8  # ตัวอย่าง 8 ชั่วโมงการทำงานใน 1 วัน
+if st.button("End Job"):
+    st.write(f"Job ended at {end_time}, duration: {duration} hours")
 
-# คำนวณ % Utilization
+# แสดง % Utilization ของเครื่องจักร
+total_available_time = 8  # เวลาเครื่องจักรสามารถทำงานได้ใน 1 วัน
+assignments = [
+    {'machine': selected_machine, 'job': job_name, 'start_time': start_time, 'end_time': end_time, 'duration': duration}
+]
 utilization = calculate_utilization(assignments, total_available_time)
-
-# แสดงข้อมูลการ Assign งานทั้งหมด
-st.subheader("Assigned Jobs:")
-df_assignments = pd.DataFrame(assignments)
-st.write(df_assignments)
-
-# แสดงผล % Utilization
-st.subheader("Machine Utilization:")
-st.write(f"{utilization:.2f}%")
+st.write(f"Machine Utilization: {utilization:.2f}%")
