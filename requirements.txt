@@ -12,3 +12,4 @@ streamlit
 openpyxl
 pygsheets
 matplotlib
+seaborn
