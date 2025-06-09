@@ -7,22 +7,6 @@ from google.oauth2.service_account import Credentials
 import requests
 import json  # เพิ่ม
 
-# ⏰ Timezone
-def now_th():
-    return datetime.utcnow() + timedelta(hours=7)
-
-# 🔐 Google Sheet Auth
-SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
-creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
-client = gspread.authorize(creds)
-
-# 📗 Sheets
-sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
-
-# ตั้งค่าหน้าจอ Streamlit ให้อยู่ในบรรทัดแรกสุด
-st.set_page_config(page_title="Sorting Process", layout="wide")
-
 # ✅ Telegram Settings
 TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
 TELEGRAM_CHAT_ID = "-4944715716"
@@ -35,8 +19,26 @@ def send_telegram_message(message):
     except Exception as e:
         st.warning(f"⚠️ Telegram Error: {e}")
 
-# 🔁 Load Master Data with Caching (เพื่อป้องกันการร้องขอซ้ำ)
-@st.cache(ttl=60*5)  # Cache data for 5 minutes
+# ⏰ Timezone
+def now_th():
+    return datetime.utcnow() + timedelta(hours=7)
+
+# 🔐 Google Sheet Auth
+SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
+creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
+client = gspread.authorize(creds)
+
+# 📗 Sheets
+sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
+try:
+    sheet = client.open_by_key(sheet_id)
+    worksheet = sheet.worksheet("Data")
+except gspread.exceptions.APIError as e:
+    st.error(f"⚠️ Error accessing Google Sheets: {e}")
+    st.stop()
+
+# 🔁 Load Master Data
 def load_master_data():
     try:
         # Employee Data
@@ -131,19 +133,6 @@ if menu == "📥 Sorting MC":
         pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         total = ng + pending
-
-        # ตรวจสอบว่ามีข้อมูลซ้ำหรือไม่
-        existing_data = worksheet.get_all_records()
-        duplicate_found = False
-        for row in existing_data:
-            if row['รหัสงาน'] == part_code and row['เครื่อง'] == machine and row['Lot Number'] == lot:
-                duplicate_found = True
-                break
-
-        if duplicate_found:
-            st.error("⚠️ ข้อมูลนี้ถูกป้อนแล้วในระบบ ไม่สามารถบันทึกซ้ำได้!")
-            st.stop()
-
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
         if submitted:
             row = [
