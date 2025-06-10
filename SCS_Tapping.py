@@ -25,15 +25,15 @@ def now_th():
 
 # 🔐 Google Sheet Auth
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # ใช้ข้อมูลจาก secrets.toml
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ใช้ ID ของ Tapping_report
+sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ID ของ Google Sheets ที่ต้องการใช้
 try:
     sheet = client.open_by_key(sheet_id)
-    worksheet = sheet.worksheet("Data")  # เปลี่ยนเป็นชื่อชีทที่ต้องการ
+    worksheet = sheet.worksheet("Data")  # ชื่อชีทที่ต้องการ
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
