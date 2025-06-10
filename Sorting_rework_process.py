@@ -1,11 +1,10 @@
-# 📦 Import Library
 from datetime import datetime, timedelta
 import pandas as pd
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-import json  # เพิ่ม
+import json
 
 # ✅ Telegram Settings
 TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
@@ -37,6 +36,17 @@ try:
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
+
+# ตรวจสอบว่าแถวแรกมีคอลัมน์หรือไม่ ถ้าไม่มีให้สร้างคอลัมน์ใหม่
+def check_and_create_columns():
+    first_row = worksheet.row_values(1)  # อ่านแถวแรก
+    if not first_row:  # ถ้าแถวแรกไม่มีข้อมูล
+        columns = ["วันที่", "พนักงาน", "รหัสงาน", "เครื่อง", "Lot Number", 
+                   "จำนวนผลิตทั้งหมด", "จำนวน NG", "หัวข้องานเสีย", "สถานะ"]
+        worksheet.append_row(columns)  # เพิ่มแถวคอลัมน์ใหม่
+        st.success("✅ สร้างชื่อคอลัมน์ใน Google Sheets เรียบร้อยแล้ว!")
+
+check_and_create_columns()  # ตรวจสอบและสร้างคอลัมน์
 
 # 🔁 Load Master Data
 def load_master_data():
