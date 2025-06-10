@@ -74,17 +74,19 @@ def generate_job_id():
         if not records:
             st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
             st.stop()
-    except gspread.exceptions.GSpreadException as e:
-        st.error(f"⚠️ API Error: {e}")
-        return None
 
-    prefix = now_th().strftime("%y%m")
-    filtered = [
-        r for r in records
-        if isinstance(r[0], str) and r[0].startswith(prefix) and r[0][-4:].isdigit()
-    ]
-    last_seq = max([int(r[0][-4:]) for r in filtered], default=0)
-    return f"{prefix}{last_seq + 1:04d}"
+        # ตรวจสอบข้อมูลที่ดึงมาแล้ว
+        prefix = now_th().strftime("%y%m")
+        filtered = [
+            r for r in records
+            if isinstance(r[0], str) and r[0].startswith(prefix) and r[0][-4:].isdigit()
+        ]
+        last_seq = max([int(r[0][-4:]) for r in filtered], default=0)
+        return f"{prefix}{last_seq + 1:04d}"
+
+    except gspread.exceptions.GSpreadException as e:
+        st.error(f"⚠️ Gspread Error: {e}")
+        return None
 
 # 🔐 Login Process
 if "logged_in_user" not in st.session_state:
