@@ -136,14 +136,30 @@ if menu == "📥 Taping MC":
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         total = ng + pending
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
+
         if submitted:
+            # ตรวจสอบว่าข้อมูลครบถ้วนก่อนบันทึก
+            if not part_code or not machine or not lot:
+                st.error("⚠️ ข้อมูลบางอย่างขาดหายไป เช่น รหัสงาน, เครื่องจักร หรือ Lot Number")
+                st.stop()
+
             row = [
-                now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
-                machine, lot, checked, ng, pending, total,
-                "Taping MC", "", "", "", reason_ng
+                now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่และเวลา
+                job_id,                                # Job ID
+                user,                                  # ชื่อพนักงาน
+                part_code,                             # รหัสงาน
+                machine,                               # เครื่องจักร
+                lot,                                   # Lot Number
+                checked,                               # จำนวนตรวจทั้งหมด
+                ng,                                    # จำนวน NG
+                pending,                               # จำนวนยังไม่ตรวจ
+                total,                                 # รวม
+                "Taping MC",                           # สถานะ (กรณีนี้สมมุติเป็น "Taping MC")
+                reason_ng                              # หัวข้องานเสีย
             ]
+            
             try:
-                worksheet.append_row(row)
+                worksheet.append_row(row)  # บันทึกข้อมูลลงใน Google Sheets
                 st.success("✅ บันทึกเรียบร้อย")
                 send_telegram_message(
                     f"📥 <b>New Taping</b>\n"
