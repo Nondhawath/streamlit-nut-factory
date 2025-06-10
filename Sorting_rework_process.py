@@ -33,6 +33,7 @@ sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"  # ID ของ Google
 try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")
+    st.success("✅ เชื่อมต่อ Google Sheets สำเร็จ!")
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
@@ -79,13 +80,13 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 # 🆔 สร้าง Job ID ปลอดภัย
 def generate_job_id():
     try:
-        records = worksheet.get_all_records()  # ใช้ get_all_records() แทน get_all_values()
+        records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
         prefix = now_th().strftime("%y%m")
         filtered = [
             r for r in records
-            if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
+            if isinstance(r[1], str) and r[1].startswith(prefix) and r[1][-4:].isdigit()  # ใช้ index ที่ถูกต้อง
         ]
-        last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
+        last_seq = max([int(r[1][-4:]) for r in filtered], default=0)
         return f"{prefix}{last_seq + 1:04d}"
 
     except gspread.exceptions.GSpreadException as e:
@@ -126,9 +127,9 @@ menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
 # 📥 Taping MC
 def check_duplicate(job_id, part_code, reason_ng):
-    records = worksheet.get_all_records()  # ใช้ get_all_records() แทน get_all_values()
+    records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
     for record in records:
-        if record["Job ID"] == job_id and record["รหัสงาน"] == part_code and record["หัวข้องานเสีย"] == reason_ng:
+        if record[1] == job_id and record[3] == part_code and record[8] == reason_ng:
             return True
     return False
 
@@ -179,7 +180,7 @@ if menu == "📥 Taping MC":
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Scrap")
     try:
-        df = pd.DataFrame(worksheet.get_all_records())  # ใช้ get_all_records()
+        df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
         if df.empty:
             st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
             st.stop()
@@ -215,7 +216,7 @@ elif menu == "🧾 Waiting Judgement":
 
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
-    df = pd.DataFrame(worksheet.get_all_records())  # ใช้ get_all_records()
+    df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
     view = st.selectbox("🗓 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
     now = now_th()
