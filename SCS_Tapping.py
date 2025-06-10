@@ -73,11 +73,11 @@ def generate_job_id():
         if not records:
             st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
             st.stop()
-        st.write(f"Records retrieved: {records}")  # แสดงข้อมูลที่ดึงออกมาเพื่อตรวจสอบ
     except gspread.exceptions.GSpreadException as e:
         st.error(f"⚠️ API Error: {e}")
         return None
 
+    # ตรวจสอบข้อมูลที่ดึงมาแล้ว
     prefix = now_th().strftime("%y%m")
     filtered = [
         r for r in records
