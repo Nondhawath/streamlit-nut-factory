@@ -43,10 +43,10 @@ except gspread.exceptions.APIError as e:
 def load_master_data():
     try:
         # Employee Data
-        emp_data = sheet.worksheet("employee_master").get_all_records()
-        emp_master = [row["ชื่อพนักงาน"] for row in emp_data]
-        emp_password_map = {row["ชื่อพนักงาน"]: str(row["รหัส"]).strip() for row in emp_data}
-        emp_level_map = {row["ชื่อพนักงาน"]: str(row["ระดับ"]).strip() for row in emp_data}
+        emp_data = sheet.worksheet("employee_master").get_all_values()  # ใช้ get_all_values()
+        emp_master = [row[0] for row in emp_data[1:]]  # สมมติว่า "ชื่อพนักงาน" อยู่ในคอลัมน์แรก
+        emp_password_map = {row[0]: str(row[1]).strip() for row in emp_data[1:]}  # "รหัส" อยู่ในคอลัมน์ที่ 2
+        emp_level_map = {row[0]: str(row[2]).strip() for row in emp_data[1:]}  # "ระดับ" อยู่ในคอลัมน์ที่ 3
         
         # Part Data
         part_master = sheet.worksheet("part_code_master").col_values(1)[1:]
@@ -56,8 +56,8 @@ def load_master_data():
         reason_list = reason_sheet.col_values(reason_sheet.find("Reason").col)[1:]
 
         # Machines Data
-        machines_data = sheet.worksheet("machines").get_all_records()
-        machines_list = [row["machines_name"] for row in machines_data]
+        machines_data = sheet.worksheet("machines").get_all_values()  # ใช้ get_all_values()
+        machines_list = [row[0] for row in machines_data[1:]]  # สมมติว่า "machines_name" อยู่ในคอลัมน์แรก
 
         return emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_list
 
