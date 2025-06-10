@@ -99,26 +99,26 @@ if "logged_in_user" not in st.session_state:
 
 user = st.session_state.logged_in_user
 user_level = st.session_state.user_level
-st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
+st.set_page_config(page_title="Taping Process", layout="wide")
+st.title(f"🔧 Taping Process - สวัสดี {user} ({user_level})")
 
 # 🔐 สิทธิ์เข้าใช้งาน
 allowed_modes = []
 if user_level == "S1":
-    allowed_modes = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
+    allowed_modes = ["📥 Taping MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
 elif user_level == "T1":
     allowed_modes = ["🧾 Waiting Judgement"]
 elif user_level == "T7":
-    allowed_modes = ["📥 Sorting MC"]
+    allowed_modes = ["📥 Taping MC"]
 elif user_level == "T8":
     allowed_modes = ["💧 Oil Cleaning"]
 
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
-# 📥 Sorting MC
-if menu == "📥 Sorting MC":
-    st.subheader("📥 กรอกข้อมูล Sorting")
-    with st.form("sorting_form"):
+# 📥 Taping MC
+if menu == "📥 Taping MC":
+    st.subheader("📥 กรอกข้อมูล Taping")
+    with st.form("taping_form"):
         job_id = generate_job_id()
         if job_id is None:
             st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
@@ -137,13 +137,13 @@ if menu == "📥 Sorting MC":
             row = [
                 now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
                 machine, lot, checked, ng, pending, total,
-                "Sorting MC", "", "", "", reason_ng
+                "Taping MC", "", "", "", reason_ng
             ]
             try:
                 worksheet.append_row(row)
                 st.success("✅ บันทึกเรียบร้อย")
                 send_telegram_message(
-                    f"📥 <b>New Sorting</b>\n"
+                    f"📥 <b>New Taping</b>\n"
                     f"🆔 Job ID: <code>{job_id}</code>\n"
                     f"👷‍♂️ พนักงาน: {user}\n"
                     f"🔩 รหัสงาน: {part_code}\n"
@@ -164,7 +164,7 @@ elif menu == "🧾 Waiting Judgement":
         st.warning("⚠️ ไม่มีข้อมูลสถานะหรือวันที่ใน Google Sheet")
         st.stop()
 
-    df = df[df["สถานะ"] == "Sorting MC"]
+    df = df[df["สถานะ"] == "Taping MC"]
 
     # เรียงลำดับจากรายการล่าสุด
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
