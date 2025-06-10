@@ -127,16 +127,17 @@ menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
 # 📥 Taping MC
 def check_duplicate(job_id, part_code, reason_ng):
+    """ ตรวจสอบข้อมูลซ้ำใน Google Sheets โดยเช็คจาก Job ID, รหัสงาน และหัวข้องานเสีย """
     records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
     for record in records:
-        if record[1] == job_id and record[3] == part_code and record[8] == reason_ng:
-            return True
-    return False
+        if len(record) > 8 and record[1] == job_id and record[3] == part_code and record[8] == reason_ng:
+            return True  # พบข้อมูลซ้ำ
+    return False  # ไม่มีข้อมูลซ้ำ
 
 if menu == "📥 Taping MC":
     st.subheader("📥 กรอกข้อมูล Taping")
     with st.form("taping_form"):
-        job_id = generate_job_id()
+        job_id = generate_job_id()  # สร้าง Job ID ใหม่
         if job_id is None:
             st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
             st.stop()
@@ -148,11 +149,11 @@ if menu == "📥 Taping MC":
         ng = st.number_input("❌ NG", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         
-        # ตรวจสอบข้อมูลซ้ำ
+        # ตรวจสอบข้อมูลซ้ำก่อนบันทึก
         if check_duplicate(job_id, part_code, reason_ng):
             st.warning("⚠️ ข้อมูลนี้ถูกบันทึกแล้ว กรุณาตรวจสอบอีกครั้ง")
         else:
-            total = ng  # ลบฟังก์ชัน "ยังไม่ตรวจ" ออก
+            total = ng  # ใช้เฉพาะ NG และตรวจ
             submitted = st.form_submit_button("✅ บันทึกข้อมูล")
             if submitted:
                 row = [
@@ -161,7 +162,7 @@ if menu == "📥 Taping MC":
                     "Taping MC", "", "", "", reason_ng
                 ]
                 try:
-                    worksheet.append_row(row)
+                    worksheet.append_row(row)  # บันทึกข้อมูลในแถวใหม่
                     st.success("✅ บันทึกเรียบร้อย")
                     send_telegram_message(
                         f"📥 <b>New Taping</b>\n"
