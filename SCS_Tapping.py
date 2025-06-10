@@ -69,7 +69,7 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 # 🆔 สร้าง Job ID ปลอดภัย
 def generate_job_id():
     try:
-        records = worksheet.get_all_records()
+        records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
     except gspread.exceptions.APIError as e:
         st.error(f"⚠️ API Error: {e}")
         return None
@@ -77,9 +77,9 @@ def generate_job_id():
     prefix = now_th().strftime("%y%m")
     filtered = [
         r for r in records
-        if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
+        if isinstance(r[0], str) and r[0].startswith(prefix) and r[0][-4:].isdigit()
     ]
-    last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
+    last_seq = max([int(r[0][-4:]) for r in filtered], default=0)
     return f"{prefix}{last_seq + 1:04d}"
 
 # 🔐 Login Process
@@ -116,9 +116,9 @@ menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
 # 📥 Taping MC
 def check_duplicate(job_id, part_code, reason_ng):
-    records = worksheet.get_all_records()
+    records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
     for record in records:
-        if record["Job ID"] == job_id and record["รหัสงาน"] == part_code and record["หัวข้องานเสีย"] == reason_ng:
+        if record[0] == job_id and record[3] == part_code and record[9] == reason_ng:
             return True
     return False
 
@@ -168,7 +168,7 @@ if menu == "📥 Taping MC":
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Scrap")
-    df = pd.DataFrame(worksheet.get_all_records())
+    df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
 
     if "สถานะ" not in df.columns or "วันที่" not in df.columns:
         st.warning("⚠️ ไม่มีข้อมูลสถานะหรือวันที่ใน Google Sheet")
@@ -204,7 +204,7 @@ elif menu == "🧾 Waiting Judgement":
 
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
-    df = pd.DataFrame(worksheet.get_all_records())
+    df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
     view = st.selectbox("🗓 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
     now = now_th()
