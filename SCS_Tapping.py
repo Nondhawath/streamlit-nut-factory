@@ -30,7 +30,7 @@ creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "new_sheet_id_here"  # เปลี่ยนเป็น ID ของไฟล์ Google Sheets ใหม่
+sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ใช้ ID ของ Tapping_report
 try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")  # เปลี่ยนเป็นชื่อชีทที่ต้องการ
