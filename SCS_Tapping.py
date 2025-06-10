@@ -70,7 +70,10 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 def generate_job_id():
     try:
         records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
-    except gspread.exceptions.APIError as e:
+        if not records:
+            st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
+            st.stop()
+    except gspread.exceptions.GSpreadException as e:
         st.error(f"⚠️ API Error: {e}")
         return None
 
@@ -168,22 +171,23 @@ if menu == "📥 Taping MC":
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Scrap")
-    df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
-
-    if "สถานะ" not in df.columns or "วันที่" not in df.columns:
-        st.warning("⚠️ ไม่มีข้อมูลสถานะหรือวันที่ใน Google Sheet")
+    try:
+        df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
+        if df.empty:
+            st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
+            st.stop()
+    except gspread.exceptions.GSpreadException as e:
+        st.error(f"⚠️ Gspread Error: {e}")
         st.stop()
 
-    df = df[df["สถานะ"] == "Taping MC"]
-
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
+    df = df[df["สถานะ"] == "Taping MC"]
     df = df.sort_values(by="วันที่", ascending=False)
 
     for idx, row in df.iterrows():
         timestamp = row.get("วันที่", "")
         st.markdown(
-            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | ยังไม่ตรวจ: {row['จำนวนยังไม่ตรวจ']} "
-            f"| 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
+            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
             unsafe_allow_html=True
         )
 
