@@ -67,27 +67,6 @@ def load_master_data():
 
 emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_list = load_master_data()
 
-# 🆔 สร้าง Job ID ปลอดภัย
-def generate_job_id():
-    try:
-        records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
-        if not records:
-            st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
-            st.stop()
-
-        # ตรวจสอบข้อมูลที่ดึงมาแล้ว
-        prefix = now_th().strftime("%y%m")
-        filtered = [
-            r for r in records
-            if isinstance(r[0], str) and r[0].startswith(prefix) and r[0][-4:].isdigit()
-        ]
-        last_seq = max([int(r[0][-4:]) for r in filtered], default=0)
-        return f"{prefix}{last_seq + 1:04d}"
-
-    except gspread.exceptions.GSpreadException as e:
-        st.error(f"⚠️ Gspread Error: {e}")
-        return None
-
 # 🔐 Login Process
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
@@ -121,21 +100,16 @@ elif user_level == "T7":
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
 # 📥 Taping MC
-def check_duplicate(job_id, part_code, reason_ng):
+def check_duplicate(part_code, reason_ng):
     records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
     for record in records:
-        if record[0] == job_id and record[3] == part_code and record[9] == reason_ng:
+        if record[3] == part_code and record[9] == reason_ng:
             return True
     return False
 
 if menu == "📥 Taping MC":
     st.subheader("📥 กรอกข้อมูล Taping")
     with st.form("taping_form"):
-        job_id = generate_job_id()
-        if job_id is None:
-            st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
-            st.stop()
-        
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 เครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
@@ -144,14 +118,14 @@ if menu == "📥 Taping MC":
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         
         # ตรวจสอบข้อมูลซ้ำ
-        if check_duplicate(job_id, part_code, reason_ng):
+        if check_duplicate(part_code, reason_ng):
             st.warning("⚠️ ข้อมูลนี้ถูกบันทึกแล้ว กรุณาตรวจสอบอีกครั้ง")
         else:
             total = ng  # ลบฟังก์ชัน "ยังไม่ตรวจ" ออก
             submitted = st.form_submit_button("✅ บันทึกข้อมูล")
             if submitted:
                 row = [
-                    now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
+                    now_th().strftime("%Y-%m-%d %H:%M:%S"), user, part_code,
                     machine, lot, checked, ng, total,  # ใช้เฉพาะ NG และตรวจ
                     "Taping MC", "", "", "", reason_ng
                 ]
@@ -160,7 +134,6 @@ if menu == "📥 Taping MC":
                     st.success("✅ บันทึกเรียบร้อย")
                     send_telegram_message(
                         f"📥 <b>New Taping</b>\n"
-                        f"🆔 Job ID: <code>{job_id}</code>\n"
                         f"👷‍♂️ พนักงาน: {user}\n"
                         f"🔩 รหัสงาน: {part_code}\n"
                         f"🛠 เครื่อง: {machine}\n"
@@ -170,60 +143,3 @@ if menu == "📥 Taping MC":
                     )
                 except Exception as e:
                     st.error(f"⚠️ Error appending data to sheet: {e}")
-
-# 🧾 Waiting Judgement
-elif menu == "🧾 Waiting Judgement":
-    st.subheader("🔍 รอตัดสินใจ Scrap")
-    try:
-        df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
-        if df.empty:
-            st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
-            st.stop()
-    except gspread.exceptions.GSpreadException as e:
-        st.error(f"⚠️ Gspread Error: {e}")
-        st.stop()
-
-    df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
-    df = df[df["สถานะ"] == "Taping MC"]
-    df = df.sort_values(by="วันที่", ascending=False)
-
-    for idx, row in df.iterrows():
-        timestamp = row.get("วันที่", "")
-        st.markdown(
-            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
-            unsafe_allow_html=True
-        )
-
-        col1 = st.columns(1)
-        if col1[0].button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
-            worksheet.update_cell(idx + 2, 11, "Scrap")
-            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            worksheet.update_cell(idx + 2, 14, user)
-            send_telegram_message(
-                f"🗑 <b>Scrap</b>\n"
-                f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
-                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
-                f"📋 หัวข้องานเสีย: {row['หัวข้องานเสีย']}\n"
-                f"❌ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
-                f"👷‍♂️ โดย: {user}"
-            )
-            st.rerun()
-
-# 📊 รายงาน
-elif menu == "📊 รายงาน":
-    df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
-    df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
-    view = st.selectbox("🗓 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
-    now = now_th()
-    if view == "รายวัน":
-        df = df[df["วันที่"].dt.date == now.date()]
-    elif view == "รายสัปดาห์":
-        df = df[df["วันที่"] >= now - pd.Timedelta(days=7)]
-    elif view == "รายเดือน":
-        df = df[df["วันที่"].dt.month == now.month]
-    elif view == "รายปี":
-        df = df[df["วันที่"].dt.year == now.year]
-    st.dataframe(df)
-    scrap_sum = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
-    st.markdown("📌 สรุป Scrap แยกรหัสงาน")
-    st.dataframe(scrap_sum)
