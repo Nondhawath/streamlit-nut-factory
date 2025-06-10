@@ -125,7 +125,7 @@ if menu == "📥 Taping MC":
             st.stop()
         st.markdown(f"**🆔 Job ID:** `{job_id}`")
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
-        machine = st.selectbox("🛠 เครื่อง", machines_list)  # ใช้เครื่องจักรจาก machines_list
+        machine = st.selectbox("🛠 เครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
         checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
@@ -165,8 +165,6 @@ elif menu == "🧾 Waiting Judgement":
         st.stop()
 
     df = df[df["สถานะ"] == "Taping MC"]
-
-    # เรียงลำดับจากรายการล่าสุด
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
     df = df.sort_values(by="วันที่", ascending=False)
 
