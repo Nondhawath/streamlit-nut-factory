@@ -29,7 +29,7 @@ creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
+sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ใช้ ID จากลิงก์ของคุณ
 try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")
