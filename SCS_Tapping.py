@@ -55,6 +55,9 @@ def load_master_data():
 
         # Machines Data
         machines_data = sheet.worksheet("machines").get_all_records()
+        if not machines_data:
+            st.error("⚠️ ไม่มีข้อมูลเครื่องจักรใน Google Sheets")
+            st.stop()
         machines_list = [row["machines_name"] for row in machines_data]
 
         return emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_list
@@ -69,7 +72,7 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 def generate_job_id():
     try:
         records = worksheet.get_all_records()
-    except gspread.exceptions.APIError as e:
+    except gspread.exceptions.GSpreadException as e:
         st.error(f"⚠️ API Error: {e}")
         return None
 
@@ -219,7 +222,7 @@ elif menu == "💧 Oil Cleaning":
             send_telegram_message(
                 f"💧 <b>ล้างเสร็จแล้ว</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
-                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"🔩 รหัสงาน: <code>{row['รหัสงาน']}</code>\n"
                 f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
                 f"👤 โดย: {user}"
             )
