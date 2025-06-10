@@ -106,13 +106,11 @@ st.title(f"🔧 Taping Process - สวัสดี {user} ({user_level})")
 # 🔐 สิทธิ์เข้าใช้งาน
 allowed_modes = []
 if user_level == "S1":
-    allowed_modes = ["📥 Taping MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
+    allowed_modes = ["📥 Taping MC", "🧾 Waiting Judgement", "📊 รายงาน"]
 elif user_level == "T1":
     allowed_modes = ["🧾 Waiting Judgement"]
 elif user_level == "T7":
     allowed_modes = ["📥 Taping MC"]
-elif user_level == "T8":
-    allowed_modes = ["💧 Oil Cleaning"]
 
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
@@ -219,26 +217,6 @@ elif menu == "🧾 Waiting Judgement":
             )
             st.rerun()
 
-# 💧 Oil Cleaning
-elif menu == "💧 Oil Cleaning":
-    st.subheader("💧 งานที่รอการล้าง")
-    df = pd.DataFrame(worksheet.get_all_records())
-    df = df[df["สถานะ"] == "Recheck"]
-    for idx, row in df.iterrows():
-        st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
-        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{idx}"):
-            worksheet.update_cell(idx + 2, 11, "Cleaned")
-            worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-            worksheet.update_cell(idx + 2, 14, user)
-            send_telegram_message(
-                f"💧 <b>ล้างเสร็จแล้ว</b>\n"
-                f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
-                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
-                f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
-                f"👤 โดย: {user}"
-            )
-            st.rerun()
-
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
     df = pd.DataFrame(worksheet.get_all_records())
@@ -257,21 +235,3 @@ elif menu == "📊 รายงาน":
     scrap_sum = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
     st.markdown("📌 สรุป Scrap แยกรหัสงาน")
     st.dataframe(scrap_sum)
-
-# 🛠 Upload Master
-elif menu == "🛠 Upload Master":
-    password = st.text_input("🔐 รหัส Sup", type="password")
-    if password == "Sup":
-        st.subheader("🛠 อัปโหลด Master")
-        emp_txt = st.text_area("👥 ชื่อพนักงาน (ชื่อ,รหัส,ระดับ)", height=150)
-        part_txt = st.text_area("🧾 รหัสงาน", height=150)
-        if st.button("📤 อัปโหลด"):
-            if emp_txt:
-                emp_lines = [e.strip().split(",") for e in emp_txt.strip().split("\n") if len(e.strip().split(",")) == 3]
-                emp_values = [["ชื่อพนักงาน", "รหัส", "ระดับ"]] + emp_lines
-                sheet.values_update("employee_master!A1", {"valueInputOption": "RAW"}, {"values": emp_values})
-            if part_txt:
-                part_lines = [[p.strip()] for p in part_txt.strip().split("\n") if p.strip()]
-                sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_lines})
-            st.success("✅ อัปโหลด Master สำเร็จแล้ว")
-            st.rerun()
