@@ -70,10 +70,10 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 def generate_job_id():
     try:
         records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
-        st.write("Data Retrieved: ", records)  # แสดงข้อมูลที่ดึงออกมาเพื่อตรวจสอบ
         if not records:
             st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
             st.stop()
+        st.write(f"Records retrieved: {records}")  # แสดงข้อมูลที่ดึงออกมาเพื่อตรวจสอบ
     except gspread.exceptions.GSpreadException as e:
         st.error(f"⚠️ API Error: {e}")
         return None
