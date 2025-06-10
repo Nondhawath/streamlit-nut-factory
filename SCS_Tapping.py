@@ -135,19 +135,18 @@ if menu == "📥 Taping MC":
         lot = st.text_input("📦 Lot Number")
         checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
-        pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         
         # ตรวจสอบข้อมูลซ้ำ
         if check_duplicate(job_id, part_code, reason_ng):
             st.warning("⚠️ ข้อมูลนี้ถูกบันทึกแล้ว กรุณาตรวจสอบอีกครั้ง")
         else:
-            total = ng + pending
+            total = ng  # ลบฟังก์ชัน "ยังไม่ตรวจ" ออก
             submitted = st.form_submit_button("✅ บันทึกข้อมูล")
             if submitted:
                 row = [
                     now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
-                    machine, lot, checked, ng, pending, total,
+                    machine, lot, checked, ng, total,  # ใช้เฉพาะ NG และตรวจ
                     "Taping MC", "", "", "", reason_ng
                 ]
                 try:
@@ -160,7 +159,7 @@ if menu == "📥 Taping MC":
                         f"🔩 รหัสงาน: {part_code}\n"
                         f"🛠 เครื่อง: {machine}\n"
                         f"📦 Lot: {lot}\n"
-                        f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}\n"
+                        f"❌ NG: {ng}\n"
                         f"📋 หัวข้องานเสีย: {reason_ng}"
                     )
                 except Exception as e:
