@@ -126,7 +126,7 @@ if menu == "📥 Taping MC":
     with st.form("taping_form"):
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 เครื่อง", machines_list)
-        lot = st.text_input("📦 Lot Number")
+        lot = st.text_input("📦 Lot Number", "")  # ถ้ามีข้อมูลให้กรอก
         checked = st.number_input("🔍 จำนวนผลิตทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
@@ -140,6 +140,11 @@ if menu == "📥 Taping MC":
             if submitted:
                 date = now_th()
                 if date:
+                    # เพิ่มการตรวจสอบข้อมูลหากฟิลด์ใดว่างเปล่า
+                    lot = lot if lot != "" else "N/A"  # กำหนดค่าเริ่มต้นหากว่าง
+                    reason_ng = reason_ng if reason_ng != "" else "ไม่มีข้อมูล"  # กำหนดค่าเริ่มต้นหากว่าง
+
+                    # สร้างข้อมูลเพื่อบันทึกลงในชีท
                     row = [
                         date.strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
                         user,  # พนักงาน
@@ -165,7 +170,6 @@ if menu == "📥 Taping MC":
                         )
                     except Exception as e:
                         st.error(f"⚠️ Error appending data to sheet: {e}")
-
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Scrap")
