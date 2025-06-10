@@ -24,7 +24,7 @@ def now_th():
 
 # 🔐 Google Sheet Auth
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
+service_account_info = st.secrets["google_sheets"]  # ดึงข้อมูลจาก Streamlit Secrets
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
