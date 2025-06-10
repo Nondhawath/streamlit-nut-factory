@@ -125,9 +125,15 @@ if menu == "📥 Taping MC":
             submitted = st.form_submit_button("✅ บันทึกข้อมูล")
             if submitted:
                 row = [
-                    now_th().strftime("%Y-%m-%d %H:%M:%S"), user, part_code,
-                    machine, lot, checked, ng, total,  # ใช้เฉพาะ NG และตรวจ
-                    "Taping MC", "", "", "", reason_ng
+                    now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
+                    user,  # พนักงาน
+                    part_code,  # รหัสงาน
+                    machine,  # เครื่อง
+                    lot,  # Lot Number
+                    checked,  # จำนวนผลิตทั้งหมด
+                    ng,  # จำนวน NG
+                    reason_ng,  # หัวข้องานเสีย
+                    "Taping MC"  # สถานะ
                 ]
                 try:
                     worksheet.append_row(row)
@@ -143,3 +149,60 @@ if menu == "📥 Taping MC":
                     )
                 except Exception as e:
                     st.error(f"⚠️ Error appending data to sheet: {e}")
+
+# 🧾 Waiting Judgement
+elif menu == "🧾 Waiting Judgement":
+    st.subheader("🔍 รอตัดสินใจ Scrap")
+    try:
+        df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
+        if df.empty:
+            st.warning("⚠️ ไม่มีข้อมูลใน Google Sheets")
+            st.stop()
+    except gspread.exceptions.GSpreadException as e:
+        st.error(f"⚠️ Gspread Error: {e}")
+        st.stop()
+
+    df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
+    df = df[df["สถานะ"] == "Taping MC"]
+    df = df.sort_values(by="วันที่", ascending=False)
+
+    for idx, row in df.iterrows():
+        timestamp = row.get("วันที่", "")
+        st.markdown(
+            f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | NG: {row['จำนวน NG']} | 📋 หัวข้องานเสีย: {row.get('หัวข้องานเสีย', '-')} | ⏰ เวลา: {timestamp}",
+            unsafe_allow_html=True
+        )
+
+        col1 = st.columns(1)
+        if col1[0].button(f"🗑 Scrap - {row['Job ID']}", key=f"scrap_{idx}"):
+            worksheet.update_cell(idx + 2, 11, "Scrap")
+            worksheet.update_cell(idx + 2, 12, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(
+                f"🗑 <b>Scrap</b>\n"
+                f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
+                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"📋 หัวข้องานเสีย: {row['หัวข้องานเสีย']}\n"
+                f"❌ จำนวนทั้งหมด: {row['จำนวนทั้งหมด']}\n"
+                f"👷‍♂️ โดย: {user}"
+            )
+            st.rerun()
+
+# 📊 รายงาน
+elif menu == "📊 รายงาน":
+    df = pd.DataFrame(worksheet.get_all_values())  # ใช้ get_all_values() แทน get_all_records()
+    df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
+    view = st.selectbox("🗓 ช่วงเวลา", ["ทั้งหมด", "รายวัน", "รายสัปดาห์", "รายเดือน", "รายปี"])
+    now = now_th()
+    if view == "รายวัน":
+        df = df[df["วันที่"].dt.date == now.date()]
+    elif view == "รายสัปดาห์":
+        df = df[df["วันที่"] >= now - pd.Timedelta(days=7)]
+    elif view == "รายเดือน":
+        df = df[df["วันที่"].dt.month == now.month]
+    elif view == "รายปี":
+        df = df[df["วันที่"].dt.year == now.year]
+    st.dataframe(df)
+    scrap_sum = df[df["สถานะ"] == "Scrap"].groupby("รหัสงาน")["จำนวนทั้งหมด"].sum().reset_index()
+    st.markdown("📌 สรุป Scrap แยกรหัสงาน")
+    st.dataframe(scrap_sum)
