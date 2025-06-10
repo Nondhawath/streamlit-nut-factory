@@ -7,8 +7,8 @@ import requests
 import json
 
 # ✅ Telegram Settings
-TELEGRAM_TOKEN = "7229880312:AAEkXptoNBQ4_5lONUhVqlzoSoeOs88-sxI"  # เปลี่ยนเป็น token ใหม่
-TELEGRAM_CHAT_ID = "-4818928611"  # เปลี่ยนเป็น chat id ใหม่
+TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+TELEGRAM_CHAT_ID = "-4944715716"
 
 def send_telegram_message(message):
     try:
@@ -20,23 +20,19 @@ def send_telegram_message(message):
 
 # ⏰ Timezone
 def now_th():
-    try:
-        return datetime.utcnow() + timedelta(hours=7)
-    except Exception as e:
-        st.error(f"⚠️ Error in datetime: {e}")
-        return None
+    return datetime.utcnow() + timedelta(hours=7)
 
 # 🔐 Google Sheet Auth
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # ใช้ข้อมูลจาก secrets.toml
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ID ของ Google Sheets ที่ต้องการใช้
+sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"  # ID ของ Google Sheets ที่ต้องการใช้
 try:
     sheet = client.open_by_key(sheet_id)
-    worksheet = sheet.worksheet("Data")  # ชื่อชีทที่ต้องการ
+    worksheet = sheet.worksheet("Data")
     st.success("✅ เชื่อมต่อ Google Sheets สำเร็จ!")
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
@@ -81,6 +77,22 @@ def load_master_data():
 
 emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_list = load_master_data()
 
+# 🆔 สร้าง Job ID ปลอดภัย
+def generate_job_id():
+    try:
+        records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
+        prefix = now_th().strftime("%y%m")
+        filtered = [
+            r for r in records
+            if isinstance(r[1], str) and r[1].startswith(prefix) and r[1][-4:].isdigit()  # ใช้ index ที่ถูกต้อง
+        ]
+        last_seq = max([int(r[1][-4:]) for r in filtered], default=0)
+        return f"{prefix}{last_seq + 1:04d}"
+
+    except gspread.exceptions.GSpreadException as e:
+        st.error(f"⚠️ Gspread Error: {e}")
+        return None
+
 # 🔐 Login Process
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
@@ -114,62 +126,56 @@ elif user_level == "T7":
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
 # 📥 Taping MC
-def check_duplicate(part_code, reason_ng):
+def check_duplicate(job_id, part_code, reason_ng):
     records = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records()
     for record in records:
-        if record[3] == part_code and record[9] == reason_ng:
+        if record[1] == job_id and record[3] == part_code and record[8] == reason_ng:
             return True
     return False
 
 if menu == "📥 Taping MC":
     st.subheader("📥 กรอกข้อมูล Taping")
     with st.form("taping_form"):
+        job_id = generate_job_id()
+        if job_id is None:
+            st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
+            st.stop()
+        
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 เครื่อง", machines_list)
-        lot = st.text_input("📦 Lot Number", "")  # ถ้ามีข้อมูลให้กรอก
+        lot = st.text_input("📦 Lot Number")
         checked = st.number_input("🔍 จำนวนผลิตทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         
         # ตรวจสอบข้อมูลซ้ำ
-        if check_duplicate(part_code, reason_ng):
+        if check_duplicate(job_id, part_code, reason_ng):
             st.warning("⚠️ ข้อมูลนี้ถูกบันทึกแล้ว กรุณาตรวจสอบอีกครั้ง")
         else:
             total = ng  # ลบฟังก์ชัน "ยังไม่ตรวจ" ออก
             submitted = st.form_submit_button("✅ บันทึกข้อมูล")
             if submitted:
-                date = now_th()
-                if date:
-                    # เพิ่มการตรวจสอบข้อมูลหากฟิลด์ใดว่างเปล่า
-                    lot = lot if lot != "" else "N/A"  # กำหนดค่าเริ่มต้นหากว่าง
-                    reason_ng = reason_ng if reason_ng != "" else "ไม่มีข้อมูล"  # กำหนดค่าเริ่มต้นหากว่าง
+                row = [
+                    now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
+                    machine, lot, checked, ng, total,  # ใช้เฉพาะ NG และตรวจ
+                    "Taping MC", "", "", "", reason_ng
+                ]
+                try:
+                    worksheet.append_row(row)
+                    st.success("✅ บันทึกเรียบร้อย")
+                    send_telegram_message(
+                        f"📥 <b>New Taping</b>\n"
+                        f"🆔 Job ID: <code>{job_id}</code>\n"
+                        f"👷‍♂️ พนักงาน: {user}\n"
+                        f"🔩 รหัสงาน: {part_code}\n"
+                        f"🛠 เครื่อง: {machine}\n"
+                        f"📦 Lot: {lot}\n"
+                        f"❌ NG: {ng}\n"
+                        f"📋 หัวข้องานเสีย: {reason_ng}"
+                    )
+                except Exception as e:
+                    st.error(f"⚠️ Error appending data to sheet: {e}")
 
-                    # สร้างข้อมูลเพื่อบันทึกลงในชีท
-                    row = [
-                        date.strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
-                        user,  # พนักงาน
-                        part_code,  # รหัสงาน
-                        machine,  # เครื่อง
-                        lot,  # Lot Number
-                        checked,  # จำนวนผลิตทั้งหมด
-                        ng,  # จำนวน NG
-                        reason_ng,  # หัวข้องานเสีย
-                        "Taping MC"  # สถานะ
-                    ]
-                    try:
-                        worksheet.append_row(row)
-                        st.success("✅ บันทึกเรียบร้อย")
-                        send_telegram_message(
-                            f"📥 <b>New Taping</b>\n"
-                            f"👷‍♂️ พนักงาน: {user}\n"
-                            f"🔩 รหัสงาน: {part_code}\n"
-                            f"🛠 เครื่อง: {machine}\n"
-                            f"📦 Lot: {lot}\n"
-                            f"❌ NG: {ng}\n"
-                            f"📋 หัวข้องานเสีย: {reason_ng}"
-                        )
-                    except Exception as e:
-                        st.error(f"⚠️ Error appending data to sheet: {e}")
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Scrap")
