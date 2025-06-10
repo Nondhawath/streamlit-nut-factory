@@ -21,7 +21,11 @@ def send_telegram_message(message):
 
 # ⏰ Timezone
 def now_th():
-    return datetime.utcnow() + timedelta(hours=7)
+    try:
+        return datetime.utcnow() + timedelta(hours=7)
+    except Exception as e:
+        st.error(f"⚠️ Error in datetime: {e}")
+        return None
 
 # 🔐 Google Sheet Auth
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -124,31 +128,33 @@ if menu == "📥 Taping MC":
             total = ng  # ลบฟังก์ชัน "ยังไม่ตรวจ" ออก
             submitted = st.form_submit_button("✅ บันทึกข้อมูล")
             if submitted:
-                row = [
-                    now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
-                    user,  # พนักงาน
-                    part_code,  # รหัสงาน
-                    machine,  # เครื่อง
-                    lot,  # Lot Number
-                    checked,  # จำนวนผลิตทั้งหมด
-                    ng,  # จำนวน NG
-                    reason_ng,  # หัวข้องานเสีย
-                    "Taping MC"  # สถานะ
-                ]
-                try:
-                    worksheet.append_row(row)
-                    st.success("✅ บันทึกเรียบร้อย")
-                    send_telegram_message(
-                        f"📥 <b>New Taping</b>\n"
-                        f"👷‍♂️ พนักงาน: {user}\n"
-                        f"🔩 รหัสงาน: {part_code}\n"
-                        f"🛠 เครื่อง: {machine}\n"
-                        f"📦 Lot: {lot}\n"
-                        f"❌ NG: {ng}\n"
-                        f"📋 หัวข้องานเสีย: {reason_ng}"
-                    )
-                except Exception as e:
-                    st.error(f"⚠️ Error appending data to sheet: {e}")
+                date = now_th()
+                if date:
+                    row = [
+                        date.strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
+                        user,  # พนักงาน
+                        part_code,  # รหัสงาน
+                        machine,  # เครื่อง
+                        lot,  # Lot Number
+                        checked,  # จำนวนผลิตทั้งหมด
+                        ng,  # จำนวน NG
+                        reason_ng,  # หัวข้องานเสีย
+                        "Taping MC"  # สถานะ
+                    ]
+                    try:
+                        worksheet.append_row(row)
+                        st.success("✅ บันทึกเรียบร้อย")
+                        send_telegram_message(
+                            f"📥 <b>New Taping</b>\n"
+                            f"👷‍♂️ พนักงาน: {user}\n"
+                            f"🔩 รหัสงาน: {part_code}\n"
+                            f"🛠 เครื่อง: {machine}\n"
+                            f"📦 Lot: {lot}\n"
+                            f"❌ NG: {ng}\n"
+                            f"📋 หัวข้องานเสีย: {reason_ng}"
+                        )
+                    except Exception as e:
+                        st.error(f"⚠️ Error appending data to sheet: {e}")
 
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
