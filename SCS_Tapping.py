@@ -5,11 +5,11 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-import json  # เพิ่ม
+import json
 
 # ✅ Telegram Settings
-TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
-TELEGRAM_CHAT_ID = "-4944715716"
+TELEGRAM_TOKEN = "7229880312:AAEkXptoNBQ4_5lONUhVqlzoSoeOs88-sxI"  # เปลี่ยนเป็น token ใหม่
+TELEGRAM_CHAT_ID = "-4818928611"  # เปลี่ยนเป็น chat id ใหม่
 
 def send_telegram_message(message):
     try:
@@ -30,10 +30,10 @@ creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
+sheet_id = "new_sheet_id_here"  # เปลี่ยนเป็น ID ของไฟล์ Google Sheets ใหม่
 try:
     sheet = client.open_by_key(sheet_id)
-    worksheet = sheet.worksheet("Data")
+    worksheet = sheet.worksheet("Data")  # เปลี่ยนเป็นชื่อชีทที่ต้องการ
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
@@ -100,61 +100,73 @@ if "logged_in_user" not in st.session_state:
 
 user = st.session_state.logged_in_user
 user_level = st.session_state.user_level
-st.set_page_config(page_title="Sorting Process", layout="wide")
-st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
+st.set_page_config(page_title="Taping Process", layout="wide")
+st.title(f"🔧 Taping Process - สวัสดี {user} ({user_level})")
 
 # 🔐 สิทธิ์เข้าใช้งาน
 allowed_modes = []
 if user_level == "S1":
-    allowed_modes = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
+    allowed_modes = ["📥 Taping MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
 elif user_level == "T1":
     allowed_modes = ["🧾 Waiting Judgement"]
 elif user_level == "T7":
-    allowed_modes = ["📥 Sorting MC"]
+    allowed_modes = ["📥 Taping MC"]
 elif user_level == "T8":
     allowed_modes = ["💧 Oil Cleaning"]
 
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 
-# 📥 Sorting MC
-if menu == "📥 Sorting MC":
-    st.subheader("📥 กรอกข้อมูล Sorting")
-    with st.form("sorting_form"):
+# 📥 Taping MC
+def check_duplicate(job_id, part_code, reason_ng):
+    records = worksheet.get_all_records()
+    for record in records:
+        if record["Job ID"] == job_id and record["รหัสงาน"] == part_code and record["หัวข้องานเสีย"] == reason_ng:
+            return True
+    return False
+
+if menu == "📥 Taping MC":
+    st.subheader("📥 กรอกข้อมูล Taping")
+    with st.form("taping_form"):
         job_id = generate_job_id()
         if job_id is None:
             st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
             st.stop()
-        st.markdown(f"**🆔 Job ID:** `{job_id}`")
+        
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
-        machine = st.selectbox("🛠 เครื่อง", machines_list)  # ใช้เครื่องจักรจาก machines_list
+        machine = st.selectbox("🛠 เครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
         checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
         pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
-        total = ng + pending
-        submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-        if submitted:
-            row = [
-                now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
-                machine, lot, checked, ng, pending, total,
-                "Sorting MC", "", "", "", reason_ng
-            ]
-            try:
-                worksheet.append_row(row)
-                st.success("✅ บันทึกเรียบร้อย")
-                send_telegram_message(
-                    f"📥 <b>New Sorting</b>\n"
-                    f"🆔 Job ID: <code>{job_id}</code>\n"
-                    f"👷‍♂️ พนักงาน: {user}\n"
-                    f"🔩 รหัสงาน: {part_code}\n"
-                    f"🛠 เครื่อง: {machine}\n"
-                    f"📦 Lot: {lot}\n"
-                    f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}\n"
-                    f"📋 หัวข้องานเสีย: {reason_ng}"
-                )
-            except Exception as e:
-                st.error(f"⚠️ Error appending data to sheet: {e}")
+        
+        # ตรวจสอบข้อมูลซ้ำ
+        if check_duplicate(job_id, part_code, reason_ng):
+            st.warning("⚠️ ข้อมูลนี้ถูกบันทึกแล้ว กรุณาตรวจสอบอีกครั้ง")
+        else:
+            total = ng + pending
+            submitted = st.form_submit_button("✅ บันทึกข้อมูล")
+            if submitted:
+                row = [
+                    now_th().strftime("%Y-%m-%d %H:%M:%S"), job_id, user, part_code,
+                    machine, lot, checked, ng, pending, total,
+                    "Taping MC", "", "", "", reason_ng
+                ]
+                try:
+                    worksheet.append_row(row)
+                    st.success("✅ บันทึกเรียบร้อย")
+                    send_telegram_message(
+                        f"📥 <b>New Taping</b>\n"
+                        f"🆔 Job ID: <code>{job_id}</code>\n"
+                        f"👷‍♂️ พนักงาน: {user}\n"
+                        f"🔩 รหัสงาน: {part_code}\n"
+                        f"🛠 เครื่อง: {machine}\n"
+                        f"📦 Lot: {lot}\n"
+                        f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}\n"
+                        f"📋 หัวข้องานเสีย: {reason_ng}"
+                    )
+                except Exception as e:
+                    st.error(f"⚠️ Error appending data to sheet: {e}")
 
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
@@ -165,9 +177,8 @@ elif menu == "🧾 Waiting Judgement":
         st.warning("⚠️ ไม่มีข้อมูลสถานะหรือวันที่ใน Google Sheet")
         st.stop()
 
-    df = df[df["สถานะ"] == "Sorting MC"]
+    df = df[df["สถานะ"] == "Taping MC"]
 
-    # เรียงลำดับจากรายการล่าสุด
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
     df = df.sort_values(by="วันที่", ascending=False)
 
@@ -264,4 +275,3 @@ elif menu == "🛠 Upload Master":
                 sheet.values_update("part_code_master!A1", {"valueInputOption": "RAW"}, {"values": [["รหัสงาน"]] + part_lines})
             st.success("✅ อัปโหลด Master สำเร็จแล้ว")
             st.rerun()
-
