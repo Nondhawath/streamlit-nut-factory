@@ -1,10 +1,11 @@
+# 📦 Import Library
 from datetime import datetime, timedelta
 import pandas as pd
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-import json
+import json  # เพิ่ม
 
 # ✅ Telegram Settings
 TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
@@ -24,12 +25,12 @@ def now_th():
 
 # 🔐 Google Sheet Auth
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-service_account_info = st.secrets["google_sheets"]  # ดึงข้อมูลจาก Streamlit Secrets
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ใช้ ID จากลิงก์ของคุณ
+sheet_id = "1GM-es30UBsqFCxBVQbBxht6IntIkL6troc5c2PWD3JA"
 try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")
@@ -55,9 +56,6 @@ def load_master_data():
 
         # Machines Data
         machines_data = sheet.worksheet("machines").get_all_records()
-        if not machines_data:
-            st.error("⚠️ ไม่มีข้อมูลเครื่องจักรใน Google Sheets")
-            st.stop()
         machines_list = [row["machines_name"] for row in machines_data]
 
         return emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_list
@@ -72,7 +70,7 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 def generate_job_id():
     try:
         records = worksheet.get_all_records()
-    except gspread.exceptions.GSpreadException as e:
+    except gspread.exceptions.APIError as e:
         st.error(f"⚠️ API Error: {e}")
         return None
 
@@ -102,78 +100,78 @@ if "logged_in_user" not in st.session_state:
 
 user = st.session_state.logged_in_user
 user_level = st.session_state.user_level
-st.set_page_config(page_title="Taping Process", layout="wide")
-st.title(f"🔧 Taping Process - สวัสดี {user} ({user_level})")
+st.set_page_config(page_title="Sorting Process", layout="wide")
+st.title(f"🔧 Sorting Process - สวัสดี {user} ({user_level})")
 
 # 🔐 สิทธิ์เข้าใช้งาน
 allowed_modes = []
 if user_level == "S1":
-    allowed_modes = ["📥 Taping MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
+    allowed_modes = ["📥 Sorting MC", "🧾 Waiting Judgement", "💧 Oil Cleaning", "📊 รายงาน", "🛠 Upload Master"]
 elif user_level == "T1":
     allowed_modes = ["🧾 Waiting Judgement"]
 elif user_level == "T7":
-    allowed_modes = ["📥 Taping MC"]
+    allowed_modes = ["📥 Sorting MC"]
 elif user_level == "T8":
     allowed_modes = ["💧 Oil Cleaning"]
 
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
-
-# 📥 Taping MC
-if menu == "📥 Taping MC":
-    st.subheader("📥 กรอกข้อมูล Taping")
-    with st.form("taping_form"):
+#📥 Sorting MC
+if menu == "📥 Sorting MC":
+    st.subheader("📥 กรอกข้อมูล Sorting")
+    with st.form("sorting_form"):
         job_id = generate_job_id()
         if job_id is None:
             st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
             st.stop()
+
         st.markdown(f"**🆔 Job ID:** `{job_id}`")
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 เครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
+        woc = st.text_input("📄 WOC")  # ✅ ช่องใหม่
+        vehicle_number = st.text_input("🚚 หมายเลขรถที่จัดเก็บ")  # ✅ ช่องใหม่
         checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
         ng = st.number_input("❌ NG", 0)
         pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
         total = ng + pending
+
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-
         if submitted:
-            # ตรวจสอบว่าข้อมูลครบถ้วนก่อนบันทึก
-            if not part_code or not machine or not lot:
-                st.error("⚠️ ข้อมูลบางอย่างขาดหายไป เช่น รหัสงาน, เครื่องจักร หรือ Lot Number")
-                st.stop()
-
             row = [
-                now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่และเวลา
-                job_id,                                # Job ID
-                user,                                  # ชื่อพนักงาน
-                part_code,                             # รหัสงาน
-                machine,                               # เครื่องจักร
-                lot,                                   # Lot Number
-                checked,                               # จำนวนตรวจทั้งหมด
-                ng,                                    # จำนวน NG
-                pending,                               # จำนวนยังไม่ตรวจ
-                total,                                 # รวม
-                "Taping MC",                           # สถานะ (กรณีนี้สมมุติเป็น "Taping MC")
-                reason_ng                              # หัวข้องานเสีย
+                now_th().strftime("%Y-%m-%d %H:%M:%S"),
+                job_id,
+                user,
+                part_code,
+                machine,
+                lot,
+                checked,
+                ng,
+                pending,
+                total,
+                "Sorting MC",  # สถานะ
+                woc,
+                vehicle_number,
+                "",  # วันที่ตัดสิน
+                reason_ng
             ]
-            
             try:
-                worksheet.append_row(row)  # บันทึกข้อมูลลงใน Google Sheets
+                worksheet.append_row(row)
                 st.success("✅ บันทึกเรียบร้อย")
                 send_telegram_message(
-                    f"📥 <b>New Taping</b>\n"
+                    f"📥 <b>New Sorting</b>\n"
                     f"🆔 Job ID: <code>{job_id}</code>\n"
                     f"👷‍♂️ พนักงาน: {user}\n"
                     f"🔩 รหัสงาน: {part_code}\n"
                     f"🛠 เครื่อง: {machine}\n"
                     f"📦 Lot: {lot}\n"
+                    f"📄 WOC: {woc}\n"
+                    f"🚚 หมายเลขรถ: {vehicle_number}\n"
                     f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}\n"
                     f"📋 หัวข้องานเสีย: {reason_ng}"
                 )
             except Exception as e:
                 st.error(f"⚠️ Error appending data to sheet: {e}")
-
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
@@ -183,7 +181,9 @@ elif menu == "🧾 Waiting Judgement":
         st.warning("⚠️ ไม่มีข้อมูลสถานะหรือวันที่ใน Google Sheet")
         st.stop()
 
-    df = df[df["สถานะ"] == "Taping MC"]
+    df = df[df["สถานะ"] == "Sorting MC"]
+
+    # เรียงลำดับจากรายการล่าสุด
     df["วันที่"] = pd.to_datetime(df["วันที่"], errors="coerce")
     df = df.sort_values(by="วันที่", ascending=False)
 
@@ -238,7 +238,7 @@ elif menu == "💧 Oil Cleaning":
             send_telegram_message(
                 f"💧 <b>ล้างเสร็จแล้ว</b>\n"
                 f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
-                f"🔩 รหัสงาน: <code>{row['รหัสงาน']}</code>\n"
+                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
                 f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
                 f"👤 โดย: {user}"
             )
