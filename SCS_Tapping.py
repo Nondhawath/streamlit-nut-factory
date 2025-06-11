@@ -118,6 +118,7 @@ menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
 #📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
+
     with st.form("sorting_form"):
         job_id = generate_job_id()
         if job_id is None:
@@ -126,38 +127,42 @@ if menu == "📥 Sorting MC":
 
         st.markdown(f"**🆔 Job ID:** `{job_id}`")
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
-        machine = st.selectbox("🛠 เครื่อง", machines_list)
+        machine = st.selectbox("🛠 ชื่อเครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
-        woc = st.text_input("📄 WOC")  # ✅ ช่องใหม่
-        vehicle_number = st.text_input("🚚 หมายเลขรถที่จัดเก็บ")  # ✅ ช่องใหม่
-        checked = st.number_input("🔍 จำนวนตรวจทั้งหมด", 0)
-        ng = st.number_input("❌ NG", 0)
-        pending = st.number_input("⏳ ยังไม่ตรวจ", 0)
+        woc = st.text_input("📄 WOC")
+        vehicle_number = st.text_input("🚚 หมายเลขรถที่จัดเก็บ")
+        checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot", 0)
+        ng = st.number_input("❌ จำนวน NG", 0)
+        pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
+
         total = ng + pending
 
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
         if submitted:
             row = [
-                now_th().strftime("%Y-%m-%d %H:%M:%S"),
-                job_id,
-                user,
-                part_code,
-                machine,
-                lot,
-                checked,
-                ng,
-                pending,
-                total,
-                "Sorting MC",  # สถานะ
-                woc,
-                vehicle_number,
-                "",  # วันที่ตัดสิน
-                reason_ng
+                now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
+                job_id,                                  # Job ID
+                user,                                    # ชื่อพนักงาน
+                part_code,                               # รหัสงาน
+                machine,                                 # ชื่อเครื่อง
+                lot,                                     # Lot Number
+                checked,                                 # จำนวนที่ตรวจสอบทั้งหมดของ Lot
+                ng,                                      # จำนวน NG
+                pending,                                 # จำนวนยังไม่ตรวจ
+                total,                                   # จำนวนทั้งหมด
+                "Sorting MC",                            # สถานะ
+                woc,                                     # WOC
+                vehicle_number,                          # หมายเลขรถที่จัดเก็บ
+                "",                                      # เวลา Scrap/Recheck
+                "",                                      # เวลา Cleaned
+                "",                                      # ผู้ล้าง
+                reason_ng                                # หัวข้องานเสีย
             ]
+
             try:
                 worksheet.append_row(row)
-                st.success("✅ บันทึกเรียบร้อย")
+                st.success("✅ บันทึกเรียบร้อยแล้ว")
                 send_telegram_message(
                     f"📥 <b>New Sorting</b>\n"
                     f"🆔 Job ID: <code>{job_id}</code>\n"
