@@ -139,10 +139,6 @@ if menu == "📥 Tapping MC":
                 "Tapping MC",                            # สถานะ
                 woc,                                     # WOC
                 vehicle_number,                          # หมายเลขTAG
-                "",                                      # เวลา Scrap/Recheck
-                "",                                      # เวลา Cleaned
-                "",                                      # ผู้ล้าง
-                reason_ng                                # หัวข้องานเสีย
             ]
 
             try:
@@ -157,8 +153,7 @@ if menu == "📥 Tapping MC":
                     f"📦 Lot: {lot}\n"
                     f"📄 WOC: {woc}\n"
                     f"🚚 หมายเลขTAG: {vehicle_number}\n"
-                    f"❌ NG: {ng}\n"
-                    f"📋 หัวข้องานเสีย: {reason_ng}"
+                    f"❌ NG: {ng}"
                 )
             except Exception as e:
                 st.error(f"⚠️ Error appending data to sheet: {e}")
