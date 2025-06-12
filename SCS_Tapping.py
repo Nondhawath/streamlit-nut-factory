@@ -69,7 +69,7 @@ emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_
 # 🔐 Login Process
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
-        st.subheader("🔐 เข้าสู่ระบบ Tapping process")
+        st.subheader("🔐 เข้าสู่ระบบ")
         username = st.selectbox("👤 Username", emp_master)
         password = st.text_input("🔑 Password", type="password")
         submitted = st.form_submit_button("🔓 Login")
@@ -136,7 +136,7 @@ if menu == "📥 Tapping MC":
                 checked,                                 # จำนวน Lot
                 ng,                                      # จำนวน NG
                 total,                                   # จำนวนทั้งหมด
-                "Tapping MC",                            # สถานะ
+                "Scrap",                                 # สถานะ
                 woc,                                     # WOC
                 vehicle_number,                          # หมายเลขTAG
             ]
@@ -145,7 +145,7 @@ if menu == "📥 Tapping MC":
                 worksheet.append_row(row)
                 st.success("✅ บันทึกเรียบร้อย")
                 send_telegram_message(
-                    f"📥 <b>New Tapping</b>\n"
+                    f"📥 <b>New Scrap</b>\n"
                     f"🆔 Job ID: <code>ไม่ใช้ Job ID แล้ว</code>\n"
                     f"👷‍♂️ พนักงาน: {user}\n"
                     f"🔩 รหัสงาน: {part_code}\n"
