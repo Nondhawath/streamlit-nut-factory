@@ -8,8 +8,8 @@ import requests
 import json
 
 # ✅ Telegram Settings
-TELEGRAM_TOKEN = "7229880312:AAEkXptoNBQ4_5lONUhVqlzoSoeOs88-sxI"
-TELEGRAM_CHAT_ID = "-4818928611"
+TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+TELEGRAM_CHAT_ID = "-4944715716"
 
 def send_telegram_message(message):
     try:
@@ -30,10 +30,10 @@ creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ลิงค์ใหม่
+sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ไฟล์ ID ใหม่
 try:
     sheet = client.open_by_key(sheet_id)
-    worksheet = sheet.worksheet("Tapping_report")  # เปลี่ยนชื่อชีทใหม่
+    worksheet = sheet.worksheet("Tapping_report")  # ชื่อชีทในไฟล์ Google Sheets
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
