@@ -132,7 +132,7 @@ if menu == "📥 Tapping MC":
         lot = st.text_input("📦 Lot Number")
         woc = st.text_input("📄 WOC")
         vehicle_number = st.text_input("🚚 หมายเลขTAG")
-        checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot", 0)
+        checked = st.number_input("🔍 จำนวน Lot", 0)
         ng = st.number_input("❌ จำนวน NG", 0)
         pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
@@ -157,7 +157,7 @@ if menu == "📥 Tapping MC":
                 part_code,                               # รหัสงาน
                 machine,                                 # ชื่อเครื่อง
                 lot,                                     # Lot Number
-                checked,                                 # จำนวนที่ตรวจสอบทั้งหมดของ Lot
+                checked,                                 # จำนวน Lot
                 ng,                                      # จำนวน NG
                 pending,                                 # จำนวนยังไม่ตรวจ
                 total,                                   # จำนวนทั้งหมด
