@@ -105,14 +105,6 @@ if menu == "📥 Tapping MC":
     st.subheader("📥 กรอกข้อมูล Tapping")
 
     with st.form("tapping_form"):
-        # ลบฟังก์ชัน generate_job_id และไม่ใช้ Job ID
-        # job_id = generate_job_id()
-        # if job_id is None:
-        #     st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
-        #     st.stop()
-
-        # st.markdown(f"**🆔 Job ID:** `{job_id}`")  # ลบการแสดงผล Job ID
-
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 ชื่อเครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
@@ -120,8 +112,6 @@ if menu == "📥 Tapping MC":
         vehicle_number = st.text_input("🚚 หมายเลขTAG")
         checked = st.number_input("🔍 จำนวน Lot", 0)
         ng = st.number_input("❌ จำนวน NG", 0)
-        # ลบจำนวนยังไม่ตรวจ
-        # pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
 
         total = ng  # ลบการรวมจำนวนยังไม่ตรวจ
