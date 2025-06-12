@@ -33,7 +33,7 @@ client = gspread.authorize(creds)
 sheet_id = "11zriIOYlG7FIz2PhWp0wxVdXA_5RFuxXhX67-UtrUd0"  # ไฟล์ ID ใหม่
 try:
     sheet = client.open_by_key(sheet_id)
-    worksheet = sheet.worksheet("Tapping_report")  # ชื่อชีทในไฟล์ Google Sheets
+    worksheet = sheet.worksheet("Data")  # ชื่อชีทในไฟล์ Google Sheets
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
