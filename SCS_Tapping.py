@@ -8,8 +8,8 @@ import requests
 import json
 
 # ✅ Telegram Settings
-TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
-TELEGRAM_CHAT_ID = "-4944715716"
+TELEGRAM_TOKEN = "7229880312:AAEkXptoNBQ4_5lONUhVqlzoSoeOs88-sxI"
+TELEGRAM_CHAT_ID = "-4818928611"
 
 def send_telegram_message(message):
     try:
