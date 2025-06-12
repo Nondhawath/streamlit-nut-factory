@@ -66,22 +66,6 @@ def load_master_data():
 
 emp_master, emp_password_map, emp_level_map, part_master, reason_list, machines_list = load_master_data()
 
-# 🆔 สร้าง Job ID ปลอดภัย
-def generate_job_id():
-    try:
-        records = worksheet.get_all_records()
-    except gspread.exceptions.APIError as e:
-        st.error(f"⚠️ API Error: {e}")
-        return None
-
-    prefix = now_th().strftime("%y%m")
-    filtered = [
-        r for r in records
-        if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
-    ]
-    last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
-    return f"{prefix}{last_seq + 1:04d}"
-
 # 🔐 Login Process
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
@@ -121,12 +105,14 @@ if menu == "📥 Tapping MC":
     st.subheader("📥 กรอกข้อมูล Tapping")
 
     with st.form("tapping_form"):
-        job_id = generate_job_id()
-        if job_id is None:
-            st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
-            st.stop()
+        # ลบฟังก์ชัน generate_job_id และไม่ใช้ Job ID
+        # job_id = generate_job_id()
+        # if job_id is None:
+        #     st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
+        #     st.stop()
 
-        st.markdown(f"**🆔 Job ID:** `{job_id}`")
+        # st.markdown(f"**🆔 Job ID:** `{job_id}`")  # ลบการแสดงผล Job ID
+
         part_code = st.selectbox("🔩 รหัสงาน", part_master)
         machine = st.selectbox("🛠 ชื่อเครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
@@ -134,10 +120,11 @@ if menu == "📥 Tapping MC":
         vehicle_number = st.text_input("🚚 หมายเลขTAG")
         checked = st.number_input("🔍 จำนวน Lot", 0)
         ng = st.number_input("❌ จำนวน NG", 0)
-        pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
+        # ลบจำนวนยังไม่ตรวจ
+        # pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
 
-        total = ng + pending
+        total = ng  # ลบการรวมจำนวนยังไม่ตรวจ
 
         # ตรวจสอบว่า WOC และ Lot Number ถูกกรอก
         if not woc:
@@ -152,14 +139,12 @@ if menu == "📥 Tapping MC":
         if submit_button and woc and lot:
             row = [
                 now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
-                job_id,                                  # Job ID
                 user,                                    # ชื่อพนักงาน
                 part_code,                               # รหัสงาน
                 machine,                                 # ชื่อเครื่อง
                 lot,                                     # Lot Number
                 checked,                                 # จำนวน Lot
                 ng,                                      # จำนวน NG
-                pending,                                 # จำนวนยังไม่ตรวจ
                 total,                                   # จำนวนทั้งหมด
                 "Tapping MC",                            # สถานะ
                 woc,                                     # WOC
@@ -175,14 +160,14 @@ if menu == "📥 Tapping MC":
                 st.success("✅ บันทึกเรียบร้อย")
                 send_telegram_message(
                     f"📥 <b>New Tapping</b>\n"
-                    f"🆔 Job ID: <code>{job_id}</code>\n"
+                    f"🆔 Job ID: <code>ไม่ใช้ Job ID แล้ว</code>\n"
                     f"👷‍♂️ พนักงาน: {user}\n"
                     f"🔩 รหัสงาน: {part_code}\n"
                     f"🛠 เครื่อง: {machine}\n"
                     f"📦 Lot: {lot}\n"
                     f"📄 WOC: {woc}\n"
                     f"🚚 หมายเลขTAG: {vehicle_number}\n"
-                    f"❌ NG: {ng} | ⏳ ยังไม่ตรวจ: {pending}\n"
+                    f"❌ NG: {ng}\n"
                     f"📋 หัวข้องานเสีย: {reason_ng}"
                 )
             except Exception as e:
