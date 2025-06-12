@@ -130,7 +130,7 @@ if menu == "📥 Sorting MC":
         machine = st.selectbox("🛠 ชื่อเครื่อง", machines_list)
         lot = st.text_input("📦 Lot Number")
         woc = st.text_input("📄 WOC")
-        vehicle_number = st.text_input("🚚 หมายเลขTAGที่จัดเก็บ")
+        vehicle_number = st.text_input("🚚 หมายเลขTAG")
         checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot", 0)
         ng = st.number_input("❌ จำนวน NG", 0)
         pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
@@ -162,7 +162,7 @@ if menu == "📥 Sorting MC":
                 total,                                   # จำนวนทั้งหมด
                 "Sorting MC",                            # สถานะ
                 woc,                                     # WOC
-                vehicle_number,                          # หมายเลขTAGที่จัดเก็บ
+                vehicle_number,                          # หมายเลขTAG
                 "",                                      # เวลา Scrap/Recheck
                 "",                                      # เวลา Cleaned
                 "",                                      # ผู้ล้าง
