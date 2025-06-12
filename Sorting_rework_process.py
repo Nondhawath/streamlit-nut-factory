@@ -138,8 +138,16 @@ if menu == "📥 Sorting MC":
 
         total = ng + pending
 
+        # ตรวจสอบว่า WOC และ Lot Number ถูกกรอก
+        if not woc:
+            st.error("⚠️ กรุณาบันทึกหมายเลข WOC")
+        if not lot:
+            st.error("⚠️ กรุณาบันทึกหมายเลข Lot")
+
         submitted = st.form_submit_button("✅ บันทึกข้อมูล")
-        if submitted:
+        
+        # หาก WOC หรือ Lot ยังไม่กรอก จะไม่ให้กดปุ่มบันทึก
+        if submitted and woc and lot:
             row = [
                 now_th().strftime("%Y-%m-%d %H:%M:%S"),  # วันที่
                 job_id,                                  # Job ID
@@ -162,7 +170,7 @@ if menu == "📥 Sorting MC":
 
             try:
                 worksheet.append_row(row)
-                st.success("✅ บันทึกเรียบร้อยแล้ว")
+                st.success("✅ บันทึกเรียบร้อย")
                 send_telegram_message(
                     f"📥 <b>New Sorting</b>\n"
                     f"🆔 Job ID: <code>{job_id}</code>\n"
