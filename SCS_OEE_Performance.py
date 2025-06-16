@@ -1,9 +1,7 @@
-# 📦 Import Library
-from datetime import datetime, timedelta
-import pandas as pd
-import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
+import streamlit as st
+from datetime import datetime, timedelta
 
 # ⏰ Timezone
 def now_th():
