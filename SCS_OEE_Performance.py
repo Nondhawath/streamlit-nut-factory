@@ -1,122 +1,135 @@
-import streamlit as st
+# 📦 Import Library
+from datetime import datetime, timedelta
 import pandas as pd
-import numpy as np
-from datetime import datetime
+import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
+import requests
 
-# สร้างข้อมูลจำลองสำหรับเครื่องจักร
-machines_data = pd.DataFrame({
-    "Machine Name": [f"Machine {i}" for i in range(1, 6)],
-    "Status": ["Idle", "Running", "Idle", "Running", "Maintenance"],
-    "Current Job": ["Job 1", "Job 2", "Job 3", "Job 4", "Job 5"],
-    "Job Progress": [75, 60, 100, 40, 20]  # เปอร์เซ็นต์การทำงาน
-})
+# ✅ Telegram Settings
+TELEGRAM_TOKEN = "7617656983:AAGqI7jQvEtKZw_tD11cQneH57WvYWl9r_s"
+TELEGRAM_CHAT_ID = "-4944715716"
 
-# สร้างข้อมูลจำลองสำหรับงานที่อัปโหลด
-job_names = [f"Job {i}" for i in range(1, 6)]
-quantities = np.random.randint(10000, 100000, size=len(job_names))
+def send_telegram_message(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+        requests.post(url, data=payload)
+    except Exception as e:
+        st.warning(f"⚠️ Telegram Error: {e}")
 
-jobs_data = pd.DataFrame({
-    "Job Name": job_names,
-    "Quantity": quantities,
-    "Delivery Date": pd.date_range(start=datetime.today(), periods=len(job_names), freq='D')
-})
+# ⏰ Timezone
+def now_th():
+    return datetime.utcnow() + timedelta(hours=7)
 
-# Sidebar สำหรับเลือกโหมดต่าง ๆ
-mode = st.sidebar.radio("Select Mode", ("Monitoring", "Assign", "Upload Plan", "User"))
+# 🔐 Google Sheet Auth
+SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
+creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
+client = gspread.authorize(creds)
 
-if mode == "Monitoring":
-    st.title("Monitoring Mode")
-    st.markdown("### Overview of All Machines")
-    st.dataframe(machines_data)
+# 📗 Sheets
+sheet_id = "1lYyHPN7Gdz628lw5s1JVkhNqnS5oHd5oSavUSgL_8cU"
+try:
+    sheet = client.open_by_key(sheet_id)
+    worksheet = sheet.worksheet("Data")  # เลือกชีทที่ชื่อว่า Data
+    part_code_sheet = sheet.worksheet("part_code_master")  # เลือกชีทที่ชื่อว่า part_code_master
+except gspread.exceptions.APIError as e:
+    st.error(f"⚠️ Error accessing Google Sheets: {e}")
+    st.stop()
 
-    # เพิ่มไอคอนให้คลิกเพื่อดูรายละเอียดงานของเครื่องจักร
-    for i, row in machines_data.iterrows():
-        machine_name = row['Machine Name']
-        status = row['Status']
-        current_job = row['Current Job']
-        job_progress = row['Job Progress']
+# 🔁 Load Master Data
+def load_master_data():
+    try:
+        # Part Data (รหัสงาน)
+        part_master = part_code_sheet.col_values(1)[1:]  # อ่านคอลัมน์รหัสงานจากชีท part_code_master
 
-        if st.button(f"🔧 {machine_name} - {status}", key=machine_name):
-            st.subheader(f"Details for {machine_name}")
-            st.write(f"**Status**: {status}")
-            st.write(f"**Current Job**: {current_job}")
-            st.write(f"**Job Progress**: {job_progress}%")
-            st.write("### Set Start and End Time for the Job")
-            
-            start_time = st.time_input(f"Start Time for {machine_name}", datetime(2025, 6, 9, 8, 0))
-            end_time = st.time_input(f"End Time for {machine_name}", datetime(2025, 6, 9, 16, 0))
+        return part_master
 
-            # คำนวณระยะเวลา
-            if end_time > start_time:
-                duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).seconds / 3600
+    except Exception as e:
+        st.error(f"⚠️ Error loading master data: {e}")
+        return []
+
+part_master = load_master_data()
+
+# 🆔 สร้าง Job ID ปลอดภัย
+def generate_job_id():
+    try:
+        records = worksheet.get_all_records()
+    except gspread.exceptions.APIError as e:
+        st.error(f"⚠️ API Error: {e}")
+        return None
+
+    prefix = now_th().strftime("%y%m")
+    filtered = [
+        r for r in records
+        if isinstance(r.get("Job ID"), str) and r["Job ID"].startswith(prefix) and r["Job ID"][-4:].isdigit()
+    ]
+    last_seq = max([int(r["Job ID"][-4:]) for r in filtered], default=0)
+    return f"{prefix}{last_seq + 1:04d}"
+
+# 🔐 Login Process
+if "logged_in_user" not in st.session_state:
+    with st.form("login_form"):
+        st.subheader("🔐 เข้าสู่ระบบ")
+        username = st.text_input("👤 Username")
+        password = st.text_input("🔑 Password", type="password")
+        submitted = st.form_submit_button("🔓 Login")
+        if submitted:
+            # ตรวจสอบรหัสผ่าน
+            if username == "admin" and password == "admin":  # ตัวอย่างการตรวจสอบ
+                st.session_state.logged_in_user = username
+                st.rerun()
             else:
-                duration = 0
+                st.error("❌ รหัสผ่านไม่ถูกต้อง")
+    st.stop()
 
-            st.write(f"**Duration**: {duration} hours")
-            st.progress(job_progress)
-            st.write(f"Job Progress for {machine_name}: {job_progress}%")
-            st.write(f"Machine Utilization: {duration / 8 * 100:.2f}%")
+user = st.session_state.logged_in_user
+st.set_page_config(page_title="บันทึกน้ำหนักชิ้นงาน", layout="wide")
+st.title(f"📦 บันทึกน้ำหนักชิ้นงาน - สวัสดี {user}")
 
-elif mode == "Assign":
-    st.title("Assign Job to Machine")
-    st.markdown("### Select Job and Machine to Assign")
-    
-    selected_job = st.selectbox("Select Job", jobs_data['Job Name'])
-    selected_machine = st.selectbox("Select Machine", machines_data['Machine Name'])
+# 📥 บันทึกน้ำหนักชิ้นงาน
+st.subheader("📦 กรอกข้อมูลน้ำหนักชิ้นงาน")
 
-    # แสดงรายละเอียดงานที่เลือก
-    if selected_job:
-        job_details = jobs_data[jobs_data['Job Name'] == selected_job].iloc[0]
-        st.write(f"**Job Name**: {job_details['Job Name']}")
-        st.write(f"**Quantity**: {job_details['Quantity']}")
-        st.write(f"**Delivery Date**: {job_details['Delivery Date']}")
+with st.form("weight_form"):
+    job_id = generate_job_id()
+    if job_id is None:
+        st.error("⚠️ ไม่สามารถสร้าง Job ID ได้")
+        st.stop()
 
-    # การมอบหมายงานให้กับเครื่องจักร
-    if st.button("Assign Job"):
-        st.write(f"Assigned **{selected_job}** to **{selected_machine}**")
+    st.markdown(f"**🆔 Job ID:** `{job_id}`")
+    part_code = st.selectbox("🔩 รหัสงาน", part_master)
+    weight = st.number_input("⚖️ น้ำหนักชิ้นงาน (n = 32)", min_value=0.0, step=0.1)
+    timestamp = now_th().strftime("%Y-%m-%d %H:%M:%S")
 
-elif mode == "Upload Plan":
-    st.title("Upload Job Plan")
-    st.markdown("### Upload New Plan")
-    
-    job_name = st.text_input("Job Name", placeholder="Enter the job name")
-    quantity = st.number_input("Quantity", min_value=1, step=1, placeholder="Enter the quantity")
-    delivery_date = st.date_input("Delivery Date", min_value=datetime.today())
-    
-    if st.button("Upload Plan"):
-        plan_data = {
-            'Job Name': job_name,
-            'Quantity': quantity,
-            'Delivery Date': str(delivery_date)
-        }
-        # เพิ่มแผนงานลงใน DataFrame
-        new_plan_df = pd.DataFrame([plan_data])
-        jobs_data = pd.concat([jobs_data, new_plan_df], ignore_index=True)
-        st.success(f"Job Plan '{job_name}' uploaded successfully!")
-        st.write(jobs_data)
+    # กำหนดปุ่มให้กดได้เฉพาะเมื่อกรอกครบ
+    submit_button = st.form_submit_button("✅ บันทึกข้อมูล")
 
-elif mode == "User":
-    st.title("User Mode")
-    st.markdown("### See Your Daily Jobs")
+    if submit_button and weight > 0:
+        # ค้นหาบรรทัดที่มีรหัสงานเดียวกัน
+        data = worksheet.get_all_records()
+        job_row = None
+        for idx, row in enumerate(data):
+            if row["รหัสงาน"] == part_code:
+                job_row = idx + 2  # +2 เนื่องจากแถวข้อมูลเริ่มต้นที่แถวที่ 2 (แถวแรกเป็นหัวตาราง)
+                break
 
-    # แสดงรายการงานที่กำลังดำเนินการ
-    current_jobs = jobs_data.sample(3)  # ใช้ sample สำหรับจำลองข้อมูล 3 งานที่กำลังทำ
-    st.write("**Current Jobs for Today**:")
-    st.dataframe(current_jobs)
-
-    # เลือกงานที่ต้องการทำ
-    selected_user_job = st.selectbox("Select Job to Start", current_jobs['Job Name'])
-
-    if selected_user_job:
-        st.write(f"**Selected Job**: {selected_user_job}")
-        start_time = st.time_input("Start Time", datetime(2025, 6, 9, 8, 0))
-        end_time = st.time_input("End Time", datetime(2025, 6, 9, 16, 0))
-
-        if st.button("Start Job"):
-            st.write(f"Started {selected_user_job} at {start_time}")
-        
-        if st.button("Finish Job"):
-            st.write(f"Finished {selected_user_job} at {end_time}")
-            # คำนวณระยะเวลา
-            duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).seconds / 3600
-            st.write(f"**Job Duration**: {duration} hours")
+        if job_row:
+            # หา first empty column ที่ n1 ถึง n30
+            for col_idx in range(1, 31):  # n1 ถึง n30
+                if not worksheet.cell(job_row, col_idx + 1).value:  # ถ้าค่าในเซลล์ว่าง
+                    worksheet.update_cell(job_row, col_idx + 1, weight)
+                    st.success(f"✅ บันทึกน้ำหนักชิ้นงาน {weight} kg เรียบร้อยแล้วใน n{col_idx}")
+                    send_telegram_message(
+                        f"📦 <b>New Weight Record</b>\n"
+                        f"🆔 Job ID: <code>{job_id}</code>\n"
+                        f"👷‍♂️ พนักงาน: {user}\n"
+                        f"🔩 รหัสงาน: {part_code}\n"
+                        f"⚖️ น้ำหนักชิ้นงาน: {weight} kg\n"
+                        f"⏰ เวลาบันทึก: {timestamp}"
+                    )
+                    break
+            else:
+                st.warning("⚠️ ไม่มีที่ว่างในคอลัมน์ n1 ถึง n30 สำหรับการบันทึกข้อมูล")
+        else:
+            st.warning("⚠️ ไม่พบรหัสงานในระบบ")
