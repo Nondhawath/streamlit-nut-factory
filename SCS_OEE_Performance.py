@@ -59,21 +59,27 @@ with st.form("weight_form"):
     submit_button = st.form_submit_button("✅ บันทึกข้อมูล")
 
     if submit_button:
-        # ค้นหาบรรทัดที่มีรหัสงานเดียวกันในชีท Data
-        data = worksheet.get_all_records()
-        job_row = None
-        for idx, row in enumerate(data):
-            if row["รหัสงาน"] == part_code:
-                job_row = idx + 2  # +2 เนื่องจากแถวข้อมูลเริ่มต้นที่แถวที่ 2 (แถวแรกเป็นหัวตาราง)
-                break
+        # ตรวจสอบว่า Google Sheet มีข้อมูลในชีท 'Data'
+        try:
+            data = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records() เพื่อดึงข้อมูลเป็น list
+            st.write("Data fetched from Google Sheets:", data)  # debug: แสดงข้อมูลที่ดึงมาจาก Google Sheets
 
-        if job_row:
-            # อัปเดตข้อมูลน้ำหนัก n1 ถึง n32 ใน Google Sheets
-            for col_idx, weight in enumerate(weights, start=1):
-                worksheet.update_cell(job_row, col_idx + 1, weight)  # +1 เนื่องจากคอลัมน์แรกเป็นรหัสงาน
-            st.success(f"✅ บันทึกน้ำหนักชิ้นงานเรียบร้อยแล้วใน n1 ถึง n32")
-        else:
-            # หากไม่พบรหัสงานในระบบ ให้เพิ่มข้อมูลลงในแถวใหม่
-            new_row = [part_code] + weights
-            worksheet.append_row(new_row)  # เพิ่มข้อมูลในแถวใหม่
-            st.success(f"✅ เพิ่มข้อมูลรหัสงานใหม่ {part_code} และบันทึกน้ำหนักเรียบร้อยแล้วใน n1 ถึง n32")
+            job_row = None
+            for idx, row in enumerate(data):
+                if row[0] == part_code:  # แถวแรกคือรหัสงาน
+                    job_row = idx + 1  # +1 เนื่องจากแถวข้อมูลเริ่มต้นที่แถวที่ 2 (แถวแรกเป็นหัวตาราง)
+                    break
+
+            if job_row:
+                # อัปเดตข้อมูลน้ำหนัก n1 ถึง n32 ใน Google Sheets
+                for col_idx, weight in enumerate(weights, start=1):
+                    worksheet.update_cell(job_row, col_idx + 1, weight)  # +1 เนื่องจากคอลัมน์แรกเป็นรหัสงาน
+                st.success(f"✅ บันทึกน้ำหนักชิ้นงานเรียบร้อยแล้วใน n1 ถึง n32")
+            else:
+                # หากไม่พบรหัสงานในระบบ ให้เพิ่มข้อมูลลงในแถวใหม่
+                new_row = [part_code] + weights
+                worksheet.append_row(new_row)  # เพิ่มข้อมูลในแถวใหม่
+                st.success(f"✅ เพิ่มข้อมูลรหัสงานใหม่ {part_code} และบันทึกน้ำหนักเรียบร้อยแล้วใน n1 ถึง n32")
+        except gspread.exceptions.GSpreadException as e:
+            st.error(f"⚠️ GSpread Error: {e}")
+            st.stop()
