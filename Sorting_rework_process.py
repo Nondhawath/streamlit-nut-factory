@@ -131,9 +131,9 @@ if menu == "📥 Sorting MC":
         lot = st.text_input("📦 Lot Number")
         woc = st.text_input("📄 WOC")
         vehicle_number = st.text_input("🚚 หมายเลขTAG")
-        checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot - Total Cnt ", 0)
-        ng = st.number_input("❌ จำนวน NG - NG Cnt.", 0)
-        pending = st.number_input("⏳ จำนวนยังไม่ตรวจ - UnTest Cnt", 0)
+        checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot Total Cnt ", 0)
+        ng = st.number_input("❌ จำนวน NG Cnt.", 0)
+        pending = st.number_input("⏳ จำนวนยังไม่ตรวจ UnTest Cnt", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
 
         total = ng + pending
