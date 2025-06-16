@@ -19,6 +19,7 @@ try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")  # เลือกชีทที่ชื่อว่า Data
     part_code_sheet = sheet.worksheet("part_code_master")  # เลือกชีทที่ชื่อว่า part_code_master
+    st.write("Google Sheets connection successful!")
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
@@ -56,21 +57,27 @@ with st.form("weight_form"):
     submit_button = st.form_submit_button("✅ บันทึกข้อมูล")
 
     if submit_button:
-        # ค้นหาบรรทัดที่มีรหัสงานเดียวกันในชีท Data
-        data = worksheet.get_all_records()
-        job_row = None
-        for idx, row in enumerate(data):
-            if row["รหัสงาน"] == part_code:
-                job_row = idx + 2  # +2 เนื่องจากแถวข้อมูลเริ่มต้นที่แถวที่ 2 (แถวแรกเป็นหัวตาราง)
-                break
+        # ตรวจสอบว่า Google Sheet มีข้อมูลในชีท 'Data'
+        try:
+            data = worksheet.get_all_records()
+            st.write("Data fetched from Google Sheets:", data)  # debug: แสดงข้อมูลที่ดึงมาจาก Google Sheets
 
-        if job_row:
-            # อัปเดตข้อมูลน้ำหนัก n1 ถึง n32 ใน Google Sheets
-            for col_idx, weight in enumerate(weights, start=1):
-                worksheet.update_cell(job_row, col_idx + 1, weight)  # +1 เนื่องจากคอลัมน์แรกเป็นรหัสงาน
-            st.success(f"✅ บันทึกน้ำหนักชิ้นงานเรียบร้อยแล้วใน n1 ถึง n32")
-        else:
-            # หากไม่พบรหัสงานในระบบ ให้เพิ่มข้อมูลลงในแถวใหม่
-            new_row = [part_code] + weights
-            worksheet.append_row(new_row)  # เพิ่มข้อมูลในแถวใหม่
-            st.success(f"✅ เพิ่มข้อมูลรหัสงานใหม่ {part_code} และบันทึกน้ำหนักเรียบร้อยแล้วใน n1 ถึง n32")
+            job_row = None
+            for idx, row in enumerate(data):
+                if row["รหัสงาน"] == part_code:
+                    job_row = idx + 2  # +2 เนื่องจากแถวข้อมูลเริ่มต้นที่แถวที่ 2 (แถวแรกเป็นหัวตาราง)
+                    break
+
+            if job_row:
+                # อัปเดตข้อมูลน้ำหนัก n1 ถึง n32 ใน Google Sheets
+                for col_idx, weight in enumerate(weights, start=1):
+                    worksheet.update_cell(job_row, col_idx + 1, weight)  # +1 เนื่องจากคอลัมน์แรกเป็นรหัสงาน
+                st.success(f"✅ บันทึกน้ำหนักชิ้นงานเรียบร้อยแล้วใน n1 ถึง n32")
+            else:
+                # หากไม่พบรหัสงานในระบบ ให้เพิ่มข้อมูลลงในแถวใหม่
+                new_row = [part_code] + weights
+                worksheet.append_row(new_row)  # เพิ่มข้อมูลในแถวใหม่
+                st.success(f"✅ เพิ่มข้อมูลรหัสงานใหม่ {part_code} และบันทึกน้ำหนักเรียบร้อยแล้วใน n1 ถึง n32")
+        except gspread.exceptions.GSpreadException as e:
+            st.error(f"⚠️ GSpread Error: {e}")
+            st.stop()
