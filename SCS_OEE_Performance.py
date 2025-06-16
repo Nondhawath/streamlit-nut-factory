@@ -11,12 +11,12 @@ def now_th():
 
 # 🔐 Google Sheet Auth
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-service_account_info = st.secrets["GOOGLE_SHEETS_CREDENTIALS"]  # เป็น dict อยู่แล้ว
+service_account_info = st.secrets["gcp_service_account"]  # ดึงข้อมูลจาก secrets.toml
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPE)
 client = gspread.authorize(creds)
 
 # 📗 Sheets
-sheet_id = "1lYyHPN7Gdz628lw5s1JVkhNqnS5oHd5oSavUSgL_8cU"
+sheet_id = "1lYyHPN7Gdz628lw5s1JVkhNqnS5oHd5oSavUSgL_8cU"  # เปลี่ยนเป็น ID ของ Google Sheet ที่คุณใช้
 try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")  # เลือกชีทที่ชื่อว่า Data
@@ -30,9 +30,7 @@ def load_master_data():
     try:
         # Part Data (รหัสงาน)
         part_master = part_code_sheet.col_values(1)[1:]  # อ่านคอลัมน์รหัสงานจากชีท part_code_master
-
         return part_master
-
     except Exception as e:
         st.error(f"⚠️ Error loading master data: {e}")
         return []
