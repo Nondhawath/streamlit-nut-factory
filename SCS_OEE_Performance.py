@@ -22,7 +22,7 @@ try:
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet("Data")  # เลือกชีทที่ชื่อว่า Data
     part_code_sheet = sheet.worksheet("part_code_master")  # เลือกชีทที่ชื่อว่า part_code_master
-    st.write("Google Sheets connection successful!")
+    # st.write("Google Sheets connection successful!")  # ลบออกจากการแสดงผล
 except gspread.exceptions.APIError as e:
     st.error(f"⚠️ Error accessing Google Sheets: {e}")
     st.stop()
@@ -62,7 +62,6 @@ with st.form("weight_form"):
         # ตรวจสอบว่า Google Sheet มีข้อมูลในชีท 'Data'
         try:
             data = worksheet.get_all_values()  # ใช้ get_all_values() แทน get_all_records() เพื่อดึงข้อมูลเป็น list
-            st.write("Data fetched from Google Sheets:", data)  # debug: แสดงข้อมูลที่ดึงมาจาก Google Sheets
 
             job_row = None
             for idx, row in enumerate(data):
