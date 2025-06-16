@@ -47,9 +47,8 @@ with st.form("weight_form"):
     
     # กรอกข้อมูลน้ำหนัก n1 ถึง n32
     for i in range(1, 33):
-        # ใช้ number_input เพื่อให้กรอกเป็นจำนวนเต็ม 4 หลัก
-        weight = st.number_input(f"⚖️ น้ำหนักชิ้นงาน (n{i})", min_value=0, max_value=9999, step=1, key=f"n{i}")
-        weights.append(weight)
+        weight = st.number_input(f"⚖️ น้ำหนักชิ้นงาน (n{i})", min_value=0.0, step=0.0001, format="%.4f", key=f"n{i}")
+        weights.append(round(weight, 4))  # เก็บข้อมูลเป็นทศนิยม 4 หลัก
     
     timestamp = now_th().strftime("%Y-%m-%d %H:%M:%S")
 
