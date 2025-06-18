@@ -19,8 +19,8 @@ def connect_to_google_sheets():
     # เชื่อมต่อกับ Google Sheets
     client = gspread.authorize(creds)
 
-    # เปิดไฟล์ Google Sheets ที่ชื่อ "Weight_Comparison" และเลือก sheet แรก
-    sheet = client.open("Weight_Comparison").sheet1
+    # ใช้ ID ของไฟล์ Google Sheets แทนชื่อไฟล์
+    sheet = client.open_by_key("your_google_sheets_file_id").sheet1  # ใช้ Google Sheets ID แทนชื่อไฟล์
 
     return sheet
 
