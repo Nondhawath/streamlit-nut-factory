@@ -1,67 +1,36 @@
 import streamlit as st
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 
-# กำหนด scope สำหรับ Google Sheets และ Drive
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+# ฟังก์ชั่นคำนวณผลต่างน้ำหนักและเปอร์เซ็นต์ความคลาดเคลื่อน
+def calculate_weight_difference(weight_prev, weight_curr):
+    return weight_curr - weight_prev, abs(weight_curr - weight_prev) / weight_prev * 100
 
-# โหลดไฟล์ credentials.json จากเครื่อง (ต้องอยู่ใน folder เดียวกันกับไฟล์นี้)
-credentials = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(credentials)
+# สร้างฟอร์มให้ผู้ใช้กรอกข้อมูลน้ำหนัก
+st.title('โปรแกรมเทียบข้อมูลน้ำหนัก')
 
-# Google Sheets key และชื่อชีท
-SPREADSHEET_KEY = "1op8bQkslCAtRbeW7r3XjGP82kcIv0ox1azrCS2-1fRE"
-data_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OSmanagementdata")
-part_code_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("OS_part_code_master")
-user_sheet = client.open_by_key(SPREADSHEET_KEY).worksheet("ชื่อและรหัสพนักงาน")
+# เลือกแผนกก่อนหน้า
+department_prev = st.selectbox("เลือกแผนกก่อนหน้า", ['Forming', 'Tapping'])
 
-# โหลดข้อมูลรหัสงาน และข้อมูลพนักงาน
-job_codes = part_code_sheet.col_values(1)[1:]  # ข้าม header
-user_data_raw = user_sheet.get_all_records()
-user_dict = {str(row["รหัส"]): row["ชื่อ"] for row in user_data_raw}
+# เลือกแผนกปัจจุบัน
+department_curr = st.selectbox("เลือกแผนกปัจจุบัน", ['Tapping', 'Final Inspection'])
 
-# เริ่มแอป Streamlit
-st.set_page_config(page_title="FI_OS_Management", layout="centered")
+# กรอกน้ำหนักจากแผนกก่อนหน้า
+weight_prev = st.number_input(f'กรอกน้ำหนักจากแผนก {department_prev}', min_value=0.0, format="%.2f")
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
+# กรอกน้ำหนักจากแผนกปัจจุบัน
+weight_curr = st.number_input(f'กรอกน้ำหนักจากแผนก {department_curr}', min_value=0.0, format="%.2f")
 
-if not st.session_state.authenticated:
-    st.header("🔒 เข้าสู่ระบบ")
-    user_code = st.text_input("รหัสพนักงาน", type="password")
-
-    if st.button("เข้าสู่ระบบ"):
-        if user_code in user_dict:
-            st.session_state.authenticated = True
-            st.session_state.username = user_dict[user_code]
-            st.experimental_rerun()
-        else:
-            st.error("❌ รหัสไม่ถูกต้อง กรุณาลองใหม่")
+# ตรวจสอบว่าผู้ใช้กรอกข้อมูลหรือยัง
+if weight_prev > 0 and weight_curr > 0:
+    # คำนวณผลต่างน้ำหนักและเปอร์เซ็นต์ความคลาดเคลื่อน
+    weight_diff, percentage_diff = calculate_weight_difference(weight_prev, weight_curr)
+    
+    # แสดงผลต่างน้ำหนัก
+    st.write(f"ผลต่างน้ำหนักระหว่างแผนก {department_prev} และ {department_curr}: {weight_diff:.2f} กิโลกรัม")
+    
+    # ตรวจสอบเปอร์เซ็นต์ความคลาดเคลื่อน
+    if percentage_diff > 2:
+        st.markdown('<p style="color:red; font-size:20px;">ค่าน้ำหนักไม่ถูกต้อง กรุณาเรียกหัวหน้างานเพื่อตรวจสอบ</p>', unsafe_allow_html=True)
+    else:
+        st.markdown('<p style="color:green; font-size:20px;">น้ำหนักถูกต้อง ให้ปฏิบัติงานต่อได้</p>', unsafe_allow_html=True)
 else:
-    st.success(f"✅ ยินดีต้อนรับคุณ {st.session_state.username}")
-    st.header("📋 รับงานเข้า / บันทึกงาน OK-NG")
-
-    job_code = st.selectbox("เลือกรหัสงาน", job_codes)
-    ok_qty = st.number_input("จำนวนงาน OK", min_value=0, step=1)
-    ng_qty = st.number_input("จำนวนงาน NG", min_value=0, step=1)
-    total_qty = ok_qty + ng_qty
-    st.markdown(f"**รวมทั้งหมด: {total_qty} ชิ้น**")
-
-    remark = st.text_input("หมายเหตุเพิ่มเติม (ถ้ามี)")
-
-    if st.button("บันทึกข้อมูล"):
-        if total_qty == 0:
-            st.warning("⚠️ กรุณากรอกจำนวน OK หรือ NG อย่างน้อยหนึ่งค่า")
-        else:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            job_id = f"{job_code}-{int(datetime.now().timestamp())}"
-
-            if ok_qty > 0:
-                data_sheet.append_row([timestamp, st.session_state.username, job_code, ok_qty, "OK", remark, job_id, "รับงาน"])
-            if ng_qty > 0:
-                data_sheet.append_row([timestamp, st.session_state.username, job_code, ng_qty, "NG", remark, job_id, "รับงาน"])
-
-            st.success(f"✅ บันทึกข้อมูลแล้ว | Job ID: {job_id}")
+    st.write("กรุณากรอกน้ำหนักจากทั้งสองแผนกเพื่อทำการตรวจสอบ")
