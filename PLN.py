@@ -57,6 +57,8 @@ def assign_jobs(plan_df):
     capacity_per_machine = 480  # เครื่องจักร 1 เครื่องมีความสามารถ 480 นาที (100%)
     machine_capacity = {machine: capacity_per_machine for machine in machines}
     
+    assignments = []  # เก็บการ Assign งาน
+    
     for index, row in plan_df.iterrows():
         job_name = row["P/No"]
         required_time = row["เวลาผลิต (นาที)"] * 60  # คำนวณเวลาในหน่วยนาที
@@ -64,7 +66,7 @@ def assign_jobs(plan_df):
         st.write(f"Job: {job_name}, จำนวน: {row['จำนวน']}, เวลาในการผลิต: {required_time:.2f} นาที")
         
         # Dropdown เลือกเครื่องจักร
-        selected_machine = st.selectbox(f"เลือกเครื่องจักรสำหรับงาน {job_name}", machines)
+        selected_machine = st.selectbox(f"เลือกเครื่องจักรสำหรับงาน {job_name}", machines, key=f"select_{index}")
         
         # คำนวณว่าเครื่องจักรสามารถทำงานนี้ได้หรือไม่
         remaining_capacity = machine_capacity[selected_machine]
@@ -72,9 +74,18 @@ def assign_jobs(plan_df):
         if remaining_capacity >= required_time:
             st.write(f"เครื่องจักร {selected_machine} สามารถทำงานนี้ได้ภายในเวลา {required_time:.2f} นาที")
             machine_capacity[selected_machine] -= required_time  # ลดเวลาใช้งานเครื่องจักร
+            assignments.append({"P/No": job_name, "เครื่องจักร": selected_machine, "เวลาที่ใช้": required_time})
         else:
             st.write(f"เครื่องจักร {selected_machine} ไม่สามารถทำงานนี้ได้เนื่องจากเวลาไม่พอ (จำเป็นต้องใช้เวลา {required_time:.2f} นาที)")
     
+    # ปุ่มยืนยันการ Assign
+    if st.button("ยืนยันการ Assign"):
+        if assignments:
+            st.success("การ Assign งานสำเร็จ!")
+            st.write(assignments)
+        else:
+            st.warning("ยังไม่มีการ Assign งานใดๆ")
+
     return plan_df
 
 # ฟังก์ชันการบันทึกผลการผลิต
