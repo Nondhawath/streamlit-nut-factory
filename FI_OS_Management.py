@@ -20,7 +20,7 @@ def connect_to_google_sheets():
     client = gspread.authorize(creds)
 
     # ใช้ ID ของไฟล์ Google Sheets แทนชื่อไฟล์
-    sheet = client.open_by_key("your_google_sheets_file_id").sheet1  # ใช้ Google Sheets ID แทนชื่อไฟล์
+    sheet = client.open_by_key("1evJ6QuCW1jWmHbyD8pJCcRX8g3d_STWu94IOLY9LbXM").sheet1  # ใช้ Google Sheets ID
 
     return sheet
 
