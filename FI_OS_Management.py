@@ -10,16 +10,18 @@ def calculate_weight_difference(weight_prev, weight_curr):
 def connect_to_google_sheets():
     # ใช้สิทธิ์การเข้าถึง Google Sheets ด้วย OAuth 2.0
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
-    # ตั้งค่าเส้นทางไฟล์ credentials.json
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    
+
+    # ใช้ข้อมูลจาก Streamlit Secrets เพื่อโหลดข้อมูล
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        st.secrets["google_cloud"], scope
+    )
+
     # เชื่อมต่อกับ Google Sheets
     client = gspread.authorize(creds)
-    
+
     # เปิดไฟล์ Google Sheets ที่ชื่อ "Weight_Comparison" และเลือก sheet แรก
     sheet = client.open("Weight_Comparison").sheet1
-    
+
     return sheet
 
 # สร้างฟอร์มให้ผู้ใช้กรอกข้อมูลน้ำหนัก
