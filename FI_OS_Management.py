@@ -1,11 +1,26 @@
 import streamlit as st
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # ฟังก์ชั่นคำนวณผลต่างน้ำหนักและเปอร์เซ็นต์ความคลาดเคลื่อน
 def calculate_weight_difference(weight_prev, weight_curr):
     return weight_curr - weight_prev, abs(weight_curr - weight_prev) / weight_prev * 100
 
+# ฟังก์ชั่นเชื่อมต่อกับ Google Sheets
+def connect_to_google_sheets():
+    # ใช้สิทธิ์การเข้าถึง Google Sheets ด้วย OAuth 2.0
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    client = gspread.authorize(creds)
+    # เปิดชีตที่ต้องการบันทึกข้อมูล
+    sheet = client.open("Weight_Comparison").sheet1
+    return sheet
+
 # สร้างฟอร์มให้ผู้ใช้กรอกข้อมูลน้ำหนัก
 st.title('โปรแกรมเทียบข้อมูลน้ำหนัก')
+
+# กรอกหมายเลข WOC
+woc = st.text_input('กรอกหมายเลข Work Order Code (WOC)', '')
 
 # เลือกแผนกก่อนหน้า
 department_prev = st.selectbox("เลือกแผนกก่อนหน้า", ['Forming', 'Tapping'])
@@ -22,7 +37,7 @@ weight_curr = st.number_input(f'กรอกน้ำหนักจากแผ
 # สร้างปุ่มตรวจสอบ
 if st.button('ตรวจสอบ'):
     # ตรวจสอบว่าผู้ใช้กรอกข้อมูลหรือยัง
-    if weight_prev > 0 and weight_curr > 0:
+    if weight_prev > 0 and weight_curr > 0 and woc != "":
         # คำนวณผลต่างน้ำหนักและเปอร์เซ็นต์ความคลาดเคลื่อน
         weight_diff, percentage_diff = calculate_weight_difference(weight_prev, weight_curr)
 
@@ -34,5 +49,10 @@ if st.button('ตรวจสอบ'):
             st.markdown('<p style="color:red; font-size:20px;">ค่าน้ำหนักไม่ถูกต้อง กรุณาเรียกหัวหน้างานเพื่อตรวจสอบ</p>', unsafe_allow_html=True)
         else:
             st.markdown('<p style="color:green; font-size:20px;">น้ำหนักถูกต้อง ให้ปฏิบัติงานต่อได้</p>', unsafe_allow_html=True)
+        
+        # บันทึกข้อมูลลง Google Sheets
+        sheet = connect_to_google_sheets()
+        sheet.append_row([woc, department_prev, department_curr, weight_prev, weight_curr, weight_diff, percentage_diff])
+        st.write("บันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว")
     else:
-        st.write("กรุณากรอกน้ำหนักจากทั้งสองแผนกเพื่อทำการตรวจสอบ")
+        st.write("กรุณากรอกหมายเลข WOC และน้ำหนักจากทั้งสองแผนกเพื่อทำการตรวจสอบ")
