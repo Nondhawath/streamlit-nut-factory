@@ -115,6 +115,8 @@ def record_production_results(plan_df):
                 plan_df.at[index, "จำนวน OK"] = ok_count
                 plan_df.at[index, "จำนวน NG"] = ng_count
                 plan_df.at[index, "จำนวนยังไม่ทดสอบ"] = untest_count
+                # ลบ Job นี้ออกจาก DataFrame
+                plan_df = plan_df.drop(index)
     
     else:
         st.warning("ยังไม่มีงานที่ถูก Assign ให้เครื่องจักรนี้")
