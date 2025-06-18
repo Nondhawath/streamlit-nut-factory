@@ -7,7 +7,9 @@ def upload_plan():
     st.header("อัปโหลดแผนการผลิต")
     
     uploaded_file = st.file_uploader("เลือกไฟล์ CSV หรือ Excel เพื่ออัปโหลดแผนการผลิต", type=["csv", "xlsx"])
+    
     if uploaded_file is not None:
+        # อ่านข้อมูลจากไฟล์ที่อัปโหลด
         if uploaded_file.type == "application/vnd.ms-excel" or uploaded_file.type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
             plan_df = pd.read_excel(uploaded_file)
         else:
@@ -16,11 +18,27 @@ def upload_plan():
         st.write("ข้อมูลแผนงานที่อัปโหลด:")
         st.write(plan_df)
         
+        # ตรวจสอบชื่อคอลัมน์
         if "P/No" not in plan_df.columns or "จำนวน" not in plan_df.columns:
             st.error("ไฟล์ที่อัปโหลดไม่มีคอลัมน์ 'P/No' หรือ 'จำนวน' กรุณาตรวจสอบและลองใหม่")
             return None
         
-        return plan_df
+        # ตรวจสอบข้อมูลซ้ำ (ใช้ P/No และ จำนวนเป็นเงื่อนไข)
+        if "plan_df" in st.session_state:
+            existing_plans = st.session_state.plan_df
+            new_plans = plan_df[~plan_df[['P/No', 'จำนวน']].apply(tuple, 1).isin(existing_plans[['P/No', 'จำนวน']].apply(tuple, 1))]
+            if not new_plans.empty:
+                # ถ้ามีข้อมูลใหม่ให้เพิ่มลงใน session_state
+                st.session_state.plan_df = pd.concat([existing_plans, new_plans], ignore_index=True)
+                st.success(f"แผนการผลิตที่ไม่ซ้ำถูกเพิ่มแล้ว {len(new_plans)} รายการ")
+            else:
+                st.warning("ไม่มีแผนการผลิตใหม่ที่ไม่ซ้ำ!")
+        else:
+            st.session_state.plan_df = plan_df
+            st.success(f"แผนการผลิตถูกเพิ่มแล้ว {len(plan_df)} รายการ")
+        
+        return st.session_state.plan_df
+    
     return None
 
 # ฟังก์ชันคำนวณเวลาในการผลิต
@@ -79,22 +97,22 @@ def main():
             st.write(plan_df)
     
     elif mode == "Assign งาน":
-        if 'plan_df' not in locals():
+        if 'plan_df' not in st.session_state:
             st.warning("กรุณาอัปโหลดแผนการผลิตก่อน")
         else:
-            plan_df = assign_jobs(plan_df)
+            plan_df = assign_jobs(st.session_state.plan_df)
     
     elif mode == "คำนวณเวลาและบันทึกผลการผลิต":
-        if 'plan_df' not in locals():
+        if 'plan_df' not in st.session_state:
             st.warning("กรุณาอัปโหลดแผนการผลิตก่อน")
         else:
-            record_production_results(plan_df)
+            record_production_results(st.session_state.plan_df)
     
     elif mode == "รายงาน":
-        if 'plan_df' not in locals():
+        if 'plan_df' not in st.session_state:
             st.warning("กรุณาอัปโหลดแผนการผลิตก่อน")
         else:
-            generate_report(plan_df)
+            generate_report(st.session_state.plan_df)
 
 if __name__ == "__main__":
     main()
