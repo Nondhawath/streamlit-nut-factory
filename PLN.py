@@ -92,18 +92,33 @@ def assign_jobs(plan_df):
 def record_production_results(plan_df):
     st.header("บันทึกผลการผลิต")
     
-    for index, row in plan_df.iterrows():
-        st.write(f"ผลการผลิตสำหรับ P/No: {row['P/No']}")
-        ok_count = st.number_input(f"จำนวน OK สำหรับ P/No {row['P/No']}", min_value=0, max_value=row["จำนวน"], value=0, key=f"ok_{index}")
-        ng_count = st.number_input(f"จำนวน NG สำหรับ P/No {row['P/No']}", min_value=0, max_value=row["จำนวน"], value=0, key=f"ng_{index}")
-        
-        untest_count = row["จำนวน"] - (ok_count + ng_count)
-        st.write(f"จำนวนที่ยังไม่ทดสอบ: {untest_count}")
-        
-        plan_df.at[index, "จำนวน OK"] = ok_count
-        plan_df.at[index, "จำนวน NG"] = ng_count
-        plan_df.at[index, "จำนวนยังไม่ทดสอบ"] = untest_count
+    # เลือกเครื่องจักรจาก Dropdown
+    machine_list = ["Machine A", "Machine B", "Machine C", "Machine D"]
+    selected_machine = st.selectbox("เลือกเครื่องจักรที่ต้องการบันทึกผลการผลิต", machine_list)
     
+    # กรองแสดง Job ที่ถูก Assign ให้เครื่องจักรที่เลือก
+    assigned_jobs = plan_df[plan_df["เครื่องจักรที่ Assign"] == selected_machine]
+    
+    # ถ้ามีการ Assign งานแล้วให้แสดงรายการ
+    if not assigned_jobs.empty:
+        for index, row in assigned_jobs.iterrows():
+            st.write(f"Job: {row['P/No']}, จำนวน: {row['จำนวน']}, เครื่องจักร: {row['เครื่องจักรที่ Assign']}")
+            ok_count = st.number_input(f"จำนวน OK สำหรับ P/No {row['P/No']}", min_value=0, max_value=row["จำนวน"], value=0, key=f"ok_{index}")
+            ng_count = st.number_input(f"จำนวน NG สำหรับ P/No {row['P/No']}", min_value=0, max_value=row["จำนวน"], value=0, key=f"ng_{index}")
+            
+            untest_count = row["จำนวน"] - (ok_count + ng_count)
+            st.write(f"จำนวนที่ยังไม่ทดสอบ: {untest_count}")
+            
+            # เพิ่มปุ่มยืนยันการเสร็จสิ้น
+            if st.button(f"ยืนยันการเสร็จสิ้นสำหรับ P/No {row['P/No']}", key=f"finish_{index}"):
+                st.success(f"บันทึกผลการผลิตสำหรับ P/No {row['P/No']} เสร็จสมบูรณ์")
+                plan_df.at[index, "จำนวน OK"] = ok_count
+                plan_df.at[index, "จำนวน NG"] = ng_count
+                plan_df.at[index, "จำนวนยังไม่ทดสอบ"] = untest_count
+    
+    else:
+        st.warning("ยังไม่มีงานที่ถูก Assign ให้เครื่องจักรนี้")
+
     st.write(plan_df)
 
 # ฟังก์ชันการแสดงรายงาน
