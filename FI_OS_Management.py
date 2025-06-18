@@ -19,18 +19,20 @@ weight_prev = st.number_input(f'กรอกน้ำหนักจากแผ
 # กรอกน้ำหนักจากแผนกปัจจุบัน
 weight_curr = st.number_input(f'กรอกน้ำหนักจากแผนก {department_curr}', min_value=0.0, format="%.2f")
 
-# ตรวจสอบว่าผู้ใช้กรอกข้อมูลหรือยัง
-if weight_prev > 0 and weight_curr > 0:
-    # คำนวณผลต่างน้ำหนักและเปอร์เซ็นต์ความคลาดเคลื่อน
-    weight_diff, percentage_diff = calculate_weight_difference(weight_prev, weight_curr)
-    
-    # แสดงผลต่างน้ำหนัก
-    st.write(f"ผลต่างน้ำหนักระหว่างแผนก {department_prev} และ {department_curr}: {weight_diff:.2f} กิโลกรัม")
-    
-    # ตรวจสอบเปอร์เซ็นต์ความคลาดเคลื่อน
-    if percentage_diff > 2:
-        st.markdown('<p style="color:red; font-size:20px;">ค่าน้ำหนักไม่ถูกต้อง กรุณาเรียกหัวหน้างานเพื่อตรวจสอบ</p>', unsafe_allow_html=True)
+# สร้างปุ่มตรวจสอบ
+if st.button('ตรวจสอบ'):
+    # ตรวจสอบว่าผู้ใช้กรอกข้อมูลหรือยัง
+    if weight_prev > 0 and weight_curr > 0:
+        # คำนวณผลต่างน้ำหนักและเปอร์เซ็นต์ความคลาดเคลื่อน
+        weight_diff, percentage_diff = calculate_weight_difference(weight_prev, weight_curr)
+
+        # แสดงผลต่างน้ำหนัก
+        st.write(f"ผลต่างน้ำหนักระหว่างแผนก {department_prev} และ {department_curr}: {weight_diff:.2f} กิโลกรัม")
+        
+        # ตรวจสอบเปอร์เซ็นต์ความคลาดเคลื่อน
+        if percentage_diff > 2:
+            st.markdown('<p style="color:red; font-size:20px;">ค่าน้ำหนักไม่ถูกต้อง กรุณาเรียกหัวหน้างานเพื่อตรวจสอบ</p>', unsafe_allow_html=True)
+        else:
+            st.markdown('<p style="color:green; font-size:20px;">น้ำหนักถูกต้อง ให้ปฏิบัติงานต่อได้</p>', unsafe_allow_html=True)
     else:
-        st.markdown('<p style="color:green; font-size:20px;">น้ำหนักถูกต้อง ให้ปฏิบัติงานต่อได้</p>', unsafe_allow_html=True)
-else:
-    st.write("กรุณากรอกน้ำหนักจากทั้งสองแผนกเพื่อทำการตรวจสอบ")
+        st.write("กรุณากรอกน้ำหนักจากทั้งสองแผนกเพื่อทำการตรวจสอบ")
