@@ -50,12 +50,30 @@ def calculate_production_time(plan_df, capacity=300):
 def assign_jobs(plan_df):
     st.header("Assign งานให้เครื่องจักร")
     
-    machine_list = ["Machine A", "Machine B", "Machine C", "Machine D"]
-    assigned_machine = st.selectbox("เลือกเครื่องจักรที่ต้องการ Assign งาน", machine_list)
+    # ข้อมูลเครื่องจักร
+    machines = ["Machine A", "Machine B", "Machine C", "Machine D"]
     
-    plan_df["เครื่องจักรที่ Assign"] = assigned_machine
+    # คำนวณเวลาในการผลิต
+    capacity_per_machine = 480  # เครื่องจักร 1 เครื่องมีความสามารถ 480 นาที (100%)
+    machine_capacity = {machine: capacity_per_machine for machine in machines}
     
-    st.write(plan_df)
+    for index, row in plan_df.iterrows():
+        job_name = row["P/No"]
+        required_time = row["เวลาผลิต (นาที)"] * 60  # คำนวณเวลาในหน่วยนาที
+        
+        st.write(f"Job: {job_name}, จำนวน: {row['จำนวน']}, เวลาในการผลิต: {required_time:.2f} นาที")
+        
+        # Dropdown เลือกเครื่องจักร
+        selected_machine = st.selectbox(f"เลือกเครื่องจักรสำหรับงาน {job_name}", machines)
+        
+        # คำนวณว่าเครื่องจักรสามารถทำงานนี้ได้หรือไม่
+        remaining_capacity = machine_capacity[selected_machine]
+        
+        if remaining_capacity >= required_time:
+            st.write(f"เครื่องจักร {selected_machine} สามารถทำงานนี้ได้ภายในเวลา {required_time:.2f} นาที")
+            machine_capacity[selected_machine] -= required_time  # ลดเวลาใช้งานเครื่องจักร
+        else:
+            st.write(f"เครื่องจักร {selected_machine} ไม่สามารถทำงานนี้ได้เนื่องจากเวลาไม่พอ (จำเป็นต้องใช้เวลา {required_time:.2f} นาที)")
     
     return plan_df
 
