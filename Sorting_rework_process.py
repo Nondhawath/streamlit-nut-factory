@@ -85,7 +85,7 @@ def generate_job_id():
 # 🔐 Login Process
 if "logged_in_user" not in st.session_state:
     with st.form("login_form"):
-        st.subheader("🔐 เข้าสู่ระบบ Sorting process")
+        st.subheader("🔐 เข้าสู่ระบบ")
         username = st.selectbox("👤 Username", emp_master)
         password = st.text_input("🔑 Password", type="password")
         submitted = st.form_submit_button("🔓 Login")
@@ -115,7 +115,8 @@ elif user_level == "T8":
     allowed_modes = ["💧 Oil Cleaning"]
 
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
-#📥 Sorting MC
+
+# 📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
 
@@ -131,9 +132,9 @@ if menu == "📥 Sorting MC":
         lot = st.text_input("📦 Lot Number")
         woc = st.text_input("📄 WOC")
         vehicle_number = st.text_input("🚚 หมายเลขTAG")
-        checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot Total Cnt ", 0)
-        ng = st.number_input("❌ จำนวน NG Cnt.", 0)
-        pending = st.number_input("⏳ จำนวนยังไม่ตรวจ UnTest Cnt", 0)
+        checked = st.number_input("🔍 จำนวนที่ตรวจสอบทั้งหมดของ Lot", 0)
+        ng = st.number_input("❌ จำนวน NG", 0)
+        pending = st.number_input("⏳ จำนวนยังไม่ตรวจ", 0)
         reason_ng = st.selectbox("📋 หัวข้องานเสีย", reason_list)
 
         total = ng + pending
@@ -186,6 +187,7 @@ if menu == "📥 Sorting MC":
                 )
             except Exception as e:
                 st.error(f"⚠️ Error appending data to sheet: {e}")
+
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
