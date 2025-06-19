@@ -115,8 +115,7 @@ elif user_level == "T8":
     allowed_modes = ["💧 Oil Cleaning"]
 
 menu = st.sidebar.selectbox("📌 โหมด", allowed_modes)
-
-# 📥 Sorting MC
+#📥 Sorting MC
 if menu == "📥 Sorting MC":
     st.subheader("📥 กรอกข้อมูล Sorting")
 
@@ -187,7 +186,6 @@ if menu == "📥 Sorting MC":
                 )
             except Exception as e:
                 st.error(f"⚠️ Error appending data to sheet: {e}")
-
 # 🧾 Waiting Judgement
 elif menu == "🧾 Waiting Judgement":
     st.subheader("🔍 รอตัดสินใจ Recheck / Scrap")
@@ -243,47 +241,23 @@ elif menu == "🧾 Waiting Judgement":
 # 💧 Oil Cleaning
 elif menu == "💧 Oil Cleaning":
     st.subheader("💧 งานที่รอการล้าง")
-    
-    # โหลดข้อมูลทั้งหมดจาก Google Sheets
     df = pd.DataFrame(worksheet.get_all_records())
-    
-    # กรองข้อมูลที่สถานะเป็น Recheck
     df = df[df["สถานะ"] == "Recheck"]
-    
-    # เพิ่มช่องค้นหาจากรหัสงาน (Job ID)
-    job_id_filter = st.text_input("🔍 ช่องค้นหาจากรหัสงาน (Job ID)", "")
-    if job_id_filter:
-        df = df[df["Job ID"].str.contains(job_id_filter, case=False, na=False)]
-    
-    # เพิ่มช่องค้นหาจากรหัสงาน (Part Code)
-    part_code_filter = st.text_input("🔍 ค้นหารหัสงาน (Part Code)", "")
-    if part_code_filter:
-        df = df[df["รหัสงาน"].str.contains(part_code_filter, case=False, na=False)]
-    
-    # ตรวจสอบว่าข้อมูลมีหรือไม่ หลังจากกรอง
-    if df.empty:
-        st.warning("ไม่มีข้อมูลที่ตรงกับคำค้นหาของคุณ")
-    else:
-        # แสดงตารางข้อมูลที่กรองแล้ว
-        st.dataframe(df)
+    for idx, row in df.iterrows():
+        st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']}", unsafe_allow_html=True)
+        if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{idx}"):
+            worksheet.update_cell(idx + 2, 11, "Cleaned")
+            worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
+            worksheet.update_cell(idx + 2, 14, user)
+            send_telegram_message(
+                f"💧 <b>ล้างเสร็จแล้ว</b>\n"
+                f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
+                f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
+                f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
+                f"👤 โดย: {user}"
+            )
+            st.rerun()
 
-        for idx, row in df.iterrows():
-            st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']} | 🚚 หมายเลขTAG: {row['หมายเลขTAG']}", unsafe_allow_html=True)
-            
-            # เพิ่มปุ่มสำหรับการล้างเสร็จ
-            if st.button(f"✅ ล้างเสร็จแล้ว - {row['Job ID']}", key=f"cleaned_{idx}"):
-                worksheet.update_cell(idx + 2, 11, "Cleaned")
-                worksheet.update_cell(idx + 2, 13, now_th().strftime("%Y-%m-%d %H:%M:%S"))
-                worksheet.update_cell(idx + 2, 14, user)
-                send_telegram_message(
-                    f"💧 <b>ล้างเสร็จแล้ว</b>\n"
-                    f"🆔 Job ID: <code>{row['Job ID']}</code>\n"
-                    f"🔩 รหัสงาน: {row['รหัสงาน']}\n"
-                    f"📦 จำนวน: {row['จำนวนทั้งหมด']}\n"
-                    f"🚚 หมายเลขTAG: {row['หมายเลขTAG']}\n"
-                    f"👤 โดย: {user}"
-                )
-                st.rerun()
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
     df = pd.DataFrame(worksheet.get_all_records())
