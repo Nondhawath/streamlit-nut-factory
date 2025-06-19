@@ -255,6 +255,11 @@ elif menu == "💧 Oil Cleaning":
     if job_id_filter:
         df = df[df["Job ID"].str.contains(job_id_filter, case=False, na=False)]
     
+    # เพิ่มช่องสำหรับค้นหารหัสงาน (Part Number)
+    part_code_filter = st.text_input("🔍 ค้นหารหัสงาน (Part Code)", "")
+    if part_code_filter:
+        df = df[df["รหัสงาน"].str.contains(part_code_filter, case=False, na=False)]
+    
     # แสดงข้อมูลตาราง
     for idx, row in df.iterrows():
         st.markdown(f"🆔 <b>{row['Job ID']}</b> | รหัส: {row['รหัสงาน']} | ทั้งหมด: {row['จำนวนทั้งหมด']} | 🚚 หมายเลขTAG: {row['หมายเลขTAG']}", unsafe_allow_html=True)
