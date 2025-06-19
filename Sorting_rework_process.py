@@ -250,12 +250,12 @@ elif menu == "💧 Oil Cleaning":
     # กรองข้อมูลที่สถานะเป็น Recheck
     df = df[df["สถานะ"] == "Recheck"]
     
-    # เพิ่มช่องสำหรับค้นหารหัสงาน
-    job_id_filter = st.text_input("🔍 ค้นหารหัสงาน", "")
+    # เพิ่มช่องสำหรับค้นหารหัสงาน (Job ID)
+    job_id_filter = st.text_input("🔍 ค้นหารหัสงาน (Job ID)", "")
     if job_id_filter:
         df = df[df["Job ID"].str.contains(job_id_filter, case=False, na=False)]
     
-    # เพิ่มช่องสำหรับค้นหารหัสงาน (Part Number)
+    # เพิ่มช่องสำหรับค้นหารหัสงาน (Part Code)
     part_code_filter = st.text_input("🔍 ค้นหารหัสงาน (Part Code)", "")
     if part_code_filter:
         df = df[df["รหัสงาน"].str.contains(part_code_filter, case=False, na=False)]
@@ -278,7 +278,7 @@ elif menu == "💧 Oil Cleaning":
                 f"👤 โดย: {user}"
             )
             st.rerun()
-
+            
 # 📊 รายงาน
 elif menu == "📊 รายงาน":
     df = pd.DataFrame(worksheet.get_all_records())
