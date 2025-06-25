@@ -25,15 +25,25 @@ spreadsheet = client.open_by_url(SHEET_URL)
 sheet = spreadsheet.worksheet("Checklist")
 machines_sheet = spreadsheet.worksheet("Machines")
 emp_sheet = spreadsheet.worksheet("Employees")
-reason_audit_sheet = spreadsheet.worksheet("Reason_Audit")  # ดึง Reason_Audit
 
 # ✅ โหลดข้อมูลเครื่องจักรและพนักงาน
 machines_df = pd.DataFrame(machines_sheet.get_all_records())
 emp_df = pd.DataFrame(emp_sheet.get_all_records())
 
-# ✅ ดึงข้อมูล Reason จากชีท Reason_Audit
-reason_data = reason_audit_sheet.get_all_records()
-checklist = [row["Reason"] for row in reason_data if "Reason" in row]  # คัดเลือกเฉพาะคอลัมน์ Reason
+# ✅ หัวข้อ Checklist
+checklist = [
+    "1.1 สวมใส่ PPE ครบถ้วนและถูกต้อง",
+    "1.2 ทวนสอบความพร้อมของพนักงาน (ไม่เจ็บป่วย)",
+    "1.3 เตรียมเอกสารและอุปกรณ์ตรงกับรุ่น",
+    "1.4 เตรียม Box แดง / ถุง NG / Tag NG",
+    "1.5 ตรวจสอบ Daily PM: Jig, Pokayoke, Guage GO/NO GO",
+    "1.6 บันทึกหลังการตรวจสอบ, Lot ชิ้นงาน",
+    "1.7 ตรวจสอบคุณภาพชิ้นงานตาม WI, OPS",
+    "1.8 ความปลอดภัยในพื้นที่ทำงาน",
+    "1.9 ความเหมาะสมของแสงสว่าง",
+    "1.10 ความสะอาด / ขยะ / Box อยู่ที่กำหนด",
+    "1.11 ไม่มี Part ตกค้าง / รับข้อเสนอแนะพนักงาน"
+]
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
@@ -42,6 +52,7 @@ st.title("📋 แบบฟอร์ม Audit พนักงาน")
 now = datetime.now(timezone("Asia/Bangkok"))
 st.info(f"🕓 เวลา: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
+inspector = st.text_input("🧑‍💼 ชื่อผู้ตรวจสอบ")
 shift = st.selectbox("🕐 กะ", ["D", "N"])
 process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
@@ -53,14 +64,14 @@ employee = st.selectbox("👷‍♂️ พนักงานที่รับ�
 filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
 machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines) if filtered_machines else ""
 
-st.write("---")  # ใช้ st.write แทน st.markdown
+st.markdown("---")
 
 # ✅ Checklist
 results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
     with col1:
-        st.write(f"{item}")  # ใช้ st.write แทน st.markdown (ไม่ใช้ **)
+        st.markdown(f"**{item}**")
     with col2:
         result = st.radio("ผล", ["✔️ ผ่าน", "❌ ไม่ผ่าน"], key=item)
         if result == "❌ ไม่ผ่าน":
@@ -82,7 +93,7 @@ if st.button("📤 บันทึกลง Google Sheets"):
 
     row_data = [
         now.strftime("%Y-%m-%d %H:%M:%S"),
-        employee,  # ใช้ชื่อพนักงานจากที่เลือก
+        inspector,
         shift,
         process,
         machine,
