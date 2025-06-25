@@ -25,25 +25,15 @@ spreadsheet = client.open_by_url(SHEET_URL)
 sheet = spreadsheet.worksheet("Checklist")
 machines_sheet = spreadsheet.worksheet("Machines")
 emp_sheet = spreadsheet.worksheet("Employees")
+reason_audit_sheet = spreadsheet.worksheet("Reason_Audit")  # ดึง Reason_Audit
 
 # ✅ โหลดข้อมูลเครื่องจักรและพนักงาน
 machines_df = pd.DataFrame(machines_sheet.get_all_records())
 emp_df = pd.DataFrame(emp_sheet.get_all_records())
 
-# ✅ หัวข้อ Checklist
-checklist = [
-    "1.1 สวมใส่ PPE ครบถ้วนและถูกต้อง",
-    "1.2 ทวนสอบความพร้อมของพนักงาน (ไม่เจ็บป่วย)",
-    "1.3 เตรียมเอกสารและอุปกรณ์ตรงกับรุ่น",
-    "1.4 เตรียม Box แดง / ถุง NG / Tag NG",
-    "1.5 ตรวจสอบ Daily PM: Jig, Pokayoke, Guage GO/NO GO",
-    "1.6 บันทึกหลังการตรวจสอบ, Lot ชิ้นงาน",
-    "1.7 ตรวจสอบคุณภาพชิ้นงานตาม WI, OPS",
-    "1.8 ความปลอดภัยในพื้นที่ทำงาน",
-    "1.9 ความเหมาะสมของแสงสว่าง",
-    "1.10 ความสะอาด / ขยะ / Box อยู่ที่กำหนด",
-    "1.11 ไม่มี Part ตกค้าง / รับข้อเสนอแนะพนักงาน"
-]
+# ✅ ดึงข้อมูล Reason จากชีท Reason_Audit
+reason_data = reason_audit_sheet.get_all_records()
+checklist = [row["Reason"] for row in reason_data if "Reason" in row]  # คัดเลือกเฉพาะคอลัมน์ Reason
 
 fail_reasons = ["ลืมปฏิบัติ", "ไม่มีอุปกรณ์", "ขาดความเข้าใจ", "อื่น ๆ"]
 
