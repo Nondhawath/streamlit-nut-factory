@@ -71,7 +71,8 @@ results = []
 for item in checklist:
     col1, col2 = st.columns([3, 2])
     with col1:
-        st.write(f"{item}")  # ใช้ st.write แทน st.markdown (ไม่ใช้ **)
+        # ใช้ st.write แทน st.markdown และลบสัญลักษณ์พิเศษ
+        st.write(f"{item}")  # ใช้ st.write แทน st.markdown
     with col2:
         result = st.radio("ผล", ["✔️ ผ่าน", "❌ ไม่ผ่าน"], key=item)
         if result == "❌ ไม่ผ่าน":
