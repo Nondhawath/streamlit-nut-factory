@@ -42,15 +42,14 @@ st.title("📋 แบบฟอร์ม Audit พนักงาน")
 now = datetime.now(timezone("Asia/Bangkok"))
 st.info(f"🕓 เวลา: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-# ✅ เลือกกะและกระบวนการ
 shift = st.selectbox("🕐 กะ", ["D", "N"])
 process = st.selectbox("🧪 กระบวนการ", ["FM", "TP", "FI"])
 
-# ✅ เลือกพนักงาน
+# ✅ พนักงาน
 emp_names = emp_df["ชื่อพนักงาน"].tolist()
 employee = st.selectbox("👷‍♂️ พนักงานที่รับการตรวจสอบ", emp_names)
 
-# ✅ เลือกเครื่องจักร
+# ✅ เครื่องจักร
 filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
 machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines) if filtered_machines else ""
 
@@ -75,7 +74,7 @@ for item in checklist:
             reason = ""
         results.append((item, result, reason))
 
-# ✅ บันทึกลง Google Sheets
+# ✅ บันทึกแนวนอน
 if st.button("📤 บันทึกลง Google Sheets"):
     if not machine:
         st.error("⚠️ กรุณาเลือกเครื่องจักรก่อนบันทึก")
