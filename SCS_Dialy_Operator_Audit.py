@@ -64,7 +64,7 @@ employee = st.selectbox("👷‍♂️ พนักงานที่รับ�
 filtered_machines = machines_df[machines_df["Process"] == process]["Machines_Name"].tolist()
 machine = st.selectbox("🛠 เลือกเครื่องจักร", filtered_machines) if filtered_machines else ""
 
-st.markdown("---")
+st.write("---")  # ใช้ st.write แทน st.markdown
 
 # ✅ Checklist
 results = []
