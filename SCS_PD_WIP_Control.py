@@ -51,6 +51,14 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
+# Function to send Telegram message
+def send_telegram_message(message):
+    TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
+    CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
+    requests.get(url)
+
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
@@ -123,20 +131,6 @@ def tapping_mode():
             sheet.append_row(row_data)  # Save to sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
             send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
-
-# Function to update WOC status with timestamp
-def update_woc_status(woc_number, status, part_name):
-    row_data = [woc_number, status, part_name]
-    row_data = add_timestamp(row_data)  # Add timestamp to the row
-    woc_status_sheet.append_row(row_data)  # Save to "WOC_Status" sheet
-
-# Telegram Bot Setup
-TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
-CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
-
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
-    requests.get(url)
 
 # Main app logic
 def main():
