@@ -22,8 +22,8 @@ sheet = client.open_by_key(spreadsheet_id).sheet1  # "Jobs" sheet
 woc_status_sheet = client.open_by_key(spreadsheet_id).worksheet('WOC_Status')  # "WOC_Status" sheet
 
 # Telegram Bot Setup using Streamlit Secrets
-TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]  # Retrieve Telegram token from secrets
-CHAT_ID = st.secrets["chat_id"]  # Retrieve chat ID from secrets
+TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
+CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
