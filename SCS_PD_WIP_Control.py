@@ -19,9 +19,16 @@ client = gspread.authorize(creds)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Access the sheets using Spreadsheet ID
-sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
-part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+try:
+    sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
+    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+except gspread.exceptions.APIError as e:
+    st.error(f"API Error: {e}")
+except gspread.exceptions.SpreadsheetNotFound as e:
+    st.error(f"Spreadsheet not found: {e}")
+except Exception as e:
+    st.error(f"An error occurred: {e}")
 
 # Function to read part codes from the "part_code_master" sheet
 def get_part_codes():
