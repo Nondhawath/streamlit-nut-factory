@@ -30,34 +30,6 @@ except gspread.exceptions.SpreadsheetNotFound as e:
 except Exception as e:
     st.error(f"An error occurred: {e}")
 
-# Function to read part codes from the "part_code_master" sheet
-def get_part_codes():
-    try:
-        part_codes = part_code_master_sheet.get_all_records()
-        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
-        return part_code_list
-    except Exception as e:
-        st.error(f"Error reading part codes: {e}")
-        return []
-
-# Function to read employee names from the "Employees" sheet
-def get_employee_names():
-    try:
-        employees = employees_sheet.get_all_records()
-        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
-        return employee_names
-    except Exception as e:
-        st.error(f"Error reading employee names: {e}")
-        return []
-
-# Function to add timestamp to every row update (with timezone)
-def add_timestamp(row_data):
-    # Set timezone to 'Asia/Bangkok' (Thailand Time)
-    tz = pytz.timezone('Asia/Bangkok')
-    timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp in Thailand time
-    row_data.append(timestamp)  # Add timestamp to the row
-    return row_data
-
 # Function to send Telegram message
 def send_telegram_message(message):
     TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
@@ -65,6 +37,13 @@ def send_telegram_message(message):
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
+
+# Function to add timestamp to every row update (with timezone)
+def add_timestamp(row_data):
+    tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
+    timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp in Thailand time
+    row_data.append(timestamp)  # Add timestamp to the row
+    return row_data
 
 # Function to check if the WOC already exists and return the row index
 def find_woc_row(woc_number):
@@ -83,22 +62,43 @@ def update_woc_row(woc_number, row_data):
     row = find_woc_row(woc_number)
     if row:
         current_row_data = sheet.row_values(row)
-        current_row_data[12] = row_data[1]  # WIP Tapping
-        current_row_data[13] = row_data[2]  # WIP Final Inspection
-        current_row_data[14] = row_data[3]  # WIP Final Work
+        current_row_data[12] = row_data[1]  # WIP Tapping column
+        current_row_data[13] = row_data[2]  # WIP Final Inspection column
+        current_row_data[14] = row_data[3]  # WIP Final Work column
         sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
     else:
         sheet.append_row(row_data)  # If WOC doesn't exist, add it as a new row
+
+# Forming Mode
+def forming_mode():
+    st.header("Forming Mode")
+    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
+    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
+    woc_number = st.text_input("หมายเลข WOC")
+    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])
+    lot_number = st.text_input("หมายเลข LOT")
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+    # Calculate number of pieces
+    if total_weight and barrel_weight and sample_weight and sample_count:
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+    
+    if st.button("บันทึก"):
+        # Save data to Google Sheets with timestamp
+        row_data = [woc_number, part_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = add_timestamp(row_data)  # Add timestamp to the row
+        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+        st.success("บันทึกข้อมูลสำเร็จ!")
+        send_telegram_message(f"Job from {department_from} to {department_to} saved!")
 
 # Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
     job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-
-    # Check if 'WOC Number' column exists in the job data
-    if len(job_data) > 0 and 'WOC Number' not in job_data[0]:
-        st.error("WOC Number column not found in the job data. Please check your Google Sheets.")
-        return
 
     st.write("ข้อมูลงานที่ถูก Transfer:")
     job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
