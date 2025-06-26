@@ -89,17 +89,30 @@ def update_woc_row(woc_number, row_data):
         current_row_data = sheet.row_values(row)
         
         # Ensure the row_data has the same size as current_row_data
-        if len(current_row_data) < 15:
+        if len(current_row_data) < 16:
             # Pad the current_row_data if there are fewer columns
-            current_row_data += [''] * (15 - len(current_row_data))
+            current_row_data += [''] * (16 - len(current_row_data))
 
         # Update the columns (Ensure you have the correct indices here)
-        current_row_data[12] = row_data[1]  # WIP Tapping column (assuming it's index 12)
-        current_row_data[13] = row_data[2]  # WIP Final Inspection column (index 13)
-        current_row_data[14] = row_data[3]  # WIP Final Work column (index 14)
-        
+        current_row_data[0] = row_data[0]  # WOC Number (index 0)
+        current_row_data[1] = row_data[1]  # Part Name (index 1)
+        current_row_data[2] = row_data[2]  # Employee (index 2)
+        current_row_data[3] = row_data[3]  # Department From (index 3)
+        current_row_data[4] = row_data[4]  # Department To (index 4)
+        current_row_data[5] = row_data[5]  # Lot Number (index 5)
+        current_row_data[6] = row_data[6]  # Total Weight (index 6)
+        current_row_data[7] = row_data[7]  # Barrel Weight (index 7)
+        current_row_data[8] = row_data[8]  # Sample Weight (index 8)
+        current_row_data[9] = row_data[9]  # Sample Count (index 9)
+        current_row_data[10] = row_data[10]  # Pieces Count (index 10)
+        current_row_data[11] = row_data[11]  # WIP Forming (index 11)
+        current_row_data[12] = row_data[12]  # Timestamp (index 12)
+        current_row_data[13] = row_data[13]  # WIP Tapping (index 13)
+        current_row_data[14] = row_data[14]  # WIP Final Inspection (index 14)
+        current_row_data[15] = row_data[15]  # WIP Final Work (index 15)
+
         # Update the row in the Google Sheet
-        sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+        sheet.update(f"A{row}:P{row}", [current_row_data])  # Update the whole row
     else:
         # If WOC doesn't exist, add it as a new row
         sheet.append_row(row_data)  # Append new row to the sheet
@@ -196,15 +209,15 @@ def tapping_work_mode():
             current_row_data = sheet.row_values(row)
             
             # Ensure the row_data has the same size as current_row_data
-            if len(current_row_data) < 15:
+            if len(current_row_data) < 16:
                 # Pad the current_row_data if there are fewer columns
-                current_row_data += [''] * (15 - len(current_row_data))
+                current_row_data += [''] * (16 - len(current_row_data))
 
             # Change status from WIP-Tapping to Used - Machine Name
-            current_row_data[12] = f"Used - {machine_name}"  # Update WIP Tapping column with machine name
+            current_row_data[13] = f"Used - {machine_name}"  # Update WIP Tapping column with machine name
 
             # Update the row in the Google Sheet
-            sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+            sheet.update(f"A{row}:P{row}", [current_row_data])  # Update the whole row
 
             st.success(f"สถานะ WOC {job_woc} ได้รับการอัปเดตเป็น 'Used - {machine_name}'")
             send_telegram_message(f"Job WOC {job_woc} processed and status updated to 'Used - {machine_name}'")
