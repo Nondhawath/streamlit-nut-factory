@@ -3,6 +3,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from datetime import datetime
+import pytz
 
 # Setting up Google Sheets Connection
 google_credentials = st.secrets["google_service_account"]  # Get Google credentials directly from secrets
@@ -42,9 +43,11 @@ def get_employee_names():
         st.error(f"Error reading employee names: {e}")
         return []
 
-# Function to add timestamp to every row update
+# Function to add timestamp to every row update (with timezone)
 def add_timestamp(row_data):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp
+    # Set timezone to 'Asia/Bangkok' (Thailand Time)
+    tz = pytz.timezone('Asia/Bangkok')
+    timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp in Thailand time
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
@@ -55,6 +58,44 @@ def send_telegram_message(message):
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
+
+# Forming Mode
+def forming_mode():
+    st.header("Forming Mode")
+    
+    # Fetch part codes and employee names from Google Sheets
+    part_codes = get_part_codes()  # Fetch part codes from the "part_code_master" sheet
+    employee_names = get_employee_names()  # Fetch employee names from the "Employees" sheet
+
+    # Create two columns layout
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
+        department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
+        woc_number = st.text_input("หมายเลข WOC")
+        lot_number = st.text_input("หมายเลข LOT")
+        selected_part_code = st.selectbox("รหัสงาน / Part Name", part_codes)  # Dropdown for selecting part code
+    
+    with col2:
+        selected_employee = st.selectbox("ชื่อพนักงาน", employee_names)  # Dropdown for selecting employee name
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+    # Calculate number of pieces
+    if total_weight and barrel_weight and sample_weight and sample_count:
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+    
+    if st.button("บันทึก"):
+        # Save data to Google Sheets with timestamp
+        row_data = [woc_number, selected_part_code, selected_employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
+        row_data = add_timestamp(row_data)  # Add timestamp to the row
+        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+        st.success("บันทึกข้อมูลสำเร็จ!")
+        send_telegram_message(f"Job from {department_from} to {department_to} saved!")
 
 # Tapping Mode
 def tapping_mode():
@@ -95,44 +136,6 @@ def tapping_mode():
             sheet.append_row(row_data)  # Save to sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
             send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
-
-# Forming Mode
-def forming_mode():
-    st.header("Forming Mode")
-    
-    # Fetch part codes and employee names from Google Sheets
-    part_codes = get_part_codes()  # Fetch part codes from the "part_code_master" sheet
-    employee_names = get_employee_names()  # Fetch employee names from the "Employees" sheet
-
-    # Create two columns layout
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
-        department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
-        woc_number = st.text_input("หมายเลข WOC")
-        lot_number = st.text_input("หมายเลข LOT")
-        selected_part_code = st.selectbox("รหัสงาน / Part Name", part_codes)  # Dropdown for selecting part code
-    
-    with col2:
-        selected_employee = st.selectbox("ชื่อพนักงาน", employee_names)  # Dropdown for selecting employee name
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-    # Calculate number of pieces
-    if total_weight and barrel_weight and sample_weight and sample_count:
-        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-    
-    if st.button("บันทึก"):
-        # Save data to Google Sheets with timestamp
-        row_data = [woc_number, selected_part_code, selected_employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
-        row_data = add_timestamp(row_data)  # Add timestamp to the row
-        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
-        st.success("บันทึกข้อมูลสำเร็จ!")
-        send_telegram_message(f"Job from {department_from} to {department_to} saved!")
 
 # Main app logic
 def main():
