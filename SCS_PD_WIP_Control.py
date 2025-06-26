@@ -26,7 +26,7 @@ TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]  # Retrieve Telegram token fro
 CHAT_ID = st.secrets["chat_id"]  # Retrieve chat ID from secrets
 
 def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
+    url = f"https://api.telegram.org/bot{7616238220:AAFAo-hDwr6NFLisP55TbffYa-wRqciV4n0}/sendMessage?chat_id={-4738980517}&text={message}"
     requests.get(url)
 
 # Function to add timestamp to every row update
