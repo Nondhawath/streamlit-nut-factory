@@ -87,12 +87,22 @@ def update_woc_row(woc_number, row_data):
     row = find_woc_row(woc_number)
     if row:
         current_row_data = sheet.row_values(row)
-        current_row_data[12] = row_data[1]  # WIP Tapping column
-        current_row_data[13] = row_data[2]  # WIP Final Inspection column
-        current_row_data[14] = row_data[3]  # WIP Final Work column
+        
+        # Ensure the row_data has the same size as current_row_data
+        if len(current_row_data) < 15:
+            # Pad the current_row_data if there are fewer columns
+            current_row_data += [''] * (15 - len(current_row_data))
+
+        # Update the columns (Ensure you have the correct indices here)
+        current_row_data[12] = row_data[1]  # WIP Tapping column (assuming it's index 12)
+        current_row_data[13] = row_data[2]  # WIP Final Inspection column (index 13)
+        current_row_data[14] = row_data[3]  # WIP Final Work column (index 14)
+        
+        # Update the row in the Google Sheet
         sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
     else:
-        sheet.append_row(row_data)  # If WOC doesn't exist, add it as a new row
+        # If WOC doesn't exist, add it as a new row
+        sheet.append_row(row_data)  # Append new row to the sheet
 
 # Forming Mode
 def forming_mode():
