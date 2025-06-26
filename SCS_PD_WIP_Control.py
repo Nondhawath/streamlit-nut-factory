@@ -17,9 +17,10 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, sco
 # Error handling for Google Sheets connection
 try:
     client = gspread.authorize(creds)
-    sheet = client.open_by_key('YOUR_SPREADSHEET_ID').worksheet('Jobs')  # Replace with your actual Spreadsheet ID
-    part_code_master_sheet = client.open_by_key('YOUR_SPREADSHEET_ID').worksheet('part_code_master')
-    employees_sheet = client.open_by_key('YOUR_SPREADSHEET_ID').worksheet('Employees')
+    # Replace with your actual Spreadsheet ID
+    sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('Jobs')  
+    part_code_master_sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('part_code_master')
+    employees_sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('Employees')
 except gspread.exceptions.GSpreadException as e:
     st.error(f"Error connecting to Google Sheets: {e}")
     raise
