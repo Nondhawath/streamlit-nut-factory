@@ -3,13 +3,14 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from datetime import datetime
-import json
-
-# Load the Google Service Account credentials from Streamlit secrets
-google_credentials = json.loads(st.secrets["google_service_account"])
 
 # Setting up Google Sheets Connection
+google_credentials = st.secrets["google_service_account"]  # Get Google credentials directly from secrets
+
+# Define the scope for Google Sheets API
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+# Authorize the credentials and set up the client
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Factory_Job_Status").sheet1  # "Jobs" sheet
