@@ -19,16 +19,9 @@ client = gspread.authorize(creds)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Access the sheets using Spreadsheet ID
-try:
-    sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
-    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-except gspread.exceptions.APIError as e:
-    st.error(f"API Error: {e}")
-except gspread.exceptions.SpreadsheetNotFound as e:
-    st.error(f"Spreadsheet not found: {e}")
-except Exception as e:
-    st.error(f"An error occurred: {e}")
+sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
+part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
 
 # Function to send Telegram message
 def send_telegram_message(message):
@@ -41,7 +34,7 @@ def send_telegram_message(message):
 # Function to add timestamp to every status change
 def add_status_timestamp(row_data, status_column_index, status_value):
     tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
-    timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp in Thailand time
+    timestamp = datetime.now(tz).strftime('%d-%m-%Y %H:%M')  # Get current timestamp in Thailand time
 
     # Update the status column and corresponding timestamp
     row_data[status_column_index] = status_value
@@ -66,10 +59,9 @@ def update_woc_row(woc_number, row_data):
     row = find_woc_row(woc_number)
     if row:
         current_row_data = sheet.row_values(row)
-        
+
         # Ensure the row_data has the same size as current_row_data
         if len(current_row_data) < 16:
-            # Pad the current_row_data if there are fewer columns
             current_row_data += [''] * (16 - len(current_row_data))
 
         # Update the columns (Ensure you have the correct indices here)
@@ -117,7 +109,7 @@ def forming_mode():
     if st.button("บันทึก"):
         # Save data to Google Sheets with timestamp
         row_data = [woc_number, part_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
-        row_data = add_timestamp(row_data)  # Add timestamp to the row
+        row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # Add timestamp to the row
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Job from {department_from} to {department_to} saved!")
@@ -156,7 +148,7 @@ def tapping_mode():
             
             # Prepare row data for Tapping
             row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
-            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            row_data = add_status_timestamp(row_data, 13, "WIP-Tapping")  # Add timestamp to the row
             
             # Update the WOC row or add it as a new row
             update_woc_row(job_woc, row_data)
@@ -189,7 +181,6 @@ def tapping_work_mode():
             
             # Ensure the row_data has the same size as current_row_data
             if len(current_row_data) < 16:
-                # Pad the current_row_data if there are fewer columns
                 current_row_data += [''] * (16 - len(current_row_data))
 
             # Change status from WIP-Tapping to Used - Machine Name
