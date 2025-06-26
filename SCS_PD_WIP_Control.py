@@ -101,17 +101,51 @@ def update_woc_status(woc_number, status, part_name):
     row_data = add_timestamp(row_data)  # Add timestamp to the row
     woc_status_sheet.append_row(row_data)  # Save to "WOC_Status" sheet
 
+# Final Inspection Mode
+def final_inspection_mode():
+    st.header("Final Inspection Mode")
+    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+    st.write("ข้อมูลงานที่ถูก Transfer:")
+    st.write(job_data)
+
+    # Select a job
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC'] for job in job_data])
+
+    if job_woc:
+        st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        # Form for checking weight
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+
+        if st.button("คำนวณและเปรียบเทียบ"):
+            # Compare with Tapping mode pieces count
+            tapping_pieces_count = 1000  # Fetch this value from Tapping mode data
+            difference = abs(pieces_count - tapping_pieces_count) / tapping_pieces_count * 100
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            # Save data to Google Sheets with timestamp
+            row_data = [job_woc, pieces_count, difference]
+            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            sheet.append_row(row_data)  # Save to sheet
+            st.success("บันทึกข้อมูลสำเร็จ!")
+            send_telegram_message(f"Job WOC {job_woc} processed in Final Inspection")
+
 # Main app logic
 def main():
     st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
-    mode = st.radio("เลือกโหมด", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
+    mode = st.selectbox("เลือกโหมดการทำงาน", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
 
     if mode == 'Forming':
         forming_mode()
     elif mode == 'Tapping':
         tapping_mode()
     elif mode == 'Final Inspection':
-        pass
+        final_inspection_mode()
     elif mode == 'Final Work':
         pass
     elif mode == 'TP Transfer':
