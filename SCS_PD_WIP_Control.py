@@ -38,36 +38,15 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
-# Function to read part codes from the "part_code_master" sheet
-def get_part_codes():
-    try:
-        # Fetch all records from the part_code_master sheet
-        part_codes = part_code_master_sheet.get_all_records()
-
-        # Extract part codes (รหัสงาน) into a list
-        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
-
-        # Return the list of part codes
-        return part_code_list
-    except Exception as e:
-        st.error(f"Error reading part codes: {e}")
-        return []
-
-# Function to read employee names from the "Employees" sheet
-def get_employee_names():
-    try:
-        employees = employees_sheet.get_all_records()
-        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
-        return employee_names
-    except Exception as e:
-        st.error(f"Error reading employee names: {e}")
-        return []
-
-# Function to add timestamp to every row update (with timezone)
-def add_timestamp(row_data):
+# Function to add timestamp to every status change
+def add_status_timestamp(row_data, status_column_index, status_value):
     tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
     timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp in Thailand time
-    row_data.append(timestamp)  # Add timestamp to the row
+
+    # Update the status column and corresponding timestamp
+    row_data[status_column_index] = status_value
+    row_data[status_column_index + 1] = timestamp  # Add timestamp next to the status
+
     return row_data
 
 # Function to check if the WOC already exists and return the row index
