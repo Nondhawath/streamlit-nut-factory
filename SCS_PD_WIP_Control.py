@@ -102,16 +102,16 @@ def tapping_mode():
     st.header("Tapping Mode")
     job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
 
-    # Check if 'WOC' column exists in the job data
-    if len(job_data) > 0 and 'WOC' not in job_data[0]:
-        st.error("WOC column not found in the job data. Please check your Google Sheets.")
+    # Check if 'WOC Number' column exists in the job data
+    if len(job_data) > 0 and 'WOC Number' not in job_data[0]:
+        st.error("WOC Number column not found in the job data. Please check your Google Sheets.")
         return
 
     st.write("ข้อมูลงานที่ถูก Transfer:")
     st.write(job_data)
 
     # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC'] for job in job_data])
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
     if job_woc:
         st.write(f"เลือกหมายเลข WOC: {job_woc}")
