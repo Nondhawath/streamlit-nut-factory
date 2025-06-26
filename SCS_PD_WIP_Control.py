@@ -3,17 +3,21 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from datetime import datetime
+import json
+
+# Load the Google Service Account credentials from Streamlit secrets
+google_credentials = json.loads(st.secrets["google_service_account"])
 
 # Setting up Google Sheets Connection
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Factory_Job_Status").sheet1  # "Jobs" sheet
 woc_status_sheet = client.open("Factory_Job_Status").worksheet('WOC_Status')  # "WOC_Status" sheet
 
 # Telegram Bot Setup
-TELEGRAM_TOKEN = 'your-telegram-bot-token'
-CHAT_ID = 'your-chat-id'
+TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]  # Retrieve Telegram token from secrets
+CHAT_ID = st.secrets["chat_id"]  # Retrieve chat ID from secrets
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
