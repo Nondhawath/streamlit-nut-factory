@@ -78,6 +78,18 @@ def find_woc_row(woc_number):
         st.error(f"Error finding WOC row: {e}")
         return None
 
+# Function to update the row in the Google Sheets
+def update_woc_row(woc_number, row_data):
+    row = find_woc_row(woc_number)
+    if row:
+        current_row_data = sheet.row_values(row)
+        current_row_data[12] = row_data[1]  # WIP Tapping
+        current_row_data[13] = row_data[2]  # WIP Final Inspection
+        current_row_data[14] = row_data[3]  # WIP Final Work
+        sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+    else:
+        sheet.append_row(row_data)  # If WOC doesn't exist, add it as a new row
+
 # Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
@@ -115,31 +127,14 @@ def tapping_mode():
             difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
             st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
             
-            # Check if WOC exists in the sheet, then update
-            row = find_woc_row(job_woc)
-            if row:
-                # If WOC exists, update the row with new data
-                row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
-                row_data = add_timestamp(row_data)  # Add timestamp to the row
-                
-                # Get existing row data
-                current_row_data = sheet.row_values(row)
-                
-                # Update the column for WIP Tapping (change column index if necessary)
-                current_row_data[12] = row_data[1]  # Update WIP Tapping column
-                current_row_data[13] = row_data[2]  # Update WIP Final Inspection column
-                
-                # Update the row in Google Sheets
-                sheet.update(f"A{row}:M{row}", [current_row_data])  # Update only the relevant range
-                st.success("บันทึกข้อมูลสำเร็จ!")
-                send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
-            else:
-                # If WOC does not exist, add it as a new row
-                row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
-                row_data = add_timestamp(row_data)  # Add timestamp to the row
-                sheet.append_row(row_data)  # Save to sheet
-                st.success("บันทึกข้อมูลสำเร็จ!")
-                send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
+            # Prepare row data for Tapping
+            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
+            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            
+            # Update the WOC row or add it as a new row
+            update_woc_row(job_woc, row_data)
+            st.success("บันทึกข้อมูลสำเร็จ!")
+            send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
 # Main app logic
 def main():
