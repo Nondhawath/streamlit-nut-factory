@@ -108,7 +108,10 @@ def tapping_mode():
         return
 
     st.write("ข้อมูลงานที่ถูก Transfer:")
-    st.write(job_data)
+    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
+
+    # Use st.table() or st.dataframe() for a cleaner display
+    st.dataframe(job_data_for_display)  # Show a table of job data without unnecessary JSON fields
 
     # Select a job
     job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
