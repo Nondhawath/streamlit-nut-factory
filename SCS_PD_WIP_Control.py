@@ -21,12 +21,12 @@ spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this 
 sheet = client.open_by_key(spreadsheet_id).sheet1  # "Jobs" sheet
 woc_status_sheet = client.open_by_key(spreadsheet_id).worksheet('WOC_Status')  # "WOC_Status" sheet
 
-# Telegram Bot Setup
+# Telegram Bot Setup using Streamlit Secrets
 TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]  # Retrieve Telegram token from secrets
 CHAT_ID = st.secrets["chat_id"]  # Retrieve chat ID from secrets
 
 def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{7616238220:AAFAo-hDwr6NFLisP55TbffYa-wRqciV4n0}/sendMessage?chat_id={-4738980517}&text={message}"
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
 # Function to add timestamp to every row update
