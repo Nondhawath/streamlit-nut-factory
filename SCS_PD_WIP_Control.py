@@ -56,6 +56,46 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
+# Tapping Mode
+def tapping_mode():
+    st.header("Tapping Mode")
+    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+
+    # Check if 'WOC' column exists in the job data
+    if len(job_data) > 0 and 'WOC' not in job_data[0]:
+        st.error("WOC column not found in the job data. Please check your Google Sheets.")
+        return
+
+    st.write("ข้อมูลงานที่ถูก Transfer:")
+    st.write(job_data)
+
+    # Select a job
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC'] for job in job_data])
+
+    if job_woc:
+        st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        # Form for checking weight
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+
+        if st.button("คำนวณและเปรียบเทียบ"):
+            # Compare with forming mode pieces count
+            forming_pieces_count = 1000  # Fetch this value from Forming mode data
+            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            # Save data to Google Sheets with timestamp
+            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
+            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            sheet.append_row(row_data)  # Save to sheet
+            st.success("บันทึกข้อมูลสำเร็จ!")
+            send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
+
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
@@ -93,40 +133,6 @@ def forming_mode():
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Job from {department_from} to {department_to} saved!")
-
-# Tapping Mode
-def tapping_mode():
-    st.header("Tapping Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-    st.write("ข้อมูลงานที่ถูก Transfer:")
-    st.write(job_data)
-
-    # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC'] for job in job_data])
-
-    if job_woc:
-        st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        # Form for checking weight
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-
-        if st.button("คำนวณและเปรียบเทียบ"):
-            # Compare with forming mode pieces count
-            forming_pieces_count = 1000  # Fetch this value from Forming mode data
-            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
-            # Save data to Google Sheets with timestamp
-            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
-            row_data = add_timestamp(row_data)  # Add timestamp to the row
-            sheet.append_row(row_data)  # Save to sheet
-            st.success("บันทึกข้อมูลสำเร็จ!")
-            send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
 # Main app logic
 def main():
