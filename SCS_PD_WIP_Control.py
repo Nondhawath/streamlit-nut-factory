@@ -17,21 +17,33 @@ client = gspread.authorize(creds)
 # Use Spreadsheet ID (Replace with your actual spreadsheet ID)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
-# Accessing the "part_code_master" and "Employees" sheets using Spreadsheet ID
-part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-
 # Function to read part codes from the "part_code_master" sheet
 def get_part_codes():
-    part_codes = part_code_master_sheet.get_all_records()
-    part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
-    return part_code_list
+    try:
+        part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+        # Get all rows from the "part_code_master" sheet
+        part_codes = part_code_master_sheet.get_all_records()
+
+        # Extract the "รหัสงาน" column
+        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
+        return part_code_list
+    except Exception as e:
+        st.error(f"Error reading part codes: {e}")
+        return []
 
 # Function to read employee names from the "Employees" sheet
 def get_employee_names():
-    employees = employees_sheet.get_all_records()
-    employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
-    return employee_names
+    try:
+        employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+        # Get all rows from the "Employees" sheet
+        employees = employees_sheet.get_all_records()
+
+        # Extract the "ชื่อพนักงาน" column
+        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
+        return employee_names
+    except Exception as e:
+        st.error(f"Error reading employee names: {e}")
+        return []
 
 # Function to add timestamp to every row update
 def add_timestamp(row_data):
