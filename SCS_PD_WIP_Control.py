@@ -171,10 +171,50 @@ def tapping_mode():
             st.success("บันทึกข้อมูลสำเร็จ!")
             send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
+# Tapping Work Mode
+def tapping_work_mode():
+    st.header("Tapping Work Mode")
+    
+    # Fetch jobs that are in WIP-Tapping status
+    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+    wip_tp_jobs = [job for job in job_data if job.get("WIP Tapping") == "WIP-Tapping"]
+
+    if len(wip_tp_jobs) == 0:
+        st.warning("ไม่มีงานที่อยู่ในสถานะ WIP-Tapping")
+        return
+
+    # Select WOC Number from jobs with WIP-Tapping status
+    job_woc = st.selectbox("เลือกหมายเลข WOC ที่มีสถานะ WIP-Tapping", [job['WOC Number'] for job in wip_tp_jobs])
+
+    # Select machine name for the job
+    machine_name = st.selectbox("เลือกชื่อเครื่องที่ทำงาน", ["TP30", "SM30", "TP60", "SM60"])  # Example machine names
+
+    if st.button("บันทึก"):
+        # Find the row index of the selected WOC Number
+        row = find_woc_row(job_woc)
+        if row:
+            current_row_data = sheet.row_values(row)
+            
+            # Ensure the row_data has the same size as current_row_data
+            if len(current_row_data) < 15:
+                # Pad the current_row_data if there are fewer columns
+                current_row_data += [''] * (15 - len(current_row_data))
+
+            # Change status from WIP-Tapping to Used - Machine Name
+            current_row_data[12] = f"Used - {machine_name}"  # Update WIP Tapping column with machine name
+
+            # Update the row in the Google Sheet
+            sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+
+            st.success(f"สถานะ WOC {job_woc} ได้รับการอัปเดตเป็น 'Used - {machine_name}'")
+            send_telegram_message(f"Job WOC {job_woc} processed and status updated to 'Used - {machine_name}'")
+        else:
+            st.error(f"WOC Number {job_woc} ไม่พบในระบบ")
+
 # Main app logic
 def main():
     st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
-    mode = st.selectbox("เลือกโหมดการทำงาน", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
+    mode = st.selectbox("เลือกโหมดการทำงาน", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer', 'Tapping Work'])
 
     if mode == 'Forming':
         forming_mode()
@@ -186,6 +226,8 @@ def main():
         pass
     elif mode == 'TP Transfer':
         pass
+    elif mode == 'Tapping Work':
+        tapping_work_mode()
 
 if __name__ == "__main__":
     main()
