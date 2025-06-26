@@ -18,17 +18,14 @@ client = gspread.authorize(creds)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Access the sheets using Spreadsheet ID
-sheet = client.open_by_key(spreadsheet_id).sheet1  # "Jobs" sheet
+sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
 part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
 employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
 
 # Function to read part codes from the "part_code_master" sheet
 def get_part_codes():
     try:
-        # Get all rows from the "part_code_master" sheet
         part_codes = part_code_master_sheet.get_all_records()
-
-        # Extract the "รหัสงาน" column
         part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
         return part_code_list
     except Exception as e:
@@ -38,10 +35,7 @@ def get_part_codes():
 # Function to read employee names from the "Employees" sheet
 def get_employee_names():
     try:
-        # Get all rows from the "Employees" sheet
         employees = employees_sheet.get_all_records()
-
-        # Extract the "ชื่อพนักงาน" column
         employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
         return employee_names
     except Exception as e:
@@ -94,7 +88,7 @@ def forming_mode():
     
     if st.button("บันทึก"):
         # Save data to Google Sheets with timestamp
-        row_data = [department_from, department_to, woc_number, selected_part_code, selected_employee, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = [woc_number, selected_part_code, selected_employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
         row_data = add_timestamp(row_data)  # Add timestamp to the row
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
@@ -128,7 +122,7 @@ def tapping_mode():
             difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
             st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
             # Save data to Google Sheets with timestamp
-            row_data = [job_woc, pieces_count, difference]
+            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
             row_data = add_timestamp(row_data)  # Add timestamp to the row
             sheet.append_row(row_data)  # Save to sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
