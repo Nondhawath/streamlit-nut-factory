@@ -38,6 +38,31 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
+# Function to read part codes from the "part_code_master" sheet
+def get_part_codes():
+    try:
+        # Fetch all records from the part_code_master sheet
+        part_codes = part_code_master_sheet.get_all_records()
+
+        # Extract part codes (รหัสงาน) into a list
+        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
+
+        # Return the list of part codes
+        return part_code_list
+    except Exception as e:
+        st.error(f"Error reading part codes: {e}")
+        return []
+
+# Function to read employee names from the "Employees" sheet
+def get_employee_names():
+    try:
+        employees = employees_sheet.get_all_records()
+        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
+        return employee_names
+    except Exception as e:
+        st.error(f"Error reading employee names: {e}")
+        return []
+
 # Function to add timestamp to every row update (with timezone)
 def add_timestamp(row_data):
     tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
@@ -75,7 +100,7 @@ def forming_mode():
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
