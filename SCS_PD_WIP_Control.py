@@ -154,15 +154,41 @@ def tapping_mode():
             st.success("บันทึกข้อมูลสำเร็จ!")
             send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
+# Tapping Work Mode
+def tapping_work_mode():
+    st.header("Tapping Work Mode")
+    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+
+    st.write("งานที่มีสถานะ WIP-Tapping:")
+    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Employee": job["Employee"], "Department From": job["Department From"], "Department To": job["Department To"], "Timestamp": job["Timestamp"]} for job in job_data]
+
+    st.dataframe(job_data_for_display)  # Show a table of job data without unnecessary JSON fields
+
+    # Select a job
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+
+    # Choose machine
+    machine_name = st.selectbox("เลือกเครื่องจักร", ["TP30", "SM30", "Other"])
+
+    if st.button("บันทึก"):
+        row_data = [job_woc, machine_name]
+        row_data = add_status_timestamp(row_data, 13, f"Used - {machine_name}")  # Update status and add timestamp
+
+        update_woc_row(job_woc, row_data)
+        st.success(f"งาน WOC {job_woc} ถูกบันทึกเป็น Used - {machine_name}")
+        send_telegram_message(f"Job WOC {job_woc} processed on {machine_name}")
+
 # Main app logic
 def main():
     st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
-    mode = st.radio("เลือกโหมด", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
+    mode = st.radio("เลือกโหมด", ['Forming', 'Tapping', 'Tapping Work', 'Final Inspection', 'Final Work', 'TP Transfer'])
 
     if mode == 'Forming':
         forming_mode()
     elif mode == 'Tapping':
         tapping_mode()
+    elif mode == 'Tapping Work':
+        tapping_work_mode()
 
 if __name__ == "__main__":
     main()
