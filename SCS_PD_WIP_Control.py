@@ -17,17 +17,29 @@ client = gspread.authorize(creds)
 # Use Spreadsheet ID (Replace with your actual spreadsheet ID)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
-# Accessing the sheets using Spreadsheet ID
-sheet = client.open_by_key(spreadsheet_id).sheet1  # "Jobs" sheet
-woc_status_sheet = client.open_by_key(spreadsheet_id).worksheet('WOC_Status')  # "WOC_Status" sheet
+# Accessing the "part_code_master" and "Employees" sheets using Spreadsheet ID
+part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
 
-# Telegram Bot Setup using Streamlit Secrets
-TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
-CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
+# Function to read part codes from the "part_code_master" sheet
+def get_part_codes():
+    # Get all rows from the "part_code_master" sheet
+    part_codes = part_code_master_sheet.get_all_records()
 
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
-    requests.get(url)
+    # Extract the "รหัสงาน" column
+    part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
+    
+    return part_code_list
+
+# Function to read employee names from the "Employees" sheet
+def get_employee_names():
+    # Get all rows from the "Employees" sheet
+    employees = employees_sheet.get_all_records()
+
+    # Extract the "ชื่อพนักงาน" column
+    employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
+    
+    return employee_names
 
 # Function to add timestamp to every row update
 def add_timestamp(row_data):
@@ -38,10 +50,16 @@ def add_timestamp(row_data):
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
+    
+    # Fetch part codes and employee names from Google Sheets
+    part_codes = get_part_codes()  # Fetch part codes from the "part_code_master" sheet
+    employee_names = get_employee_names()  # Fetch employee names from the "Employees" sheet
+
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])
+    selected_part_code = st.selectbox("รหัสงาน / Part Name", part_codes)  # Dropdown for selecting part code
+    selected_employee = st.selectbox("ชื่อพนักงาน", employee_names)  # Dropdown for selecting employee name
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -55,8 +73,9 @@ def forming_mode():
     
     if st.button("บันทึก"):
         # Save data to Google Sheets with timestamp
-        row_data = [department_from, department_to, woc_number, part_name, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = [department_from, department_to, woc_number, selected_part_code, selected_employee, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
         row_data = add_timestamp(row_data)  # Add timestamp to the row
+        sheet = client.open_by_key(spreadsheet_id).sheet1  # "Jobs" sheet
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Job from {department_from} to {department_to} saved!")
@@ -101,39 +120,13 @@ def update_woc_status(woc_number, status, part_name):
     row_data = add_timestamp(row_data)  # Add timestamp to the row
     woc_status_sheet.append_row(row_data)  # Save to "WOC_Status" sheet
 
-# Final Inspection Mode
-def final_inspection_mode():
-    st.header("Final Inspection Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-    st.write("ข้อมูลงานที่ถูก Transfer:")
-    st.write(job_data)
+# Telegram Bot Setup
+TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
+CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
 
-    # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC'] for job in job_data])
-
-    if job_woc:
-        st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        # Form for checking weight
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-
-        if st.button("คำนวณและเปรียบเทียบ"):
-            # Compare with Tapping mode pieces count
-            tapping_pieces_count = 1000  # Fetch this value from Tapping mode data
-            difference = abs(pieces_count - tapping_pieces_count) / tapping_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
-            # Save data to Google Sheets with timestamp
-            row_data = [job_woc, pieces_count, difference]
-            row_data = add_timestamp(row_data)  # Add timestamp to the row
-            sheet.append_row(row_data)  # Save to sheet
-            st.success("บันทึกข้อมูลสำเร็จ!")
-            send_telegram_message(f"Job WOC {job_woc} processed in Final Inspection")
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
+    requests.get(url)
 
 # Main app logic
 def main():
@@ -145,7 +138,7 @@ def main():
     elif mode == 'Tapping':
         tapping_mode()
     elif mode == 'Final Inspection':
-        final_inspection_mode()
+        pass
     elif mode == 'Final Work':
         pass
     elif mode == 'TP Transfer':
