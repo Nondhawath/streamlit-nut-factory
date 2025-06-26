@@ -23,22 +23,14 @@ employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
 
 # Function to read part codes from the "part_code_master" sheet
 def get_part_codes():
-    # Get all rows from the "part_code_master" sheet
     part_codes = part_code_master_sheet.get_all_records()
-
-    # Extract the "รหัสงาน" column
     part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
-    
     return part_code_list
 
 # Function to read employee names from the "Employees" sheet
 def get_employee_names():
-    # Get all rows from the "Employees" sheet
     employees = employees_sheet.get_all_records()
-
-    # Extract the "ชื่อพนักงาน" column
     employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
-    
     return employee_names
 
 # Function to add timestamp to every row update
@@ -55,16 +47,22 @@ def forming_mode():
     part_codes = get_part_codes()  # Fetch part codes from the "part_code_master" sheet
     employee_names = get_employee_names()  # Fetch employee names from the "Employees" sheet
 
-    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
-    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
-    woc_number = st.text_input("หมายเลข WOC")
-    selected_part_code = st.selectbox("รหัสงาน / Part Name", part_codes)  # Dropdown for selecting part code
-    selected_employee = st.selectbox("ชื่อพนักงาน", employee_names)  # Dropdown for selecting employee name
-    lot_number = st.text_input("หมายเลข LOT")
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+    # Create two columns layout
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
+        department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
+        woc_number = st.text_input("หมายเลข WOC")
+        lot_number = st.text_input("หมายเลข LOT")
+        selected_part_code = st.selectbox("รหัสงาน / Part Name", part_codes)  # Dropdown for selecting part code
+    
+    with col2:
+        selected_employee = st.selectbox("ชื่อพนักงาน", employee_names)  # Dropdown for selecting employee name
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
     # Calculate number of pieces
     if total_weight and barrel_weight and sample_weight and sample_count:
