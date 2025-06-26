@@ -121,8 +121,16 @@ def tapping_mode():
                 # If WOC exists, update the row with new data
                 row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
                 row_data = add_timestamp(row_data)  # Add timestamp to the row
-                sheet.delete_rows(row)  # Delete the existing row
-                sheet.insert_row(row_data, row)  # Insert the updated data back into the same row
+                
+                # Get existing row data
+                current_row_data = sheet.row_values(row)
+                
+                # Update the column for WIP Tapping (change column index if necessary)
+                current_row_data[12] = row_data[1]  # Update WIP Tapping column
+                current_row_data[13] = row_data[2]  # Update WIP Final Inspection column
+                
+                # Update the row in Google Sheets
+                sheet.update(f"A{row}:M{row}", [current_row_data])  # Update only the relevant range
                 st.success("บันทึกข้อมูลสำเร็จ!")
                 send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
             else:
