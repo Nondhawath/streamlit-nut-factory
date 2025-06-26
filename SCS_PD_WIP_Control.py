@@ -13,8 +13,13 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 # Authorize the credentials and set up the client
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
-sheet = client.open("Factory_Job_Status").sheet1  # "Jobs" sheet
-woc_status_sheet = client.open("Factory_Job_Status").worksheet('WOC_Status')  # "WOC_Status" sheet
+
+# Use Spreadsheet ID (Replace with your actual spreadsheet ID)
+spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
+
+# Accessing the sheets using Spreadsheet ID
+sheet = client.open_by_key(spreadsheet_id).sheet1  # "Jobs" sheet
+woc_status_sheet = client.open_by_key(spreadsheet_id).worksheet('WOC_Status')  # "WOC_Status" sheet
 
 # Telegram Bot Setup
 TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]  # Retrieve Telegram token from secrets
