@@ -16,11 +16,17 @@ client = gspread.authorize(creds)
 # Spreadsheet ID (Replace with your actual spreadsheet ID)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
-# Accessing the sheets using Spreadsheet ID
-sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
-part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')  # "part_code_master" sheet
-employee_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')  # "Employees" sheet
-machine_sheet = client.open_by_key(spreadsheet_id).worksheet('Machines')  # "Machines" sheet
+# Function to cache data from Google Sheets
+@st.cache_data
+def get_sheet_data(sheet_name):
+    sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+    return sheet.get_all_records()
+
+# Use the cached data
+part_code_master_data = get_sheet_data('part_code_master')
+employee_data = get_sheet_data('Employees')
+machine_data = get_sheet_data('Machines')
+job_data = get_sheet_data('Jobs')
 
 # Function to add timestamp to every row update
 def add_status_timestamp(row_data, status_column_index, status_value):
@@ -29,28 +35,13 @@ def add_status_timestamp(row_data, status_column_index, status_value):
     row_data[status_column_index + 1] = timestamp  # Add timestamp next to the status
     return row_data
 
-# Fetch part codes dynamically from the part_code_master sheet
-def get_part_codes():
-    part_codes = part_code_master_sheet.col_values(1)[1:]  # Skip the header row
-    return part_codes
-
-# Fetch employee names dynamically from the employee sheet
-def get_employee_names():
-    employees = employee_sheet.col_values(1)[1:]  # Skip the header row
-    return employees
-
-# Fetch machine names dynamically from the Machines sheet
-def get_machine_names():
-    machine_data = machine_sheet.col_values(1)[1:]  # Skip the header row
-    return machine_data
-
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Outsource'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())
+    part_name = st.selectbox("รหัสงาน / Part Name", [part['รหัสงาน'] for part in part_code_master_data])
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -63,16 +54,17 @@ def forming_mode():
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
     if st.button("บันทึก"):
-        employee = st.selectbox("ชื่อพนักงาน", get_employee_names())
+        employee = st.selectbox("ชื่อพนักงาน", [employee['ชื่อพนักงาน'] for employee in employee_data])
         row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
         row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # Add timestamp for WIP-Forming status
-        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+        job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
+        job_sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+    job_data = get_sheet_data('Jobs')  # Fetch all jobs from Google Sheets
     st.write("ข้อมูลงานที่ถูก Transfer:")
     job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
@@ -90,13 +82,14 @@ def tapping_mode():
         if st.button("คำนวณและเปรียบเทียบ"):
             row_data = [job_woc, pieces_count]
             row_data = add_status_timestamp(row_data, 1, "WIP-Tapping")  # Add timestamp for WIP-Tapping status
-            sheet.append_row(row_data)  # Save to sheet
+            job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
+            job_sheet.append_row(row_data)  # Save to sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Final Inspection Mode
 def final_inspection_mode():
     st.header("Final Inspection Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+    job_data = get_sheet_data('Jobs')  # Fetch all jobs from Google Sheets
     st.write("ข้อมูลงานที่ถูก Transfer:")
     job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
@@ -114,7 +107,8 @@ def final_inspection_mode():
         if st.button("คำนวณและเปรียบเทียบ"):
             row_data = [job_woc, pieces_count]
             row_data = add_status_timestamp(row_data, 1, "WIP-Final Inspection")  # Add timestamp for WIP-Final Inspection status
-            sheet.append_row(row_data)  # Save to sheet
+            job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
+            job_sheet.append_row(row_data)  # Save to sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Main app logic
