@@ -13,13 +13,14 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
 
-# Use Spreadsheet ID (Replace with your actual spreadsheet ID)
+# Spreadsheet ID (Replace with your actual spreadsheet ID)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Accessing the sheets using Spreadsheet ID
 sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
 part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')  # "part_code_master" sheet
 employee_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')  # "Employees" sheet
+machine_sheet = client.open_by_key(spreadsheet_id).worksheet('Machines')  # "Machines" sheet
 
 # Function to add timestamp to every row update
 def add_status_timestamp(row_data, status_column_index, status_value):
@@ -38,10 +39,15 @@ def get_employee_names():
     employees = employee_sheet.col_values(1)[1:]  # Skip the header row
     return employees
 
+# Fetch machine names dynamically from the Machines sheet
+def get_machine_names():
+    machine_data = machine_sheet.col_values(1)[1:]  # Skip the header row
+    return machine_data
+
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
-    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final Inspection', 'Outsource'])
+    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Outsource'])
     woc_number = st.text_input("หมายเลข WOC")
     part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())
