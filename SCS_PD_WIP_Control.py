@@ -2,7 +2,6 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import time
 
 # ฟังก์ชันเชื่อมต่อกับ Google Sheets
 def connect_to_google_sheets():
@@ -77,55 +76,33 @@ def forming_mode(sheet, part_code_master_sheet):
 # โหมดการทำงานสำหรับ Tapping
 def tapping_mode(sheet):
     st.header("Tapping Mode (TP)")
-    job_data = sheet.get_all_records()
+    try:
+        job_data = sheet.get_all_records()  # Get all records from the Jobs sheet
 
-    st.write("ข้อมูลงานที่ถูก Transfer:")
-    st.write(job_data)
+        st.write("ข้อมูลงานที่ถูก Transfer:")
+        st.write(job_data)
 
-    # เลือกหมายเลข WOC ที่ต้องการ
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+        # เลือกหมายเลข WOC ที่ต้องการ
+        job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
-    if job_woc:
-        st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+        if job_woc:
+            st.write(f"เลือกหมายเลข WOC: {job_woc}")
+            total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+            barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+            sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+            sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+            if total_weight and barrel_weight and sample_weight and sample_count:
+                pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+                st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
 
-        if st.button("คำนวณและเปรียบเทียบ"):
-            row_data = [job_woc, pieces_count]
-            row_data = add_status_timestamp(row_data, 11, "WIP-Tapping")
-            save_to_google_sheets(sheet, row_data)
+            if st.button("คำนวณและเปรียบเทียบ"):
+                row_data = [job_woc, pieces_count]
+                row_data = add_status_timestamp(row_data, 11, "WIP-Tapping")
+                save_to_google_sheets(sheet, row_data)
 
-# โหมดการทำงานสำหรับ Final Inspection
-def final_inspection_mode(sheet):
-    st.header("Final Inspection Mode (FI)")
-    job_data = sheet.get_all_records()
-
-    st.write("ข้อมูลงานที่ถูก Transfer:")
-    st.write(job_data)
-
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
-
-    if job_woc:
-        st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-
-        if st.button("คำนวณและเปรียบเทียบ"):
-            row_data = [job_woc, pieces_count]
-            row_data = add_status_timestamp(row_data, 11, "WIP-Final Inspection")
-            save_to_google_sheets(sheet, row_data)
+    except Exception as e:
+        st.error(f"Error in Tapping Mode: {e}")
 
 # ฟังก์ชันหลัก
 def main():
@@ -133,14 +110,12 @@ def main():
     if not sheet or not part_code_master_sheet:
         return
 
-    mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode", "Tapping Mode", "Final Inspection Mode"])
+    mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode", "Tapping Mode"])
 
     if mode == "Forming Mode":
         forming_mode(sheet, part_code_master_sheet)
     elif mode == "Tapping Mode":
         tapping_mode(sheet)
-    elif mode == "Final Inspection Mode":
-        final_inspection_mode(sheet)
 
 if __name__ == "__main__":
     main()
