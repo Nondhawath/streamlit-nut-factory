@@ -13,7 +13,7 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
 
-# Spreadsheet ID (Replace with your actual spreadsheet ID)
+# Spreadsheet ID (Replace with your actual Spreadsheet ID)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Function to cache data from Google Sheets
@@ -41,7 +41,15 @@ def forming_mode():
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Outsource'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", [part['รหัสงาน'] for part in part_code_master_data])
+    
+    # ตรวจสอบข้อมูลที่ดึงมาจาก Google Sheets
+    st.write("Part Code Master Data:", part_code_master_data)
+
+    # ตรวจสอบว่า column 'รหัสงาน' มีอยู่จริง
+    part_names = [part['รหัสงาน'] for part in part_code_master_data if 'รหัสงาน' in part]
+    st.write("Part Names:", part_names)
+
+    part_name = st.selectbox("รหัสงาน / Part Name", part_names)
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -64,12 +72,16 @@ def forming_mode():
 # Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
-    job_data = get_sheet_data('Jobs')  # Fetch all jobs from Google Sheets
+    job_data = job_data  # Fetch all jobs from Google Sheets
     st.write("ข้อมูลงานที่ถูก Transfer:")
+    st.write(job_data)
+
+    # Select a job
     job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
     if job_woc:
         st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        # Form for checking weight
         total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
         barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
         sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
@@ -80,21 +92,31 @@ def tapping_mode():
             st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
 
         if st.button("คำนวณและเปรียบเทียบ"):
-            row_data = [job_woc, pieces_count]
-            row_data = add_status_timestamp(row_data, 1, "WIP-Tapping")  # Add timestamp for WIP-Tapping status
+            # Compare with forming mode pieces count
+            forming_pieces_count = 1000  # Fetch this value from Forming mode data
+            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            
+            # Save data to Google Sheets with timestamp
+            row_data = [job_woc, pieces_count, difference]
+            row_data = add_status_timestamp(row_data, 12, "WIP-Tapping")  # Add timestamp for WIP-Tapping status
             job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
-            job_sheet.append_row(row_data)  # Save to sheet
+            job_sheet.append_row(row_data)  # Save the row to "Jobs" sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Final Inspection Mode
 def final_inspection_mode():
     st.header("Final Inspection Mode")
-    job_data = get_sheet_data('Jobs')  # Fetch all jobs from Google Sheets
+    job_data = job_data  # Fetch all jobs from Google Sheets
     st.write("ข้อมูลงานที่ถูก Transfer:")
+    st.write(job_data)
+
+    # Select a job
     job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
     if job_woc:
         st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        # Form for checking weight
         total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
         barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
         sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
@@ -105,10 +127,16 @@ def final_inspection_mode():
             st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
 
         if st.button("คำนวณและเปรียบเทียบ"):
-            row_data = [job_woc, pieces_count]
-            row_data = add_status_timestamp(row_data, 1, "WIP-Final Inspection")  # Add timestamp for WIP-Final Inspection status
+            # Compare with tapping mode pieces count
+            tapping_pieces_count = 1200  # Fetch this value from Tapping mode data
+            difference = abs(pieces_count - tapping_pieces_count) / tapping_pieces_count * 100
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            
+            # Save data to Google Sheets with timestamp
+            row_data = [job_woc, pieces_count, difference]
+            row_data = add_status_timestamp(row_data, 13, "WIP-Final Inspection")  # Add timestamp for WIP-Final Inspection status
             job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
-            job_sheet.append_row(row_data)  # Save to sheet
+            job_sheet.append_row(row_data)  # Save the row to "Jobs" sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Main app logic
