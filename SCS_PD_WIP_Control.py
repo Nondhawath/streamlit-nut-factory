@@ -33,7 +33,8 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
-# Function to get part codes dynamically from Google Sheets
+# Function to get part codes dynamically from Google Sheets with caching to avoid too many requests
+@st.cache(ttl=60*10)  # Cache for 10 minutes
 def get_part_codes():
     try:
         # Fetch part codes from part_code_master sheet
@@ -156,7 +157,7 @@ def tapping_mode():
             # Compare with forming mode pieces count
             forming_pieces_count = 1000  # Fetch this value from Forming mode data
             difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}")
 
             row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
             row_data = add_status_timestamp(row_data, 13, "WIP-Tapping")  # Add timestamp to the row
