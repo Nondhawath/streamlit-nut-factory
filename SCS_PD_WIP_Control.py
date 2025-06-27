@@ -4,12 +4,12 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # กำหนด Google Sheets API credentials
-google_credentials = st.secrets["google_service_account"]  
+google_credentials = st.secrets["google_service_account"]
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
 
-spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spreadsheet ID ที่ใช้งานจริง
+spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # เปลี่ยนเป็น Spreadsheet ID ที่ใช้งานจริง
 sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
 # ถ้ามีหลายชีทเชื่อมต่อเพิ่ม
 part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
