@@ -2,126 +2,145 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import time
 
-# กำหนดการเชื่อมต่อ Google Sheets
-google_credentials = st.secrets["google_service_account"]
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
-client = gspread.authorize(creds)
+# ฟังก์ชันเชื่อมต่อกับ Google Sheets
+def connect_to_google_sheets():
+    try:
+        google_credentials = st.secrets["google_service_account"]  # Get Google credentials from secrets
 
-# ใช้ Spreadsheet ID
-spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spreadsheet ID ของคุณที่นี่
-sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # เชื่อมต่อกับชีท Jobs
+        # Define the scope for Google Sheets API
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# ฟังก์ชันสำหรับการเพิ่ม Timestamp
+        # Authorize the credentials and set up the client
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
+        client = gspread.authorize(creds)
+
+        # Use Spreadsheet ID
+        spreadsheet_id = st.secrets["spreadsheet_id"]  # Spreadsheet ID from secrets
+        sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
+        part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')  # Part code sheet
+
+        return sheet, part_code_master_sheet
+    except Exception as e:
+        st.error(f"Error connecting to Google Sheets: {e}")
+        return None, None
+
+# ฟังก์ชันดึงข้อมูลจาก Google Sheets
+def get_part_codes(part_code_master_sheet):
+    try:
+        part_codes = part_code_master_sheet.get_all_records()
+        return [part['Part Name'] for part in part_codes]
+    except Exception as e:
+        st.error(f"Error fetching part codes: {e}")
+        return []
+
+# ฟังก์ชันที่เพิ่มข้อมูลการบันทึกสถานะและเวลา
 def add_status_timestamp(row_data, status_column_index, status_value):
-    timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     row_data[status_column_index] = status_value
-    row_data[status_column_index + 1] = timestamp  # เพิ่ม Timestamp ถัดจากสถานะ
+    row_data[status_column_index + 1] = timestamp
     return row_data
 
-# ฟังก์ชันการดึงข้อมูลจาก Part Code Master และ Employees
-def get_part_codes():
-    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-    part_codes = part_code_master_sheet.col_values(1)  # สมมติว่า Part Code อยู่ในคอลัมน์ที่ 1
-    return part_codes[1:]  # ลบหัวคอลัมน์
+# ฟังก์ชันการบันทึกข้อมูลลงใน Google Sheets
+def save_to_google_sheets(sheet, row_data):
+    try:
+        sheet.append_row(row_data)
+        st.success("ข้อมูลถูกบันทึกเรียบร้อยแล้ว")
+    except Exception as e:
+        st.error(f"Error saving data to Google Sheets: {e}")
 
-def get_employees():
-    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-    employees = employees_sheet.col_values(1)  # สมมติว่า Employee อยู่ในคอลัมน์ที่ 1
-    return employees[1:]  # ลบหัวคอลัมน์
-
-def get_machines():
-    machines_sheet = client.open_by_key(spreadsheet_id).worksheet('Machines')
-    machines = machines_sheet.col_values(1)  # สมมติว่าเครื่องจักรอยู่ในคอลัมน์ที่ 1
-    return machines[1:]  # ลบหัวคอลัมน์
-
-# ฟังก์ชันการทำงาน Forming
-def forming_mode():
+# โหมดการทำงานสำหรับ Forming
+def forming_mode(sheet, part_code_master_sheet):
     st.header("Forming Mode (FM)")
+    part_codes = get_part_codes(part_code_master_sheet)
 
-    # การรับข้อมูลจากผู้ใช้
-    department_from = 'Forming'  # เนื่องจาก Forming เป็นแผนกต้นทาง
-    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Out Source'])
+    department_from = "FM"
+    department_to = st.selectbox('เลือกแผนกปลายทาง', ['TP', 'FI', 'OS'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
-    employee = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
-    machine_name = st.selectbox("ชื่อเครื่องจักร", get_machines())  # Fetch machine names dynamically
+    part_name = st.selectbox("รหัสงาน / Part Name", part_codes)
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
     sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
     sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-    # คำนวณ Pieces Count
-    pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000) if total_weight and barrel_weight and sample_weight and sample_count else 0
+    if total_weight and barrel_weight and sample_weight and sample_count:
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
 
     if st.button("บันทึก"):
-        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
-        row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # บันทึกสถานะและ Timestamp
-        sheet.append_row(row_data)  # บันทึกลง Google Sheets
-        st.success("บันทึกข้อมูลสำเร็จ!")
+        row_data = [woc_number, part_name, "นายคมสันต์ คงคำลี", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = add_status_timestamp(row_data, 11, "WIP-Forming")
+        save_to_google_sheets(sheet, row_data)
 
-# ฟังก์ชันการทำงาน Tapping
-def tapping_mode():
+# โหมดการทำงานสำหรับ Tapping
+def tapping_mode(sheet):
     st.header("Tapping Mode (TP)")
-
-    # เลือก WOC จากข้อมูลที่มีอยู่ใน Google Sheets
     job_data = sheet.get_all_records()
-    woc_numbers = [job['WOC Number'] for job in job_data]
 
-    woc_number = st.selectbox("เลือกหมายเลข WOC", woc_numbers)
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
-    employee = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
-    machine_name = st.selectbox("ชื่อเครื่องจักร", get_machines())  # Fetch machine names dynamically
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+    st.write("ข้อมูลงานที่ถูก Transfer:")
+    st.write(job_data)
 
-    if st.button("บันทึก"):
-        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000) if total_weight and barrel_weight and sample_weight and sample_count else 0
-        row_data = [woc_number, part_name, employee, "Tapping", "Final Inspection", "LOT123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
-        row_data = add_status_timestamp(row_data, 11, "WIP-Tapping")  # บันทึกสถานะและ Timestamp
-        sheet.append_row(row_data)  # บันทึกลง Google Sheets
-        st.success("บันทึกข้อมูลสำเร็จ!")
+    # เลือกหมายเลข WOC ที่ต้องการ
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
 
-# ฟังก์ชันการทำงาน Final Inspection
-def final_inspection_mode():
+    if job_woc:
+        st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+
+        if st.button("คำนวณและเปรียบเทียบ"):
+            row_data = [job_woc, pieces_count]
+            row_data = add_status_timestamp(row_data, 11, "WIP-Tapping")
+            save_to_google_sheets(sheet, row_data)
+
+# โหมดการทำงานสำหรับ Final Inspection
+def final_inspection_mode(sheet):
     st.header("Final Inspection Mode (FI)")
-
-    # เลือก WOC จากข้อมูลที่มีอยู่ใน Google Sheets
     job_data = sheet.get_all_records()
-    woc_numbers = [job['WOC Number'] for job in job_data]
 
-    woc_number = st.selectbox("เลือกหมายเลข WOC", woc_numbers)
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
-    employee = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
-    machine_name = st.selectbox("ชื่อเครื่องจักร", get_machines())  # Fetch machine names dynamically
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+    st.write("ข้อมูลงานที่ถูก Transfer:")
+    st.write(job_data)
 
-    if st.button("บันทึก"):
-        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000) if total_weight and barrel_weight and sample_weight and sample_count else 0
-        row_data = [woc_number, part_name, employee, "Final Inspection", "Completed", "LOT456", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
-        row_data = add_status_timestamp(row_data, 11, "WIP-Final Inspection")  # บันทึกสถานะและ Timestamp
-        sheet.append_row(row_data)  # บันทึกลง Google Sheets
-        st.success("บันทึกข้อมูลสำเร็จ!")
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+
+    if job_woc:
+        st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+
+        if st.button("คำนวณและเปรียบเทียบ"):
+            row_data = [job_woc, pieces_count]
+            row_data = add_status_timestamp(row_data, 11, "WIP-Final Inspection")
+            save_to_google_sheets(sheet, row_data)
 
 # ฟังก์ชันหลัก
 def main():
-    st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
+    sheet, part_code_master_sheet = connect_to_google_sheets()
+    if not sheet or not part_code_master_sheet:
+        return
 
     mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode", "Tapping Mode", "Final Inspection Mode"])
 
     if mode == "Forming Mode":
-        forming_mode()
+        forming_mode(sheet, part_code_master_sheet)
     elif mode == "Tapping Mode":
-        tapping_mode()
+        tapping_mode(sheet)
     elif mode == "Final Inspection Mode":
-        final_inspection_mode()
+        final_inspection_mode(sheet)
 
 if __name__ == "__main__":
     main()
