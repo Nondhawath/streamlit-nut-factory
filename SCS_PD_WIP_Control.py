@@ -43,6 +43,16 @@ def get_part_codes():
         st.error(f"Error fetching part codes: {e}")
         return []
 
+# ฟังก์ชันดึงชื่อพนักงานจาก Google Sheets
+@st.cache_data(ttl=60*10)  # Cache for 10 minutes
+def get_employees():
+    try:
+        employees = employees_sheet.col_values(1)  # ดึงชื่อพนักงานจากคอลัมน์แรก
+        return employees
+    except Exception as e:
+        st.error(f"Error fetching employee names: {e}")
+        return []
+
 # ฟังก์ชันเพิ่ม status และ timestamp
 def add_status_timestamp(row_data, status_column_index, status_value):
     # เช็คให้แน่ใจว่า row_data มีจำนวนคอลัมน์ที่เพียงพอ
@@ -111,6 +121,7 @@ def forming_mode():
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
     part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    employee_name = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -124,50 +135,12 @@ def forming_mode():
     
     if st.button("บันทึก"):
         # Save data to Google Sheets with timestamp
-        row_data = [woc_number, part_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = [woc_number, part_name, employee_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
         # Add status and timestamp for WIP-Forming
         row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # Add timestamp to the row
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Job from {department_from} to {department_to} saved!")
-
-# Tapping Mode
-def tapping_mode():
-    st.header("Tapping Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-
-    st.write("ข้อมูลงานที่ถูก Transfer:")
-    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
-
-    # Use st.table() or st.dataframe() for a cleaner display
-    st.dataframe(job_data_for_display)  # Show a table of job data without unnecessary JSON fields
-
-    # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
-
-    if job_woc:
-        st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        # Form for checking weight
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-
-        if st.button("คำนวณและเปรียบเทียบ"):
-            # Compare with forming mode pieces count
-            forming_pieces_count = 1000  # Fetch this value from Forming mode data
-            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}")
-
-            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
-            row_data = add_status_timestamp(row_data, 13, "WIP-Tapping")  # Add timestamp to the row
-            update_woc_row(job_woc, row_data)  # Update the job status in Google Sheets
-            st.success("บันทึกข้อมูลสำเร็จ!")
-            send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
 # Main function
 def main():
