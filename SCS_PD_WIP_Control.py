@@ -34,7 +34,7 @@ def send_telegram_message(message):
     requests.get(url)
 
 # Function to get part codes dynamically from Google Sheets with caching to avoid too many requests
-@st.cache(ttl=60*10)  # Cache for 10 minutes
+@st.cache_data(ttl=60*10)  # Cache for 10 minutes
 def get_part_codes():
     try:
         # Fetch part codes from part_code_master sheet
