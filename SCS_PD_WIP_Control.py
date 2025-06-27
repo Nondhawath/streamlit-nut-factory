@@ -46,6 +46,10 @@ def get_part_codes():
 
 # Function to add timestamp to every status change
 def add_status_timestamp(row_data, status_column_index, status_value):
+    # Ensure that row_data has enough columns, if not, extend it with empty values
+    while len(row_data) <= status_column_index:
+        row_data.append('')  # Fill missing columns with empty strings
+
     tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
     timestamp = datetime.now(tz).strftime('%d-%m-%Y %H:%M')  # Get current timestamp in Thailand time
 
@@ -122,6 +126,7 @@ def forming_mode():
     if st.button("บันทึก"):
         # Save data to Google Sheets with timestamp
         row_data = [woc_number, part_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        # Add status and timestamp for WIP-Forming
         row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # Add timestamp to the row
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
@@ -161,46 +166,20 @@ def tapping_mode():
 
             row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
             row_data = add_status_timestamp(row_data, 13, "WIP-Tapping")  # Add timestamp to the row
-
-            update_woc_row(job_woc, row_data)
+            update_woc_row(job_woc, row_data)  # Update the job status in Google Sheets
             st.success("บันทึกข้อมูลสำเร็จ!")
             send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
-# Tapping Work Mode
-def tapping_work_mode():
-    st.header("Tapping Work Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-
-    st.write("งานที่มีสถานะ WIP-Tapping:")
-    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Employee": job["Employee"], "Department From": job["Department From"], "Department To": job["Department To"], "Timestamp": job["Timestamp"]} for job in job_data if job["WIP Tapping"] == "WIP-Tapping"]
-
-    st.dataframe(job_data_for_display)  # Show only jobs with WIP-Tapping status
-
-    # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data if job["WIP Tapping"] == "WIP-Tapping"])
-
-    # Choose machine
-    machine_name = st.selectbox("เลือกเครื่องจักร", ["TP30", "SM30", "Other"])
-
-    if st.button("บันทึก"):
-        row_data = [job_woc, machine_name]
-        row_data = add_status_timestamp(row_data, 13, f"Used - {machine_name}")  # Update status and add timestamp
-
-        update_woc_row(job_woc, row_data)
-        st.success(f"งาน WOC {job_woc} ถูกบันทึกเป็น Used - {machine_name}")
-        send_telegram_message(f"Job WOC {job_woc} processed on {machine_name}")
-
-# Main app logic
+# Main function
 def main():
-    st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
-    mode = st.sidebar.radio("เลือกโหมด", ['Forming', 'Tapping', 'Tapping Work', 'Final Inspection', 'Final Work', 'TP Transfer'])
+    st.sidebar.title("เลือกโหมด")
+    mode = st.sidebar.selectbox("เลือกโหมด", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
 
     if mode == 'Forming':
         forming_mode()
     elif mode == 'Tapping':
         tapping_mode()
-    elif mode == 'Tapping Work':
-        tapping_work_mode()
+    # Add more modes if needed (e.g., Final Inspection, Final Work, TP Transfer)
 
 if __name__ == "__main__":
     main()
