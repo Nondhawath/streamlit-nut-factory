@@ -20,6 +20,22 @@ def add_status_timestamp(row_data, status_column_index, status_value):
     row_data[status_column_index + 1] = timestamp  # เพิ่ม Timestamp ถัดจากสถานะ
     return row_data
 
+# ฟังก์ชันการดึงข้อมูลจาก Part Code Master และ Employees
+def get_part_codes():
+    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+    part_codes = part_code_master_sheet.col_values(1)  # สมมติว่า Part Code อยู่ในคอลัมน์ที่ 1
+    return part_codes[1:]  # ลบหัวคอลัมน์
+
+def get_employees():
+    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+    employees = employees_sheet.col_values(1)  # สมมติว่า Employee อยู่ในคอลัมน์ที่ 1
+    return employees[1:]  # ลบหัวคอลัมน์
+
+def get_machines():
+    machines_sheet = client.open_by_key(spreadsheet_id).worksheet('Machines')
+    machines = machines_sheet.col_values(1)  # สมมติว่าเครื่องจักรอยู่ในคอลัมน์ที่ 1
+    return machines[1:]  # ลบหัวคอลัมน์
+
 # ฟังก์ชันการทำงาน Forming
 def forming_mode():
     st.header("Forming Mode (FM)")
@@ -28,7 +44,9 @@ def forming_mode():
     department_from = 'Forming'  # เนื่องจาก Forming เป็นแผนกต้นทาง
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Out Source'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part A", "Part B", "Part C"])
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    employee = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
+    machine_name = st.selectbox("ชื่อเครื่องจักร", get_machines())  # Fetch machine names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -39,7 +57,7 @@ def forming_mode():
     pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000) if total_weight and barrel_weight and sample_weight and sample_count else 0
 
     if st.button("บันทึก"):
-        row_data = [woc_number, part_name, "Employee Name", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
+        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
         row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # บันทึกสถานะและ Timestamp
         sheet.append_row(row_data)  # บันทึกลง Google Sheets
         st.success("บันทึกข้อมูลสำเร็จ!")
@@ -53,7 +71,9 @@ def tapping_mode():
     woc_numbers = [job['WOC Number'] for job in job_data]
 
     woc_number = st.selectbox("เลือกหมายเลข WOC", woc_numbers)
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part A", "Part B", "Part C"])
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    employee = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
+    machine_name = st.selectbox("ชื่อเครื่องจักร", get_machines())  # Fetch machine names dynamically
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
     sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
@@ -61,7 +81,7 @@ def tapping_mode():
 
     if st.button("บันทึก"):
         pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000) if total_weight and barrel_weight and sample_weight and sample_count else 0
-        row_data = [woc_number, part_name, "Employee Name", "Tapping", "Final Inspection", "LOT123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
+        row_data = [woc_number, part_name, employee, "Tapping", "Final Inspection", "LOT123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
         row_data = add_status_timestamp(row_data, 11, "WIP-Tapping")  # บันทึกสถานะและ Timestamp
         sheet.append_row(row_data)  # บันทึกลง Google Sheets
         st.success("บันทึกข้อมูลสำเร็จ!")
@@ -75,7 +95,9 @@ def final_inspection_mode():
     woc_numbers = [job['WOC Number'] for job in job_data]
 
     woc_number = st.selectbox("เลือกหมายเลข WOC", woc_numbers)
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part A", "Part B", "Part C"])
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    employee = st.selectbox("ชื่อพนักงาน", get_employees())  # Fetch employee names dynamically
+    machine_name = st.selectbox("ชื่อเครื่องจักร", get_machines())  # Fetch machine names dynamically
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
     sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
@@ -83,7 +105,7 @@ def final_inspection_mode():
 
     if st.button("บันทึก"):
         pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000) if total_weight and barrel_weight and sample_weight and sample_count else 0
-        row_data = [woc_number, part_name, "Employee Name", "Final Inspection", "Completed", "LOT456", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
+        row_data = [woc_number, part_name, employee, "Final Inspection", "Completed", "LOT456", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "", ""]
         row_data = add_status_timestamp(row_data, 11, "WIP-Final Inspection")  # บันทึกสถานะและ Timestamp
         sheet.append_row(row_data)  # บันทึกลง Google Sheets
         st.success("บันทึกข้อมูลสำเร็จ!")
