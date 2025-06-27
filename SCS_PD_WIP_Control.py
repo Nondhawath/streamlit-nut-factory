@@ -33,6 +33,16 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
+# Function to get part codes dynamically from Google Sheets
+def get_part_codes():
+    try:
+        # Fetch part codes from part_code_master sheet
+        part_codes = part_code_master_sheet.col_values(1)  # Assuming "Part Code" is in the first column
+        return part_codes
+    except Exception as e:
+        st.error(f"Error fetching part codes: {e}")
+        return []
+
 # Function to add timestamp to every status change
 def add_status_timestamp(row_data, status_column_index, status_value):
     tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
@@ -161,12 +171,12 @@ def tapping_work_mode():
     job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
 
     st.write("งานที่มีสถานะ WIP-Tapping:")
-    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Employee": job["Employee"], "Department From": job["Department From"], "Department To": job["Department To"], "Timestamp": job["Timestamp"]} for job in job_data]
+    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Employee": job["Employee"], "Department From": job["Department From"], "Department To": job["Department To"], "Timestamp": job["Timestamp"]} for job in job_data if job["WIP Tapping"] == "WIP-Tapping"]
 
-    st.dataframe(job_data_for_display)  # Show a table of job data without unnecessary JSON fields
+    st.dataframe(job_data_for_display)  # Show only jobs with WIP-Tapping status
 
     # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data if job["WIP Tapping"] == "WIP-Tapping"])
 
     # Choose machine
     machine_name = st.selectbox("เลือกเครื่องจักร", ["TP30", "SM30", "Other"])
@@ -182,7 +192,7 @@ def tapping_work_mode():
 # Main app logic
 def main():
     st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
-    mode = st.radio("เลือกโหมด", ['Forming', 'Tapping', 'Tapping Work', 'Final Inspection', 'Final Work', 'TP Transfer'])
+    mode = st.sidebar.radio("เลือกโหมด", ['Forming', 'Tapping', 'Tapping Work', 'Final Inspection', 'Final Work', 'TP Transfer'])
 
     if mode == 'Forming':
         forming_mode()
