@@ -24,32 +24,48 @@ def get_sheet_data(sheet_name):
 
 # Use the cached data
 part_code_master_data = get_sheet_data('part_code_master')
-employee_data = get_sheet_data('Employees')
-machine_data = get_sheet_data('Machines')
-job_data = get_sheet_data('Jobs')
 
-# Function to add timestamp to every row update
+# Display Part Code Master Data
+def display_part_code_master_data():
+    part_codes = [part['รหัสงาน'] for part in part_code_master_data if 'รหัสงาน' in part]
+    
+    if part_codes:
+        part_codes.sort()
+        ranges = []
+        # Create ranges based on the sorted part codes
+        for i in range(0, len(part_codes), 100):
+            start = part_codes[i]
+            end = part_codes[i + 99] if i + 99 < len(part_codes) else part_codes[-1]
+            ranges.append(f"[{start} - {end}]")
+
+        # Display the Part Code Ranges
+        st.write("Part Code Master Data:")
+        st.write(ranges)
+    
+    # Display Part Names (No empty list)
+    part_names = [part['Part Name'] for part in part_code_master_data if 'Part Name' in part and part['Part Name']]
+    
+    if part_names:
+        st.write("Part Names:")
+        st.write(part_names)
+
+# Call the function to display the data
+display_part_code_master_data()
+
+# Google Sheets data to save work statuses and timestamps
 def add_status_timestamp(row_data, status_column_index, status_value):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp
-    row_data[status_column_index] = status_value  # Add status to the row
+    timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')  # Format: 26-06-2025 14:54
+    row_data[status_column_index] = status_value  # Set the status
     row_data[status_column_index + 1] = timestamp  # Add timestamp next to the status
     return row_data
 
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
-    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
-    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Outsource'])
+    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
+    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
-    
-    # ตรวจสอบข้อมูลที่ดึงมาจาก Google Sheets
-    st.write("Part Code Master Data:", part_code_master_data)
-
-    # ตรวจสอบว่า column 'รหัสงาน' มีอยู่จริง
-    part_names = [part['รหัสงาน'] for part in part_code_master_data if 'รหัสงาน' in part]
-    st.write("Part Names:", part_names)
-
-    part_name = st.selectbox("รหัสงาน / Part Name", part_names)
+    part_name = st.selectbox("รหัสงาน / Part Name", [part['Part Name'] for part in part_code_master_data])
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -62,22 +78,22 @@ def forming_mode():
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
     if st.button("บันทึก"):
-        employee = st.selectbox("ชื่อพนักงาน", [employee['ชื่อพนักงาน'] for employee in employee_data])
-        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
-        row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # Add timestamp for WIP-Forming status
-        job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
-        job_sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+        # Save data to Google Sheets with timestamp
+        row_data = [department_from, department_to, woc_number, part_name, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = add_status_timestamp(row_data, 11, "WIP-Forming")  # Add timestamp to the row
+        sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
+        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
-    job_data = job_data  # Fetch all jobs from Google Sheets
+    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
     st.write("ข้อมูลงานที่ถูก Transfer:")
     st.write(job_data)
 
     # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC'] for job in job_data])
 
     if job_woc:
         st.write(f"เลือกหมายเลข WOC: {job_woc}")
@@ -96,60 +112,22 @@ def tapping_mode():
             forming_pieces_count = 1000  # Fetch this value from Forming mode data
             difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
             st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
-            
             # Save data to Google Sheets with timestamp
             row_data = [job_woc, pieces_count, difference]
-            row_data = add_status_timestamp(row_data, 12, "WIP-Tapping")  # Add timestamp for WIP-Tapping status
-            job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
-            job_sheet.append_row(row_data)  # Save the row to "Jobs" sheet
-            st.success("บันทึกข้อมูลสำเร็จ!")
-
-# Final Inspection Mode
-def final_inspection_mode():
-    st.header("Final Inspection Mode")
-    job_data = job_data  # Fetch all jobs from Google Sheets
-    st.write("ข้อมูลงานที่ถูก Transfer:")
-    st.write(job_data)
-
-    # Select a job
-    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
-
-    if job_woc:
-        st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        # Form for checking weight
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-
-        if st.button("คำนวณและเปรียบเทียบ"):
-            # Compare with tapping mode pieces count
-            tapping_pieces_count = 1200  # Fetch this value from Tapping mode data
-            difference = abs(pieces_count - tapping_pieces_count) / tapping_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
-            
-            # Save data to Google Sheets with timestamp
-            row_data = [job_woc, pieces_count, difference]
-            row_data = add_status_timestamp(row_data, 13, "WIP-Final Inspection")  # Add timestamp for WIP-Final Inspection status
-            job_sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')
-            job_sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+            row_data = add_status_timestamp(row_data, 12, "WIP-Tapping")  # Add timestamp to the row
+            sheet.append_row(row_data)  # Save to sheet
             st.success("บันทึกข้อมูลสำเร็จ!")
 
 # Main app logic
 def main():
     st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
-    mode = st.sidebar.selectbox("เลือกโหมด", ['Forming', 'Tapping', 'Final Inspection'])
+    mode = st.sidebar.selectbox("เลือกโหมด", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
 
     if mode == 'Forming':
         forming_mode()
     elif mode == 'Tapping':
         tapping_mode()
-    elif mode == 'Final Inspection':
-        final_inspection_mode()
+    # Add more modes if necessary (Final Inspection, Final Work, etc.)
 
 if __name__ == "__main__":
     main()
