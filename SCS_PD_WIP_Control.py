@@ -5,105 +5,104 @@ import requests
 from datetime import datetime
 import pytz
 
-# Setting up Google Sheets Connection
-google_credentials = st.secrets["google_service_account"]  # Get Google credentials directly from secrets
+# ตั้งค่าการเชื่อมต่อกับ Google Sheets
+google_credentials = st.secrets["google_service_account"]  # ดึงข้อมูล credentials จาก secrets
 
-# Define the scope for Google Sheets API
+# กำหนด scope สำหรับ Google Sheets API
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# Authorize the credentials and set up the client
+# อนุมัติการเข้าถึงข้อมูล Google Sheets
 creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 
-# Error handling for Google Sheets connection
+# เชื่อมต่อกับ Google Sheets
 try:
     client = gspread.authorize(creds)
-    # Replace with your actual Spreadsheet ID
-    sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('Jobs')  
+    # ระบุ Spreadsheet ID ของคุณ
+    sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('Jobs')
     part_code_master_sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('part_code_master')
     employees_sheet = client.open_by_key('1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE').worksheet('Employees')
 except gspread.exceptions.GSpreadException as e:
     st.error(f"Error connecting to Google Sheets: {e}")
     raise
 
-# Function to send Telegram message
+# ฟังก์ชันการส่งข้อความผ่าน Telegram
 def send_telegram_message(message):
-    TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
-    CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
+    TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # ดึง token จาก secrets
+    CHAT_ID = st.secrets["telegram"]["chat_id"]  # ดึง chat_id จาก secrets
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
-# Function to get part codes dynamically from Google Sheets with caching to avoid too many requests
+# ฟังก์ชันดึงรหัสงานจาก Google Sheets
 @st.cache_data(ttl=60*10)  # Cache for 10 minutes
 def get_part_codes():
     try:
-        # Fetch part codes from part_code_master sheet
-        part_codes = part_code_master_sheet.col_values(1)  # Assuming "Part Code" is in the first column
+        part_codes = part_code_master_sheet.col_values(1)  # ดึงรหัสงานจากคอลัมน์แรก
         return part_codes
     except Exception as e:
         st.error(f"Error fetching part codes: {e}")
         return []
 
-# Function to add timestamp to every status change
+# ฟังก์ชันเพิ่ม status และ timestamp
 def add_status_timestamp(row_data, status_column_index, status_value):
-    # Ensure that row_data has enough columns, if not, extend it with empty values
-    while len(row_data) <= status_column_index:
-        row_data.append('')  # Fill missing columns with empty strings
+    # เช็คให้แน่ใจว่า row_data มีจำนวนคอลัมน์ที่เพียงพอ
+    while len(row_data) <= status_column_index + 1:
+        row_data.append('')  # เพิ่มคอลัมน์ว่างถ้ายังไม่พอ
 
-    tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
-    timestamp = datetime.now(tz).strftime('%d-%m-%Y %H:%M')  # Get current timestamp in Thailand time
+    tz = pytz.timezone('Asia/Bangkok')  # ตั้งเวลาเป็นเวลาในประเทศไทย
+    timestamp = datetime.now(tz).strftime('%d-%m-%Y %H:%M')  # เวลาปัจจุบันในรูปแบบที่ต้องการ
 
-    # Update the status column and corresponding timestamp
+    # อัปเดตสถานะและ timestamp
     row_data[status_column_index] = status_value
-    row_data[status_column_index + 1] = timestamp  # Add timestamp next to the status
+    row_data[status_column_index + 1] = timestamp  # เพิ่ม timestamp ในคอลัมน์ถัดไป
 
     return row_data
 
-# Function to check if the WOC already exists and return the row index
+# ฟังก์ชันเพื่อหาบรรทัดที่มี WOC ที่ต้องการ
 def find_woc_row(woc_number):
     try:
-        job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+        job_data = sheet.get_all_records()  # ดึงข้อมูลงานทั้งหมดจาก Google Sheets
         for idx, job in enumerate(job_data):
-            if job.get("WOC Number") == woc_number:  # Check if WOC Number matches
-                return idx + 2  # Return the row index (gspread is 1-indexed, so we add 2)
-        return None  # If WOC Number doesn't exist, return None
+            if job.get("WOC Number") == woc_number:  # ถ้าหมายเลข WOC ตรง
+                return idx + 2  # คืนค่าบรรทัดที่พบ (gspread ใช้เลขบรรทัดเริ่มต้นที่ 1)
+        return None  # ถ้าไม่พบ WOC ที่ตรงกัน
     except Exception as e:
         st.error(f"Error finding WOC row: {e}")
         return None
 
-# Function to update the row in the Google Sheets
+# ฟังก์ชันอัปเดตข้อมูลใน Google Sheets
 def update_woc_row(woc_number, row_data):
     row = find_woc_row(woc_number)
     if row:
         current_row_data = sheet.row_values(row)
 
-        # Ensure the row_data has the same size as current_row_data
+        # ตรวจสอบให้แน่ใจว่า row_data มีขนาดพอๆ กับ current_row_data
         if len(current_row_data) < 16:
             current_row_data += [''] * (16 - len(current_row_data))
 
-        # Update the columns (Ensure you have the correct indices here)
-        current_row_data[0] = row_data[0]  # WOC Number (index 0)
-        current_row_data[1] = row_data[1]  # Part Name (index 1)
-        current_row_data[2] = row_data[2]  # Employee (index 2)
-        current_row_data[3] = row_data[3]  # Department From (index 3)
-        current_row_data[4] = row_data[4]  # Department To (index 4)
-        current_row_data[5] = row_data[5]  # Lot Number (index 5)
-        current_row_data[6] = row_data[6]  # Total Weight (index 6)
-        current_row_data[7] = row_data[7]  # Barrel Weight (index 7)
-        current_row_data[8] = row_data[8]  # Sample Weight (index 8)
-        current_row_data[9] = row_data[9]  # Sample Count (index 9)
-        current_row_data[10] = row_data[10]  # Pieces Count (index 10)
-        current_row_data[11] = row_data[11]  # WIP Forming (index 11)
-        current_row_data[12] = row_data[12]  # Timestamp (index 12)
-        current_row_data[13] = row_data[13]  # WIP Tapping (index 13)
-        current_row_data[14] = row_data[14]  # WIP Final Inspection (index 14)
-        current_row_data[15] = row_data[15]  # WIP Final Work (index 15)
+        # อัปเดตข้อมูลในแต่ละคอลัมน์
+        current_row_data[0] = row_data[0]  # WOC Number
+        current_row_data[1] = row_data[1]  # Part Name
+        current_row_data[2] = row_data[2]  # Employee
+        current_row_data[3] = row_data[3]  # Department From
+        current_row_data[4] = row_data[4]  # Department To
+        current_row_data[5] = row_data[5]  # Lot Number
+        current_row_data[6] = row_data[6]  # Total Weight
+        current_row_data[7] = row_data[7]  # Barrel Weight
+        current_row_data[8] = row_data[8]  # Sample Weight
+        current_row_data[9] = row_data[9]  # Sample Count
+        current_row_data[10] = row_data[10]  # Pieces Count
+        current_row_data[11] = row_data[11]  # WIP Forming
+        current_row_data[12] = row_data[12]  # Timestamp
+        current_row_data[13] = row_data[13]  # WIP Tapping
+        current_row_data[14] = row_data[14]  # WIP Final Inspection
+        current_row_data[15] = row_data[15]  # WIP Final Work
 
-        # Update the row in the Google Sheet
-        sheet.update(f"A{row}:P{row}", [current_row_data])  # Update the whole row
+        # อัปเดตแถวใน Google Sheets
+        sheet.update(f"A{row}:P{row}", [current_row_data])  # อัปเดตทั้งแถว
     else:
-        # If WOC doesn't exist, add it as a new row
-        sheet.append_row(row_data)  # Append new row to the sheet
+        # ถ้าไม่พบ WOC ให้เพิ่มแถวใหม่
+        sheet.append_row(row_data)  # เพิ่มแถวใหม่
 
 # Forming Mode
 def forming_mode():
