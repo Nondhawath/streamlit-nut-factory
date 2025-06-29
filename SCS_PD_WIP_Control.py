@@ -52,7 +52,7 @@ def send_telegram_message(message):
     requests.get(url)
 
 # Function to read part codes from the "part_code_master" sheet with caching
-@st.cache_data(ttl=60)  # Cache data for 10 minutes to avoid exceeding API quota
+@st.cache_data(ttl=60)  # Cache data for 60 seconds to avoid exceeding API quota
 def get_part_codes():
     try:
         # Fetch all records from the part_code_master sheet
@@ -65,7 +65,7 @@ def get_part_codes():
         return []
 
 # Function to read employee names from the "Employees" sheet with caching
-@st.cache_data(ttl=60)  # Cache data for 10 minutes to avoid exceeding API quota
+@st.cache_data(ttl=60)  # Cache data for 60 seconds to avoid exceeding API quota
 def get_employee_names():
     try:
         employees_sheet = open_sheets()[2]
@@ -89,7 +89,9 @@ def forming_mode(sheet):
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    
+    # Fetch part names dynamically from Google Sheets
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  
     employee = st.selectbox("ชื่อพนักงาน", get_employee_names())  # Fetch employee names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
@@ -103,18 +105,25 @@ def forming_mode(sheet):
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
     if st.button("บันทึก"):
-        # Save data to Google Sheets with timestamp
-        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]  # Add WIP status
-        row_data = add_timestamp(row_data)  # Add timestamp to the row
-        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
-        st.success("บันทึกข้อมูลสำเร็จ!")
-        send_telegram_message(f"Job from {department_from} to {department_to} saved!")
+        # Check if WOC Number already exists to avoid duplicates
+        existing_row = sheet.find(woc_number)
+        if existing_row:
+            st.error(f"WOC Number {woc_number} already exists. Please use a different number.")
+        else:
+            # Save data to Google Sheets with timestamp
+            row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
+            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+            st.success("บันทึกข้อมูลสำเร็จ!")
+        
+            # Log the transfer in the Transfer Logs sheet
+            log_transfer_to_logs(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count)
 
 # Tapping Mode
 def tapping_mode(sheet):
     st.header("Tapping Mode")
     
-    @st.cache_data(ttl=60)  # Cache the job data for 10 minutes to avoid exceeding API quota
+    @st.cache_data(ttl=60)  # Cache the job data for 60 seconds to avoid exceeding API quota
     def fetch_job_data():
         try:
             # Define the expected headers explicitly
