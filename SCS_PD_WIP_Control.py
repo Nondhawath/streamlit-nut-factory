@@ -7,8 +7,12 @@ import datetime
 # ดึงข้อมูล Firebase Credentials จาก Secrets
 firebase_credentials = st.secrets["firebase_credentials"]
 
-# แปลงข้อมูล Firebase credentials จาก JSON เป็น dictionary
-firebase_credentials_dict = json.loads(firebase_credentials)
+# ตรวจสอบว่า firebase_credentials เป็น string หรือไม่ก่อนการใช้ json.loads
+if isinstance(firebase_credentials, str):
+    firebase_credentials_dict = json.loads(firebase_credentials)  # แปลงข้อมูลจาก string เป็น dictionary
+else:
+    st.error("Firebase credentials must be a JSON string.")  # แสดงข้อผิดพลาดหากไม่ได้เป็น string
+    firebase_credentials_dict = {}
 
 # สร้างไฟล์จากข้อมูลที่ได้รับ
 cred = credentials.Certificate(firebase_credentials_dict)
