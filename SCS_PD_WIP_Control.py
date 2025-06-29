@@ -114,7 +114,14 @@ def tapping_mode(sheet):
     @st.cache_data(ttl=60)  # Cache the job data for 60 seconds to avoid too many requests
     def fetch_job_data():
         try:
-            return sheet.get_all_records()  # Fetch all jobs from Google Sheets
+            # Define the expected headers explicitly
+            expected_headers = ['WOC Number', 'Part Name', 'Employee', 'Department From', 'Department To', 
+                                'Lot Number', 'Total Weight', 'Barrel Weight', 'Sample Weight', 'Sample Count', 
+                                'Pieces Count', 'WIP Status', 'Timestamp', 'WOC Source']  # Modify based on your actual header row
+            
+            # Fetch the records with the expected headers
+            job_data = sheet.get_all_records(expected_headers=expected_headers)
+            return job_data
         except gspread.exceptions.GSpreadException as e:
             st.error(f"Error reading job data: {e}")
             return []
