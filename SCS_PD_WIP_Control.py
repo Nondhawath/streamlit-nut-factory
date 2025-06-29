@@ -57,6 +57,16 @@ def get_part_codes():
         st.error(f"Error reading part codes: {e}")
         return []
 
+# Function to fetch employee names from the 'Employees' sheet
+def get_employee_names():
+    try:
+        employees = employees_sheet.get_all_records()
+        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
+        return employee_names
+    except Exception as e:
+        st.error(f"Error reading employee names: {e}")
+        return []
+
 # Function to send Telegram message
 def send_telegram_message(message):
     TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
