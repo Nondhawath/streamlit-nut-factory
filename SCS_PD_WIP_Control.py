@@ -43,6 +43,20 @@ def open_sheets():
         st.error(f"Unexpected error: {e}")
         return None, None, None, None
 
+# Function to fetch part codes from the 'part_code_master' sheet
+def get_part_codes():
+    try:
+        # Fetch all records from the part_code_master sheet
+        part_codes = part_code_master_sheet.get_all_records()
+
+        # Extract part codes (รหัสงาน) into a list
+        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
+
+        return part_code_list  # Return the list of part codes
+    except Exception as e:
+        st.error(f"Error reading part codes: {e}")
+        return []
+
 # Function to send Telegram message
 def send_telegram_message(message):
     TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
