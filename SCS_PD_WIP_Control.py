@@ -51,17 +51,17 @@ def open_sheets():
         return None, None, None, None
 
 # Function to fetch part codes from the 'part_code_master' sheet
-def get_part_codes():
+def get_part_codes(part_code_master_sheet):
     try:
-        part_codes = part_code_master_sheet.get_all_records()
-        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
+        part_codes = part_code_master_sheet.get_all_records()  # Get all records from the part_code_master sheet
+        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]  # Extract part codes (รหัสงาน)
         return part_code_list
     except Exception as e:
         st.error(f"Error reading part codes: {e}")
         return []
 
 # Function to fetch employee names from the 'Employees' sheet
-def get_employee_names():
+def get_employee_names(employees_sheet):
     try:
         employees = employees_sheet.get_all_records()
         employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
@@ -88,15 +88,15 @@ def add_timestamp(row_data):
     return row_data
 
 # Forming Mode
-def forming_mode(sheet):
+def forming_mode(sheet, part_code_master_sheet, employees_sheet):
     st.header("Forming Mode")
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
     
     # Fetch part names dynamically from Google Sheets
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  
-    employee = st.selectbox("ชื่อพนักงาน", get_employee_names())  # Fetch employee names dynamically
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes(part_code_master_sheet))  
+    employee = st.selectbox("ชื่อพนักงาน", get_employee_names(employees_sheet))  # Fetch employee names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -188,7 +188,7 @@ def main():
 
     if sheet:  # Check if the sheets were successfully opened
         if mode == 'Forming':
-            forming_mode(sheet)
+            forming_mode(sheet, part_code_master_sheet, employees_sheet)
         elif mode == 'Tapping':
             tapping_mode(sheet)
         elif mode == 'Final Inspection':
