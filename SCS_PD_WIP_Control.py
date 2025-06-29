@@ -40,6 +40,7 @@ def send_telegram_message(message):
     requests.get(url)
 
 # Function to read part codes from the "part_code_master" sheet
+@st.cache(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
 def get_part_codes():
     try:
         part_codes = part_code_master_sheet.get_all_records()
@@ -50,6 +51,7 @@ def get_part_codes():
         return []
 
 # Function to read employee names from the "Employees" sheet
+@st.cache(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
 def get_employee_names():
     try:
         employees = employees_sheet.get_all_records()
