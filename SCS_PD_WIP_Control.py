@@ -23,6 +23,7 @@ try:
     sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
     part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
     employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+    transfer_logs_sheet = client.open_by_key(spreadsheet_id).worksheet('Transfer Logs')
 except gspread.exceptions.APIError as e:
     st.error(f"API Error: {e}")
 except gspread.exceptions.SpreadsheetNotFound as e:
@@ -41,26 +42,11 @@ def send_telegram_message(message):
 # Function to read part codes from the "part_code_master" sheet
 def get_part_codes():
     try:
-        # Fetch all records from the part_code_master sheet
         part_codes = part_code_master_sheet.get_all_records()
-
-        # Extract part codes (รหัสงาน) into a list
         part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
-
-        # Return the list of part codes
         return part_code_list
     except Exception as e:
         st.error(f"Error reading part codes: {e}")
-        return []
-
-# Function to read employee names from the "Employees" sheet
-def get_employee_names():
-    try:
-        employees = employees_sheet.get_all_records()
-        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
-        return employee_names
-    except Exception as e:
-        st.error(f"Error reading employee names: {e}")
         return []
 
 # Function to add timestamp to every row update (with timezone)
@@ -70,45 +56,11 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
-# Function to check if the WOC already exists and return the row index
-def find_woc_row(woc_number):
-    try:
-        job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-        for idx, job in enumerate(job_data):
-            if job.get("WOC Number") == woc_number:  # Check if WOC Number matches
-                return idx + 2  # Return the row index (gspread is 1-indexed, so we add 2)
-        return None  # If WOC Number doesn't exist, return None
-    except Exception as e:
-        st.error(f"Error finding WOC row: {e}")
-        return None
-
-# Function to update the row in the Google Sheets
-def update_woc_row(woc_number, row_data):
-    row = find_woc_row(woc_number)
-    if row:
-        current_row_data = sheet.row_values(row)
-        
-        # Ensure the row_data has the same size as current_row_data
-        if len(current_row_data) < 15:
-            # Pad the current_row_data if there are fewer columns
-            current_row_data += [''] * (15 - len(current_row_data))
-
-        # Update the columns (Ensure you have the correct indices here)
-        current_row_data[12] = row_data[1]  # WIP Tapping column (assuming it's index 12)
-        current_row_data[13] = row_data[2]  # WIP Final Inspection column (index 13)
-        current_row_data[14] = row_data[3]  # WIP Final Work column (index 14)
-        
-        # Update the row in the Google Sheet
-        sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
-    else:
-        # If WOC doesn't exist, add it as a new row
-        sheet.append_row(row_data)  # Append new row to the sheet
-
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
-    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
-    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
+    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
+    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
     part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
     lot_number = st.text_input("หมายเลข LOT")
