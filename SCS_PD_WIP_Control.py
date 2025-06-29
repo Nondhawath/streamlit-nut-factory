@@ -81,7 +81,7 @@ def add_timestamp(row_data):
     return row_data
 
 # Forming Mode
-def forming_mode(sheet):
+def forming_mode(sheet, part_code_master_sheet):
     st.header("Forming Mode")
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
@@ -181,7 +181,7 @@ def main():
 
     if sheet:  # Check if the sheets were successfully opened
         if mode == 'Forming':
-            forming_mode(sheet)
+            forming_mode(sheet, part_code_master_sheet)
         elif mode == 'Tapping':
             tapping_mode(sheet)
         elif mode == 'Final Inspection':
