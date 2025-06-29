@@ -1,7 +1,7 @@
+import time
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import requests
 from datetime import datetime
 import pytz
 
@@ -58,59 +58,28 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
-# Function to log transfer data into "Transfer Logs" sheet
-def log_transfer_to_logs(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count):
+# Function to safely fetch job data and handle quota errors
+def fetch_job_data_with_retries(sheet, retries=5, delay=60):
     try:
-        transfer_logs_sheet = open_sheets()[3]  # Get Transfer Logs sheet (this returns the correct sheet)
-        timestamp = datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Prepare row data for logging transfer
-        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, timestamp, "Transferred", "None"]
-        transfer_logs_sheet.append_row(row_data)  # Append the data to Transfer Logs sheet
-        
-        st.success("Transfer logged successfully!")
-        send_telegram_message(f"WOC {woc_number} transferred from {department_from} to {department_to}")
-        
-    except Exception as e:
-        st.error(f"Error logging transfer: {e}")
-
-# Forming Mode
-def forming_mode(sheet):
-    st.header("Forming Mode")
-    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
-    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
-    woc_number = st.text_input("หมายเลข WOC")
-    
-    # Fetch part names dynamically from Google Sheets
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  
-    employee = st.selectbox("ชื่อพนักงาน", get_employee_names())  # Fetch employee names dynamically
-    lot_number = st.text_input("หมายเลข LOT")
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-    # Calculate number of pieces
-    if total_weight and barrel_weight and sample_weight and sample_count:
-        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-    
-    if st.button("บันทึก"):
-        # Check if WOC Number already exists to avoid duplicates
-        existing_row = sheet.find(woc_number)
-        if existing_row:
-            st.error(f"WOC Number {woc_number} already exists. Please use a different number.")
+        # Attempt to get all records
+        job_data = sheet.get_all_records()
+        return job_data
+    except gspread.exceptions.APIError as e:
+        st.error(f"APIError while fetching data: {e}")
+        # Retry mechanism if quota exceeded
+        if retries > 0:
+            st.warning(f"Retrying after {delay} seconds...")
+            time.sleep(delay)  # Sleep for the specified delay
+            return fetch_job_data_with_retries(sheet, retries-1, delay)  # Retry fetching data
         else:
-            # Save data to Google Sheets with timestamp
-            row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
-            row_data = add_timestamp(row_data)  # Add timestamp to the row
-            sheet.append_row(row_data)  # Save the row to "Jobs" sheet
-            st.success("บันทึกข้อมูลสำเร็จ!")
+            st.error("Maximum retries reached. Could not fetch job data.")
+            return []
 
 # Tapping Mode
 def tapping_mode(sheet):
     st.header("Tapping Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+    
+    job_data = fetch_job_data_with_retries(sheet)  # Fetch job data with retry logic
 
     st.write("ข้อมูลงานที่ถูก Transfer:")
     job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
