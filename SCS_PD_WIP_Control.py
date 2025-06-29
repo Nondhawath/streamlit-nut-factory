@@ -49,6 +49,16 @@ def get_part_codes():
         st.error(f"Error reading part codes: {e}")
         return []
 
+# Function to read employee names from the "Employees" sheet
+def get_employee_names():
+    try:
+        employees = employees_sheet.get_all_records()
+        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
+        return employee_names
+    except Exception as e:
+        st.error(f"Error reading employee names: {e}")
+        return []
+
 # Function to add timestamp to every row update (with timezone)
 def add_timestamp(row_data):
     tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
@@ -63,6 +73,7 @@ def forming_mode():
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
     part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    employee = st.selectbox("ชื่อพนักงาน", get_employee_names())  # Fetch employee names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -76,7 +87,7 @@ def forming_mode():
     
     if st.button("บันทึก"):
         # Save data to Google Sheets with timestamp
-        row_data = [woc_number, part_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]  # Add WIP status
         row_data = add_timestamp(row_data)  # Add timestamp to the row
         sheet.append_row(row_data)  # Save the row to "Jobs" sheet
         st.success("บันทึกข้อมูลสำเร็จ!")
