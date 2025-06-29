@@ -1,13 +1,17 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
+import json
 import datetime
 
 # ดึงข้อมูล Firebase Credentials จาก Secrets
 firebase_credentials = st.secrets["firebase_credentials"]
 
-# สร้างไฟล์ชั่วคราวจาก JSON ใน Secrets
-cred = credentials.Certificate(firebase_credentials)
+# แปลงข้อมูล Firebase credentials จาก JSON เป็น dictionary
+firebase_credentials_dict = json.loads(firebase_credentials)
+
+# สร้างไฟล์จากข้อมูลที่ได้รับ
+cred = credentials.Certificate(firebase_credentials_dict)
 
 # เริ่มต้น Firebase Admin SDK
 firebase_admin.initialize_app(cred)
