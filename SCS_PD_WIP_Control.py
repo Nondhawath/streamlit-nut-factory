@@ -102,8 +102,13 @@ def forming_mode():
 # Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
-    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+    
+    @st.cache_data(ttl=60)  # Cache the job data for 60 seconds to avoid too many requests
+    def fetch_job_data():
+        return sheet.get_all_records()  # Fetch all jobs from Google Sheets
 
+    job_data = fetch_job_data()  # Fetch job data from cache
+    
     st.write("ข้อมูลงานที่ถูก Transfer:")
     job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
 
