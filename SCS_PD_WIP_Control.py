@@ -51,8 +51,8 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
     requests.get(url)
 
-# Function to read part codes from the "part_code_master" sheet
-@st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
+# Function to read part codes from the "part_code_master" sheet with caching
+@st.cache_data(ttl=600)  # Cache data for 10 minutes to avoid exceeding API quota
 def get_part_codes():
     try:
         # Fetch all records from the part_code_master sheet
@@ -64,8 +64,8 @@ def get_part_codes():
         st.error(f"Error reading part codes: {e}")
         return []
 
-# Function to read employee names from the "Employees" sheet
-@st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
+# Function to read employee names from the "Employees" sheet with caching
+@st.cache_data(ttl=600)  # Cache data for 10 minutes to avoid exceeding API quota
 def get_employee_names():
     try:
         employees_sheet = open_sheets()[2]
@@ -114,7 +114,7 @@ def forming_mode(sheet):
 def tapping_mode(sheet):
     st.header("Tapping Mode")
     
-    @st.cache_data(ttl=60)  # Cache the job data for 60 seconds to avoid too many requests
+    @st.cache_data(ttl=600)  # Cache the job data for 10 minutes to avoid exceeding API quota
     def fetch_job_data():
         try:
             # Define the expected headers explicitly
