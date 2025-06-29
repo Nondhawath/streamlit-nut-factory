@@ -13,3 +13,4 @@ openpyxl
 pygsheets
 matplotlib
 seaborn
+firebase-admin
