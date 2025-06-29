@@ -83,6 +83,22 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
+# Function to log transfer data into "Transfer Logs" sheet
+def log_transfer_to_logs(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count):
+    try:
+        transfer_logs_sheet = open_sheets()[3]  # Get Transfer Logs sheet (this returns the correct sheet)
+        timestamp = datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Prepare row data for logging transfer
+        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, timestamp, "Transferred", "None"]
+        transfer_logs_sheet.append_row(row_data)  # Append the data to Transfer Logs sheet
+        
+        st.success("Transfer logged successfully!")
+        send_telegram_message(f"WOC {woc_number} transferred from {department_from} to {department_to}")
+        
+    except Exception as e:
+        st.error(f"Error logging transfer: {e}")
+
 # Forming Mode
 def forming_mode(sheet):
     st.header("Forming Mode")
