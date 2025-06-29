@@ -2,16 +2,15 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
 import json
-import datetime
 
-# ดึงข้อมูล Firebase Credentials จาก Secrets
+# ดึงข้อมูล Firebase credentials จาก Secrets
 firebase_credentials = st.secrets["firebase_credentials"]
 
-# ตรวจสอบว่า firebase_credentials เป็น string หรือไม่ก่อนการใช้ json.loads
-if isinstance(firebase_credentials, str):
-    firebase_credentials_dict = json.loads(firebase_credentials)  # แปลงข้อมูลจาก string เป็น dictionary
+# แปลงข้อมูล Firebase credentials จาก JSON string เป็น dictionary
+if isinstance(firebase_credentials, str):  # ตรวจสอบว่าเป็น JSON string
+    firebase_credentials_dict = json.loads(firebase_credentials)  # แปลงจาก JSON string เป็น dictionary
 else:
-    st.error("Firebase credentials must be a JSON string.")  # แสดงข้อผิดพลาดหากไม่ได้เป็น string
+    st.error("Firebase credentials must be a JSON string.")
     firebase_credentials_dict = {}
 
 # สร้างไฟล์จากข้อมูลที่ได้รับ
@@ -23,7 +22,7 @@ firebase_admin.initialize_app(cred)
 # เข้าถึง Firestore
 db = firestore.client()
 
-# ฟังก์ชันเพื่อบันทึกข้อมูลการส่งงาน
+# ฟังก์ชันการบันทึกข้อมูล
 def log_transfer_to_logs(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, status):
     transfer_ref = db.collection('transfer_logs')
     transfer_ref.add({
@@ -42,12 +41,12 @@ def log_transfer_to_logs(woc_number, part_name, employee, department_from, depar
         "Timestamp": datetime.datetime.now(),
     })
 
-# ฟังก์ชัน Forming Mode (แผนก Forming)
+# ฟังก์ชัน Forming Mode
 def forming_mode():
     st.header("Forming Mode")
     department_from = 'Forming'
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection'])
-    
+
     woc_number = st.text_input("หมายเลข WOC")
     part_name = st.text_input("ชื่อรหัสงาน / Part Name")
     employee = st.text_input("ชื่อพนักงาน")
@@ -56,25 +55,25 @@ def forming_mode():
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
     sample_weight = st.number_input("น้ำหนักของตัวอย่าง", min_value=0.0)
     sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-    
+
     # คำนวณจำนวนชิ้นงาน
     if total_weight and barrel_weight and sample_weight and sample_count:
         pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-    
+
     if st.button("บันทึกข้อมูล"):
         # เก็บข้อมูลการส่งงานจาก Forming
         log_transfer_to_logs(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming")
         st.success("บันทึกข้อมูลสำเร็จ!")
 
-# ฟังก์ชัน Tapping Mode (แผนก Tapping)
+# ฟังก์ชัน Tapping Mode
 def tapping_mode():
     st.header("Tapping Mode")
     woc_number = st.text_input("หมายเลข WOC")
     # ดึงข้อมูลจาก Firestore สำหรับงานที่รับมาจาก Forming
     transfer_logs_ref = db.collection('transfer_logs')
     query = transfer_logs_ref.where('WOC Number', '==', woc_number).stream()
-    
+
     for doc in query:
         job_data = doc.to_dict()
         st.write(f"WOC Number: {job_data['WOC Number']}")
@@ -88,7 +87,7 @@ def tapping_mode():
         st.write(f"Sample Weight: {job_data['Sample Weight']}")
         st.write(f"Sample Count: {job_data['Sample Count']}")
         st.write(f"Pieces Count: {job_data['Pieces Count']}")
-    
+
     # ตรวจสอบน้ำหนักและชิ้นงาน
     if st.button("บันทึกข้อมูล"):
         log_transfer_to_logs(woc_number, job_data['Part Name'], job_data['Employee'], 'Tapping', 'Final Inspection', job_data['Lot Number'], job_data['Total Weight'], job_data['Barrel Weight'], job_data['Sample Weight'], job_data['Sample Count'], job_data['Pieces Count'], "WIP-Tapping")
