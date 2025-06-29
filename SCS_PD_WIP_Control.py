@@ -113,7 +113,11 @@ def tapping_mode(sheet):
     
     @st.cache_data(ttl=60)  # Cache the job data for 60 seconds to avoid too many requests
     def fetch_job_data():
-        return sheet.get_all_records()  # Fetch all jobs from Google Sheets
+        try:
+            return sheet.get_all_records()  # Fetch all jobs from Google Sheets
+        except gspread.exceptions.GSpreadException as e:
+            st.error(f"Error reading job data: {e}")
+            return []
 
     job_data = fetch_job_data()  # Fetch job data from cache
     
