@@ -1,9 +1,8 @@
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 
-# เรียกข้อมูลจาก Streamlit Secrets
+# ดึงข้อมูลจาก Streamlit Secrets
 google_credentials = st.secrets["google_credentials"]
 
 # ตั้งค่าการเชื่อมต่อกับ Google Sheets API
