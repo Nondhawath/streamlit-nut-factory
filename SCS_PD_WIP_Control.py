@@ -12,14 +12,18 @@ google_credentials = st.secrets["google_service_account"]  # Get Google credenti
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 # Authorize the credentials and set up the client
-creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
-client = gspread.authorize(creds)
+@st.cache_resource  # Cache the Google Sheets client for reuse
+def get_google_sheets_client():
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
+    client = gspread.authorize(creds)
+    return client
 
 # Use Spreadsheet ID (Replace with your actual spreadsheet ID)
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Access the sheets using Spreadsheet ID
 try:
+    client = get_google_sheets_client()  # Use the cached Google Sheets client
     sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
     part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
     employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
@@ -40,7 +44,7 @@ def send_telegram_message(message):
     requests.get(url)
 
 # Function to read part codes from the "part_code_master" sheet
-@st.cache(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
+@st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
 def get_part_codes():
     try:
         part_codes = part_code_master_sheet.get_all_records()
@@ -51,7 +55,7 @@ def get_part_codes():
         return []
 
 # Function to read employee names from the "Employees" sheet
-@st.cache(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
+@st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
 def get_employee_names():
     try:
         employees = employees_sheet.get_all_records()
