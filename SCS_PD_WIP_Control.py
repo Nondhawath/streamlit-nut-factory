@@ -22,18 +22,26 @@ def get_google_sheets_client():
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
 # Access the sheets using Spreadsheet ID
-try:
-    client = get_google_sheets_client()  # Use the cached Google Sheets client
-    sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
-    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-    transfer_logs_sheet = client.open_by_key(spreadsheet_id).worksheet('Transfer Logs')
-except gspread.exceptions.APIError as e:
-    st.error(f"API Error: {e}")
-except gspread.exceptions.SpreadsheetNotFound as e:
-    st.error(f"Spreadsheet not found: {e}")
-except Exception as e:
-    st.error(f"An error occurred: {e}")
+def open_sheets():
+    try:
+        client = get_google_sheets_client()  # Use the cached Google Sheets client
+        sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
+        part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+        employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+        transfer_logs_sheet = client.open_by_key(spreadsheet_id).worksheet('Transfer Logs')
+        return sheet, part_code_master_sheet, employees_sheet, transfer_logs_sheet
+    except gspread.exceptions.APIError as e:
+        st.error(f"API Error while accessing Google Sheets: {e}")
+        return None, None, None, None
+    except gspread.exceptions.SpreadsheetNotFound as e:
+        st.error(f"Spreadsheet not found: {e}")
+        return None, None, None, None
+    except gspread.exceptions.GSpreadException as e:
+        st.error(f"GSpreadException: {e}")
+        return None, None, None, None
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+        return None, None, None, None
 
 # Function to send Telegram message
 def send_telegram_message(message):
@@ -45,7 +53,7 @@ def send_telegram_message(message):
 
 # Function to read part codes from the "part_code_master" sheet
 @st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
-def get_part_codes():
+def get_part_codes(part_code_master_sheet):
     try:
         part_codes = part_code_master_sheet.get_all_records()
         part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
@@ -56,7 +64,7 @@ def get_part_codes():
 
 # Function to read employee names from the "Employees" sheet
 @st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
-def get_employee_names():
+def get_employee_names(employees_sheet):
     try:
         employees = employees_sheet.get_all_records()
         employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
@@ -73,13 +81,13 @@ def add_timestamp(row_data):
     return row_data
 
 # Forming Mode
-def forming_mode():
+def forming_mode(sheet):
     st.header("Forming Mode")
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
-    employee = st.selectbox("ชื่อพนักงาน", get_employee_names())  # Fetch employee names dynamically
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes(part_code_master_sheet))  # Fetch part names dynamically
+    employee = st.selectbox("ชื่อพนักงาน", get_employee_names(employees_sheet))  # Fetch employee names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -100,7 +108,7 @@ def forming_mode():
         send_telegram_message(f"Job from {department_from} to {department_to} saved!")
 
 # Tapping Mode
-def tapping_mode():
+def tapping_mode(sheet):
     st.header("Tapping Mode")
     
     @st.cache_data(ttl=60)  # Cache the job data for 60 seconds to avoid too many requests
@@ -158,16 +166,21 @@ def main():
     st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
     mode = st.selectbox("เลือกโหมดการทำงาน", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
 
-    if mode == 'Forming':
-        forming_mode()
-    elif mode == 'Tapping':
-        tapping_mode()
-    elif mode == 'Final Inspection':
-        pass
-    elif mode == 'Final Work':
-        pass
-    elif mode == 'TP Transfer':
-        pass
+    sheet, part_code_master_sheet, employees_sheet, transfer_logs_sheet = open_sheets()  # Open sheets
+
+    if sheet:  # Check if the sheets were successfully opened
+        if mode == 'Forming':
+            forming_mode(sheet)
+        elif mode == 'Tapping':
+            tapping_mode(sheet)
+        elif mode == 'Final Inspection':
+            pass
+        elif mode == 'Final Work':
+            pass
+        elif mode == 'TP Transfer':
+            pass
+    else:
+        st.error("ไม่สามารถเชื่อมต่อกับ Google Sheets ได้!")
 
 if __name__ == "__main__":
     main()
