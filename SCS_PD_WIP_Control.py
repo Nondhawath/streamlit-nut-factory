@@ -112,7 +112,6 @@ def tapping_mode():
     st.write("ข้อมูลงานที่ถูก Transfer:")
     job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
 
-    # Use st.table() or st.dataframe() for a cleaner display
     st.dataframe(job_data_for_display)  # Show a table of job data without unnecessary JSON fields
 
     # Select a job
@@ -146,8 +145,8 @@ def tapping_mode():
                 st.warning("ไม่พบข้อมูลจำนวนชิ้นงานจาก Forming เพื่อทำการเปรียบเทียบ")
 
         if st.button("คำนวณและเปรียบเทียบ"):
-            # Prepare row data for Tapping
-            row_data = [job_woc, pieces_count_tapping, difference_percentage, "WIP-Tapping", datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%Y-%m-%d %H:%M:%S')]
+            # Prepare row data for Tapping with WOC Source linking to Forming
+            row_data = [job_woc, pieces_count_tapping, difference_percentage, "WIP-Tapping", job_woc, datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%Y-%m-%d %H:%M:%S')]
             
             # Instead of updating, append as a new row in the Google Sheets
             sheet.append_row(row_data)
