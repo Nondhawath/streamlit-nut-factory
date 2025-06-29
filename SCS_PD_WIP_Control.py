@@ -85,18 +85,27 @@ def update_woc_row(woc_number, row_data):
         current_row_data = sheet.row_values(row)
         
         # Ensure the row_data has the same size as current_row_data
-        if len(current_row_data) < 15:
+        if len(current_row_data) < 13:
             # Pad the current_row_data if there are fewer columns
-            current_row_data += [''] * (15 - len(current_row_data))
+            current_row_data += [''] * (13 - len(current_row_data))  # Ensure there are 13 columns
 
         # Update the columns (Ensure you have the correct indices here)
-        current_row_data[11] = row_data[1]  # Pieces Count (index 11)
-        current_row_data[12] = row_data[2]  # Difference Percentage (index 12)
-        current_row_data[13] = row_data[3]  # WIP Status (index 13)
-        current_row_data[14] = row_data[4]  # Timestamp (index 14)
+        current_row_data[0] = row_data[0]  # WOC Number (index 0)
+        current_row_data[1] = row_data[1]  # Part Name (index 1)
+        current_row_data[2] = row_data[2]  # Employee (index 2)
+        current_row_data[3] = row_data[3]  # Department From (index 3)
+        current_row_data[4] = row_data[4]  # Department To (index 4)
+        current_row_data[5] = row_data[5]  # Lot Number (index 5)
+        current_row_data[6] = row_data[6]  # Total Weight (index 6)
+        current_row_data[7] = row_data[7]  # Barrel Weight (index 7)
+        current_row_data[8] = row_data[8]  # Sample Weight (index 8)
+        current_row_data[9] = row_data[9]  # Sample Count (index 9)
+        current_row_data[10] = row_data[10]  # Pieces Count (index 10)
+        current_row_data[11] = row_data[11]  # WIP Status (index 11)
+        current_row_data[12] = row_data[12]  # Timestamp (index 12)
 
         # Update the row in the Google Sheet
-        sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+        sheet.update(f"A{row}:M{row}", [current_row_data])  # Update the whole row from A to M
     else:
         # If WOC doesn't exist, append it as a new row
         sheet.append_row(row_data)  # Append new row to the sheet
