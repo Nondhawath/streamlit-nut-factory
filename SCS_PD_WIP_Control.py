@@ -72,50 +72,6 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
-# Function to find WOC row
-def find_woc_row(woc_number):
-    try:
-        job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
-        for idx, job in enumerate(job_data):
-            if job.get("WOC Number") == woc_number:  # Check if WOC Number matches
-                return idx + 2  # Return the row index (gspread is 1-indexed, so we add 2)
-        return None  # If WOC Number doesn't exist, return None
-    except Exception as e:
-        st.error(f"Error finding WOC row: {e}")
-        return None
-
-# Function to update the row in the Google Sheets
-def update_woc_row(woc_number, row_data):
-    row = find_woc_row(woc_number)
-    if row:
-        current_row_data = sheet.row_values(row)
-        
-        # Ensure the row_data has the same size as current_row_data (13 columns)
-        if len(row_data) < 13:
-            # Pad the row_data if there are fewer columns
-            row_data += [''] * (13 - len(row_data))  # Ensure there are 13 columns
-
-        # Now update the columns safely
-        current_row_data[0] = row_data[0]  # WOC Number (index 0)
-        current_row_data[1] = row_data[1]  # Part Name (index 1)
-        current_row_data[2] = row_data[2]  # Employee (index 2)
-        current_row_data[3] = row_data[3]  # Department From (index 3)
-        current_row_data[4] = row_data[4]  # Department To (index 4)
-        current_row_data[5] = row_data[5]  # Lot Number (index 5)
-        current_row_data[6] = row_data[6]  # Total Weight (index 6)
-        current_row_data[7] = row_data[7]  # Barrel Weight (index 7)
-        current_row_data[8] = row_data[8]  # Sample Weight (index 8)
-        current_row_data[9] = row_data[9]  # Sample Count (index 9)
-        current_row_data[10] = row_data[10]  # Pieces Count (index 10)
-        current_row_data[11] = row_data[11]  # WIP Status (index 11)
-        current_row_data[12] = row_data[12]  # Timestamp (index 12)
-
-        # Update the row in the Google Sheet
-        sheet.update(f"A{row}:M{row}", [current_row_data])  # Update the whole row from A to M
-    else:
-        # If WOC doesn't exist, append it as a new row
-        sheet.append_row(row_data)  # Append new row to the sheet
-
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
@@ -188,8 +144,8 @@ def tapping_mode():
             # Prepare row data for Tapping
             row_data = [job_woc, pieces_count_tapping, difference_percentage, "WIP-Tapping", datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%Y-%m-%d %H:%M:%S')]
             
-            # Update the WOC row or add it as a new row
-            update_woc_row(job_woc, row_data)
+            # Instead of updating, append as a new row in the Google Sheets
+            sheet.append_row(row_data)
             st.success("บันทึกข้อมูลสำเร็จ!")
             send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
 
