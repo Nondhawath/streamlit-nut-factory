@@ -90,12 +90,12 @@ def update_woc_row(woc_number, row_data):
     if row:
         current_row_data = sheet.row_values(row)
         
-        # Ensure the row_data has the same size as current_row_data
-        if len(current_row_data) < 13:
-            # Pad the current_row_data if there are fewer columns
-            current_row_data += [''] * (13 - len(current_row_data))  # Ensure there are 13 columns
+        # Ensure the row_data has the same size as current_row_data (13 columns)
+        if len(row_data) < 13:
+            # Pad the row_data if there are fewer columns
+            row_data += [''] * (13 - len(row_data))  # Ensure there are 13 columns
 
-        # Update the columns (Ensure you have the correct indices here)
+        # Now update the columns safely
         current_row_data[0] = row_data[0]  # WOC Number (index 0)
         current_row_data[1] = row_data[1]  # Part Name (index 1)
         current_row_data[2] = row_data[2]  # Employee (index 2)
