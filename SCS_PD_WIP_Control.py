@@ -53,8 +53,10 @@ def send_telegram_message(message):
 
 # Function to read part codes from the "part_code_master" sheet
 @st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
-def get_part_codes(part_code_master_sheet):
+def get_part_codes():
     try:
+        # Fetch all records from the part_code_master sheet
+        part_code_master_sheet = open_sheets()[1]
         part_codes = part_code_master_sheet.get_all_records()
         part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
         return part_code_list
@@ -64,8 +66,9 @@ def get_part_codes(part_code_master_sheet):
 
 # Function to read employee names from the "Employees" sheet
 @st.cache_data(ttl=60)  # Cache the function result for 60 seconds to avoid too many requests
-def get_employee_names(employees_sheet):
+def get_employee_names():
     try:
+        employees_sheet = open_sheets()[2]
         employees = employees_sheet.get_all_records()
         employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
         return employee_names
@@ -81,13 +84,13 @@ def add_timestamp(row_data):
     return row_data
 
 # Forming Mode
-def forming_mode(sheet, part_code_master_sheet):
+def forming_mode(sheet):
     st.header("Forming Mode")
     department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming'])
     department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes(part_code_master_sheet))  # Fetch part names dynamically
-    employee = st.selectbox("ชื่อพนักงาน", get_employee_names(employees_sheet))  # Fetch employee names dynamically
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    employee = st.selectbox("ชื่อพนักงาน", get_employee_names())  # Fetch employee names dynamically
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -181,7 +184,7 @@ def main():
 
     if sheet:  # Check if the sheets were successfully opened
         if mode == 'Forming':
-            forming_mode(sheet, part_code_master_sheet)
+            forming_mode(sheet)
         elif mode == 'Tapping':
             tapping_mode(sheet)
         elif mode == 'Final Inspection':
