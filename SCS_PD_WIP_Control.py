@@ -1,54 +1,191 @@
 import streamlit as st
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import requests
 from datetime import datetime
+import pytz
 
-# ฟังก์ชันคำนวณ Pieces Count
-def calculate_pieces_count(total_weight, barrel_weight, sample_weight, sample_count):
-    return (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+# Setting up Google Sheets Connection
+google_credentials = st.secrets["google_service_account"]  # Get Google credentials directly from secrets
 
-# ฟังก์ชันบันทึกข้อมูลลงใน Google Sheets
-def log_to_google_sheets(data):
-    # ใส่โค้ดการบันทึกลง Google Sheets ที่นี่
-    pass
+# Define the scope for Google Sheets API
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# Streamlit UI
-st.title("Work Order Management System")
+# Authorize the credentials and set up the client
+creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
+client = gspread.authorize(creds)
 
-# ฟอร์มกรอกข้อมูลสำหรับการโอนงานจาก FM ไป TP
-st.header("Forming (FM) to Tapping (TP) Transfer")
+# Use Spreadsheet ID (Replace with your actual spreadsheet ID)
+spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # Replace this with your actual Spreadsheet ID
 
-# เลือกแผนกที่ทำการโอนงาน (FM หรือ TP)
-department_from = st.selectbox("Select Department From", ["Forming (FM)", "Tapping (TP)"])
+# Access the sheets using Spreadsheet ID
+try:
+    sheet = client.open_by_key(spreadsheet_id).worksheet('Jobs')  # "Jobs" sheet
+    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+except gspread.exceptions.APIError as e:
+    st.error(f"API Error: {e}")
+except gspread.exceptions.SpreadsheetNotFound as e:
+    st.error(f"Spreadsheet not found: {e}")
+except Exception as e:
+    st.error(f"An error occurred: {e}")
 
-# ฟอร์มการกรอกข้อมูลสำหรับ FM (แผนกต้นทาง)
-if department_from == "Forming (FM)":
-    # เมื่อแผนกต้นทางเป็น FM จะไม่มี WOC ก่อนหน้า
-    new_woc = st.text_input("Enter New WOC Number")
-    previous_woc = "N/A"  # ไม่มี WOC ก่อนหน้า
-else:
-    # เมื่อแผนกต้นทางเป็น TP จะสามารถเลือก WOC ก่อนหน้าได้
-    previous_woc = st.selectbox("Select Previous WOC", ["WOC001", "WOC002", "WOC003"])  # ตัวอย่าง WOC ก่อนหน้า
-    new_woc = st.text_input("Enter New WOC Number")
+# Function to send Telegram message
+def send_telegram_message(message):
+    TELEGRAM_TOKEN = st.secrets["telegram"]["telegram_bot_token"]  # Retrieve Telegram token from secrets
+    CHAT_ID = st.secrets["telegram"]["chat_id"]  # Retrieve chat ID from secrets
 
-# กรอกข้อมูลการชั่งน้ำหนัก
-lot_number = st.text_input("Lot Number")
-total_weight = st.number_input("Total Weight", min_value=0.0)
-barrel_weight = st.number_input("Barrel Weight", min_value=0.0)
-sample_weight = st.number_input("Sample Weight", min_value=0.0)
-sample_count = st.number_input("Sample Count", min_value=0)
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
+    requests.get(url)
 
-# คำนวณ Pieces Count
-if total_weight and barrel_weight and sample_weight and sample_count:
-    pieces_count = calculate_pieces_count(total_weight, barrel_weight, sample_weight, sample_count)
-    st.write(f"Pieces Count: {pieces_count:.2f}")
+# Function to read part codes from the "part_code_master" sheet
+def get_part_codes():
+    try:
+        # Fetch all records from the part_code_master sheet
+        part_codes = part_code_master_sheet.get_all_records()
 
-# บันทึกข้อมูลเมื่อกดปุ่ม
-if st.button("Save Data"):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    status = "Transfer"  # สถานะเป็น "Transfer"
+        # Extract part codes (รหัสงาน) into a list
+        part_code_list = [part_code['รหัสงาน'] for part_code in part_codes]
+
+        # Return the list of part codes
+        return part_code_list
+    except Exception as e:
+        st.error(f"Error reading part codes: {e}")
+        return []
+
+# Function to read employee names from the "Employees" sheet
+def get_employee_names():
+    try:
+        employees = employees_sheet.get_all_records()
+        employee_names = [employee['ชื่อพนักงาน'] for employee in employees]
+        return employee_names
+    except Exception as e:
+        st.error(f"Error reading employee names: {e}")
+        return []
+
+# Function to add timestamp to every row update (with timezone)
+def add_timestamp(row_data):
+    tz = pytz.timezone('Asia/Bangkok')  # Set timezone to 'Asia/Bangkok' (Thailand Time)
+    timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp in Thailand time
+    row_data.append(timestamp)  # Add timestamp to the row
+    return row_data
+
+# Function to check if the WOC already exists and return the row index
+def find_woc_row(woc_number):
+    try:
+        job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+        for idx, job in enumerate(job_data):
+            if job.get("WOC Number") == woc_number:  # Check if WOC Number matches
+                return idx + 2  # Return the row index (gspread is 1-indexed, so we add 2)
+        return None  # If WOC Number doesn't exist, return None
+    except Exception as e:
+        st.error(f"Error finding WOC row: {e}")
+        return None
+
+# Function to update the row in the Google Sheets
+def update_woc_row(woc_number, row_data):
+    row = find_woc_row(woc_number)
+    if row:
+        current_row_data = sheet.row_values(row)
+        
+        # Ensure the row_data has the same size as current_row_data
+        if len(current_row_data) < 15:
+            # Pad the current_row_data if there are fewer columns
+            current_row_data += [''] * (15 - len(current_row_data))
+
+        # Update the columns (Ensure you have the correct indices here)
+        current_row_data[12] = row_data[1]  # WIP Tapping column (assuming it's index 12)
+        current_row_data[13] = row_data[2]  # WIP Final Inspection column (index 13)
+        current_row_data[14] = row_data[3]  # WIP Final Work column (index 14)
+        
+        # Update the row in the Google Sheet
+        sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+    else:
+        # If WOC doesn't exist, add it as a new row
+        sheet.append_row(row_data)  # Append new row to the sheet
+
+# Forming Mode
+def forming_mode():
+    st.header("Forming Mode")
+    department_from = st.selectbox('เลือกแผนกต้นทาง', ['Forming', 'Tapping', 'Final'])
+    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Forming', 'Tapping', 'Final'])
+    woc_number = st.text_input("หมายเลข WOC")
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_codes())  # Fetch part names dynamically
+    lot_number = st.text_input("หมายเลข LOT")
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+    # Calculate number of pieces
+    if total_weight and barrel_weight and sample_weight and sample_count:
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
-    # ข้อมูลที่ต้องบันทึก
-    data = [previous_woc, new_woc, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, status, timestamp]
-    
-    # บันทึกข้อมูลลง Google Sheets
-    log_to_google_sheets(data)
-    st.success("Data saved successfully. WOC Transfer completed.")
+    if st.button("บันทึก"):
+        # Save data to Google Sheets with timestamp
+        row_data = [woc_number, part_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = add_timestamp(row_data)  # Add timestamp to the row
+        sheet.append_row(row_data)  # Save the row to "Jobs" sheet
+        st.success("บันทึกข้อมูลสำเร็จ!")
+        send_telegram_message(f"Job from {department_from} to {department_to} saved!")
+
+# Tapping Mode
+def tapping_mode():
+    st.header("Tapping Mode")
+    job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+
+    st.write("ข้อมูลงานที่ถูก Transfer:")
+    job_data_for_display = [{"WOC Number": job["WOC Number"], "Part Name": job["Part Name"], "Department From": job["Department From"], "Department To": job["Department To"], "Total Weight": job["Total Weight"], "Timestamp": job["Timestamp"]} for job in job_data]
+
+    # Use st.table() or st.dataframe() for a cleaner display
+    st.dataframe(job_data_for_display)  # Show a table of job data without unnecessary JSON fields
+
+    # Select a job
+    job_woc = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+
+    if job_woc:
+        st.write(f"เลือกหมายเลข WOC: {job_woc}")
+        # Form for checking weight
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+
+        if st.button("คำนวณและเปรียบเทียบ"):
+            # Compare with forming mode pieces count
+            forming_pieces_count = 1000  # Fetch this value from Forming mode data
+            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            
+            # Prepare row data for Tapping
+            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
+            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            
+            # Update the WOC row or add it as a new row
+            update_woc_row(job_woc, row_data)
+            st.success("บันทึกข้อมูลสำเร็จ!")
+            send_telegram_message(f"Job WOC {job_woc} processed in Tapping")
+
+# Main app logic
+def main():
+    st.title("ระบบรับส่งงานระหว่างแผนกในโรงงาน")
+    mode = st.selectbox("เลือกโหมดการทำงาน", ['Forming', 'Tapping', 'Final Inspection', 'Final Work', 'TP Transfer'])
+
+    if mode == 'Forming':
+        forming_mode()
+    elif mode == 'Tapping':
+        tapping_mode()
+    elif mode == 'Final Inspection':
+        pass
+    elif mode == 'Final Work':
+        pass
+    elif mode == 'TP Transfer':
+        pass
+
+if __name__ == "__main__":
+    main()
