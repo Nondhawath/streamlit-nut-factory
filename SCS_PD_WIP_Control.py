@@ -66,6 +66,41 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # Add timestamp to the row
     return row_data
 
+# Function to find WOC row
+def find_woc_row(woc_number):
+    try:
+        job_data = sheet.get_all_records()  # Fetch all jobs from Google Sheets
+        for idx, job in enumerate(job_data):
+            if job.get("WOC Number") == woc_number:  # Check if WOC Number matches
+                return idx + 2  # Return the row index (gspread is 1-indexed, so we add 2)
+        return None  # If WOC Number doesn't exist, return None
+    except Exception as e:
+        st.error(f"Error finding WOC row: {e}")
+        return None
+
+# Function to update the row in the Google Sheets
+def update_woc_row(woc_number, row_data):
+    row = find_woc_row(woc_number)
+    if row:
+        current_row_data = sheet.row_values(row)
+        
+        # Ensure the row_data has the same size as current_row_data
+        if len(current_row_data) < 15:
+            # Pad the current_row_data if there are fewer columns
+            current_row_data += [''] * (15 - len(current_row_data))
+
+        # Update the columns (Ensure you have the correct indices here)
+        current_row_data[11] = row_data[1]  # Pieces Count (index 11)
+        current_row_data[12] = row_data[2]  # Difference Percentage (index 12)
+        current_row_data[13] = row_data[3]  # WIP Status (index 13)
+        current_row_data[14] = row_data[4]  # Timestamp (index 14)
+
+        # Update the row in the Google Sheet
+        sheet.update(f"A{row}:O{row}", [current_row_data])  # Update the whole row
+    else:
+        # If WOC doesn't exist, append it as a new row
+        sheet.append_row(row_data)  # Append new row to the sheet
+
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode")
@@ -109,25 +144,34 @@ def tapping_mode():
 
     if job_woc:
         st.write(f"เลือกหมายเลข WOC: {job_woc}")
-        # Form for checking weight
+        
+        # Get the Pieces Count from Forming for comparison
+        forming_job = next((job for job in job_data if job['WOC Number'] == job_woc), None)
+        if forming_job:
+            pieces_count_forming = forming_job.get('Pieces Count', 0)
+        else:
+            pieces_count_forming = 0  # Default value if no Forming data found
+
+        # Form for checking weight and calculation
         total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
         barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
         sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
         sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
         if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+            pieces_count_tapping = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงานใน Tapping: {pieces_count_tapping:.2f}")
+
+            # Calculate the percentage difference
+            if pieces_count_forming > 0:
+                difference_percentage = abs(pieces_count_tapping - pieces_count_forming) / pieces_count_forming * 100
+                st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference_percentage:.2f}%")
+            else:
+                st.warning("ไม่พบข้อมูลจำนวนชิ้นงานจาก Forming เพื่อทำการเปรียบเทียบ")
 
         if st.button("คำนวณและเปรียบเทียบ"):
-            # Compare with forming mode pieces count
-            forming_pieces_count = 1000  # Fetch this value from Forming mode data
-            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
-            
             # Prepare row data for Tapping
-            row_data = [job_woc, pieces_count, difference, "WIP-Tapping"]
-            row_data = add_timestamp(row_data)  # Add timestamp to the row
+            row_data = [job_woc, pieces_count_tapping, difference_percentage, "WIP-Tapping", datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%Y-%m-%d %H:%M:%S')]
             
             # Update the WOC row or add it as a new row
             update_woc_row(job_woc, row_data)
