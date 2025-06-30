@@ -36,8 +36,8 @@ def connect_to_google_sheets():
 fm_sheet, tp_sheet, fi_sheet, wh_sheet, summary_sheet = connect_to_google_sheets()
 
 # Telegram bot สำหรับการแจ้งเตือน
-TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]
-CHAT_ID = st.secrets["chat_id"]
+TELEGRAM_TOKEN = st.secrets["telegram_bot"]["telegram_bot_token"]
+CHAT_ID = st.secrets["telegram_bot"]["chat_id"]
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
