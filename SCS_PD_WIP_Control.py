@@ -23,8 +23,8 @@ wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
 summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
 
 # Telegram bot สำหรับการแจ้งเตือน
-TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]
-CHAT_ID = st.secrets["chat_id"]
+TELEGRAM_TOKEN = st.secrets["telegram_bot"]["telegram_bot_token"]
+CHAT_ID = st.secrets["telegram_bot"]["chat_id"]
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
