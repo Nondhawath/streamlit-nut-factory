@@ -59,6 +59,7 @@ def forming_mode():
         row_data = [woc_number, part_name, "นายคมสันต์", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
         row_data = add_timestamp(row_data)
         fm_sheet.append_row(row_data)
+        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
@@ -86,6 +87,7 @@ def tapping_mode():
         row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Tapping"]
         row_data = add_timestamp(row_data)
         tp_sheet.append_row(row_data)
+        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("รับงานสำเร็จ!")
         send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
@@ -113,6 +115,7 @@ def final_inspection_mode():
         row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Final Inspection"]
         row_data = add_timestamp(row_data)
         fi_sheet.append_row(row_data)
+        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("รับงานจาก Tapping สำเร็จ!")
         send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
 
