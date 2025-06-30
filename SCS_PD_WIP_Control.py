@@ -1,8 +1,8 @@
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 import requests
+from datetime import datetime
 
 # ตั้งค่าการเชื่อมต่อ Google Sheets
 google_credentials = st.secrets["google_service_account"]  # ใช้ข้อมูลบัญชี Google จาก Secrets
@@ -80,7 +80,7 @@ def tapping_mode():
     st.header("Tapping Receive Mode (TP)")
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
     department_to = "TP"
-    job_data = get_fm_data()  # ดึงข้อมูลจาก FM ที่แคชไว้
+    job_data = fm_sheet.get_all_records()  # ดึงข้อมูลจาก FM
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
     
     # กรอกข้อมูลการรับ
@@ -107,7 +107,7 @@ def final_inspection_mode():
     st.header("Final Inspection Receive Mode (FI)")
     department_from = "TP"  # รับงานจาก Tapping
     department_to = "FI"
-    job_data = get_tp_data()  # ดึงข้อมูลจาก TP ที่แคชไว้
+    job_data = tp_sheet.get_all_records()  # ดึงข้อมูลจาก TP
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
     
     # กรอกข้อมูลการรับ
