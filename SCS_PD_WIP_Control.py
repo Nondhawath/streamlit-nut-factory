@@ -1,112 +1,140 @@
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import requests
 from datetime import datetime
 
-# Set up Google Sheets connection
+# ตั้งค่าการเชื่อมต่อ Google Sheets
+google_credentials = st.secrets["google_service_account"]  # ใช้ข้อมูลบัญชี Google จาก Secrets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["google_service_account"], scope)
+
+# อนุญาตการเข้าถึงและตั้งค่า Client สำหรับการเชื่อมต่อ Google Sheets
+creds = ServiceAccountCredentials.from_json_keyfile_dict(google_credentials, scope)
 client = gspread.authorize(creds)
 
-# Define Google Sheets
-spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'
+# ตั้งชื่อไฟล์ Google Sheets ที่จะใช้
+spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spreadsheet ID ที่คุณใช้งาน
 
-# Sheets for each department
-fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming Sheet
-tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping Sheet
-fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection Sheet
-wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse Sheet
-summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # Summary Sheet
+# เข้าถึงชีตต่าง ๆ ตามแผนกที่กำหนด
+fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming
+tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping
+fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection
+wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
+summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
 
-# Function to get part names from the Part Code Master Sheet
-def get_part_names():
-    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-    part_code_master_data = part_code_master_sheet.get_all_records()
-    return [part['รหัสงาน'] for part in part_code_master_data]
+# Telegram bot สำหรับการแจ้งเตือน
+TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]
+CHAT_ID = st.secrets["chat_id"]
 
-# Function to get employees
-def get_employees():
-    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-    employees_data = employees_sheet.get_all_records()
-    return [employee['ชื่อพนักงาน'] for employee in employees_data]
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
+    requests.get(url)
 
-# Function to get machine names
-def get_machines():
-    machines_sheet = client.open_by_key(spreadsheet_id).worksheet('Machines')
-    machines_data = machines_sheet.get_all_records()
-    return [machine['Machine Name'] for machine in machines_data]
-
-# Function to add timestamp
-def add_timestamp(row_data, status_column_index, status_value):
-    row_data[status_column_index] = status_value  # Add the status to the row
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    row_data.append(timestamp)  # Add timestamp to the row
+# ฟังก์ชันสำหรับเพิ่มเวลา Timestamp ในข้อมูล
+def add_timestamp(row_data):
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # เก็บเวลาในรูปแบบ YYYY-MM-DD HH:MM:SS
+    row_data.append(timestamp)  # เพิ่ม Timestamp ลงในแถว
     return row_data
 
 # Forming Mode
 def forming_mode():
     st.header("Forming Mode (FM)")
-    department_from = "Forming"
-    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Out Source'])
+    department_from = "FM"
+    department_to = st.selectbox('แผนกปลายทาง', ['TP', 'FI', 'OS'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", get_part_names())
-    employee = st.selectbox("ชื่อพนักงาน", get_employees())
+    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])  # เปลี่ยนเป็นการดึงข้อมูลจากชีต
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
     sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
     sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-    # Calculate pieces count
+    # คำนวณจำนวนชิ้นงาน
     if total_weight and barrel_weight and sample_weight and sample_count:
         pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
     if st.button("บันทึก"):
-        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
-        row_data = add_timestamp(row_data, 11, "WIP-Forming")
+        # บันทึกข้อมูลลงในชีต FM
+        row_data = [woc_number, part_name, "นายคมสันต์", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
+        row_data = add_timestamp(row_data)
         fm_sheet.append_row(row_data)
-        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("บันทึกข้อมูลสำเร็จ!")
+        send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
 # Tapping Mode
 def tapping_mode():
-    st.header("Tapping Mode (TP)")
-    job_data = summary_sheet.get_all_records()  # Fetch all jobs from Summary Sheet
+    st.header("Tapping Receive Mode (TP)")
+    department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
+    department_to = "TP"
+    job_data = fm_sheet.get_all_records()  # ดึงข้อมูลจาก FM
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
-    job = next(job for job in job_data if job['WOC Number'] == woc_number)
+    
+    # กรอกข้อมูลการรับ
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-    if job:
-        st.write(f"ข้อมูลงาน: {job}")
-        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
+    if st.button("รับงาน"):
+        # คำนวณจำนวนชิ้นงาน
         if total_weight and barrel_weight and sample_weight and sample_count:
             pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
             st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+        
+        # บันทึกข้อมูลลงในชีต TP
+        row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Tapping"]
+        row_data = add_timestamp(row_data)
+        tp_sheet.append_row(row_data)
+        st.success("รับงานสำเร็จ!")
+        send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
-        if st.button("คำนวณและเปรียบเทียบ"):
-            # Compare with Forming mode pieces count
-            forming_pieces_count = job['Pieces Count']
-            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
-            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
-            row_data = [woc_number, pieces_count, difference]
-            row_data = add_timestamp(row_data, 12, "WIP-Tapping")
-            tp_sheet.append_row(row_data)
-            summary_sheet.append_row(row_data)  # Save to summary sheet as well
-            st.success("บันทึกข้อมูลสำเร็จ!")
+# Final Inspection Mode
+def final_inspection_mode():
+    st.header("Final Inspection Receive Mode (FI)")
+    department_from = "TP"  # รับงานจาก Tapping
+    department_to = "FI"
+    job_data = tp_sheet.get_all_records()  # ดึงข้อมูลจาก TP
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    
+    # กรอกข้อมูลการรับ
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-# Main app logic
+    if st.button("รับงาน"):
+        # คำนวณจำนวนชิ้นงาน
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+        
+        # บันทึกข้อมูลลงในชีต FI
+        row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Final Inspection"]
+        row_data = add_timestamp(row_data)
+        fi_sheet.append_row(row_data)
+        st.success("รับงานจาก Tapping สำเร็จ!")
+        send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
+
+# Main function to run the app
 def main():
     st.title("ระบบการโอนถ่ายงานระหว่างแผนก")
-    mode = st.sidebar.selectbox("เลือกโหมด", ['Forming Mode', 'Tapping Mode'])
+    mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode", "Tapping Receive Mode", "Tapping Work Mode", "Final Inspection Receive Mode", "Final Work Mode", "TP Transfer Mode", "Completed Mode"])
 
-    if mode == 'Forming Mode':
+    if mode == "Forming Mode":
         forming_mode()
-    elif mode == 'Tapping Mode':
+    elif mode == "Tapping Receive Mode":
         tapping_mode()
+    elif mode == "Tapping Work Mode":
+        pass  # Add functionality as needed
+    elif mode == "Final Inspection Receive Mode":
+        final_inspection_mode()
+    elif mode == "Final Work Mode":
+        pass  # Add functionality as needed
+    elif mode == "TP Transfer Mode":
+        pass  # Add functionality as needed
+    elif mode == "Completed Mode":
+        pass  # Add functionality as needed
 
 if __name__ == "__main__":
     main()
