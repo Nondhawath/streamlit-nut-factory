@@ -1,153 +1,112 @@
 import streamlit as st
-import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-# ใช้ข้อมูลแผนกที่กำหนดไว้
-departments = ['Forming', 'Tapping', 'Final Inspection', 'Out Source', 'Warehouse']
+# Set up Google Sheets connection
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["google_service_account"], scope)
+client = gspread.authorize(creds)
 
-# สร้าง DataFrame เพื่อเก็บข้อมูลการรับส่งงาน
-if 'work_history' not in st.session_state:
-    st.session_state['work_history'] = pd.DataFrame(columns=[
-        'WOC Number', 'Part Name', 'Employee', 'Department From', 'Department To', 'Lot Number', 
-        'Total Weight', 'Barrel Weight', 'Sample Weight', 'Sample Count', 'Pieces Count', 
-        'Status', 'Timestamp'
-    ])
+# Define Google Sheets
+spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'
 
-# ฟังก์ชันคำนวณ Pieces Count
-def calculate_pieces_count(total_weight, barrel_weight, sample_weight, sample_count):
-    return (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+# Sheets for each department
+fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming Sheet
+tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping Sheet
+fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection Sheet
+wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse Sheet
+summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # Summary Sheet
 
-# ฟังก์ชันส่งงาน
-def send_work(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count):
-    pieces_count = calculate_pieces_count(total_weight, barrel_weight, sample_weight, sample_count)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = pd.DataFrame([[woc_number, part_name, employee, department_from, department_to, lot_number, 
-                             total_weight, barrel_weight, sample_weight, sample_count, pieces_count, 'WIP-Forming', timestamp]],
-                           columns=st.session_state['work_history'].columns)
-    st.session_state['work_history'] = pd.concat([st.session_state['work_history'], new_row], ignore_index=True)
+# Function to get part names from the Part Code Master Sheet
+def get_part_names():
+    part_code_master_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+    part_code_master_data = part_code_master_sheet.get_all_records()
+    return [part['รหัสงาน'] for part in part_code_master_data]
 
-# ฟังก์ชันรับงาน
-def receive_work(woc_number, department_to):
-    st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number, 'Department To'] = department_to
-    st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number, 'Status'] = 'Received'
-    st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number, 'Timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# Function to get employees
+def get_employees():
+    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+    employees_data = employees_sheet.get_all_records()
+    return [employee['ชื่อพนักงาน'] for employee in employees_data]
 
-# ฟังก์ชันแสดงประวัติการส่งงาน
-def show_work_history():
-    st.subheader('Work History')
-    st.dataframe(st.session_state['work_history'])
+# Function to get machine names
+def get_machines():
+    machines_sheet = client.open_by_key(spreadsheet_id).worksheet('Machines')
+    machines_data = machines_sheet.get_all_records()
+    return [machine['Machine Name'] for machine in machines_data]
 
-# ส่วนของฟอร์มรับส่งงาน
-st.title('Work Transfer System')
+# Function to add timestamp
+def add_timestamp(row_data, status_column_index, status_value):
+    row_data[status_column_index] = status_value  # Add the status to the row
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row_data.append(timestamp)  # Add timestamp to the row
+    return row_data
 
-# Dropdown สำหรับเลือกโหมด
-mode = st.selectbox('Select Mode', [
-    'Forming Mode (FM)', 'Tapping Receive Mode (TP)', 'Tapping Work Mode',
-    'Final Inspection Receive Mode (FI)', 'Final Work Mode (FI Work)', 'TP Transfer Mode', 'Completed Mode (WH)'
-])
+# Forming Mode
+def forming_mode():
+    st.header("Forming Mode (FM)")
+    department_from = "Forming"
+    department_to = st.selectbox('เลือกแผนกปลายทาง', ['Tapping', 'Final Inspection', 'Out Source'])
+    woc_number = st.text_input("หมายเลข WOC")
+    part_name = st.selectbox("รหัสงาน / Part Name", get_part_names())
+    employee = st.selectbox("ชื่อพนักงาน", get_employees())
+    lot_number = st.text_input("หมายเลข LOT")
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-# ฟอร์มการส่งงาน (Forming Mode)
-if mode == 'Forming Mode (FM)':
-    with st.form(key='send_work_form'):
-        st.subheader('Send Work from Forming (FM)')
-        woc_number = st.text_input('WOC Number')
-        part_name = st.text_input('Part Name')
-        employee = st.text_input('Employee')
-        department_from = 'Forming'  # แสดงว่าเริ่มจากแผนก Forming
-        department_to = st.selectbox('Department To', ['Tapping', 'Final Inspection', 'Out Source'])
-        lot_number = st.text_input('Lot Number')
-        total_weight = st.number_input('Total Weight', min_value=0.0, step=0.1)
-        barrel_weight = st.number_input('Barrel Weight', min_value=0.0, step=0.1)
-        sample_weight = st.number_input('Sample Weight', min_value=0.0, step=0.1)
-        sample_count = st.number_input('Sample Count', min_value=0, step=1)
-        
-        send_button = st.form_submit_button('Send Work')
-        
-        if send_button:
-            send_work(woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count)
-            st.success('Work has been sent!')
+    # Calculate pieces count
+    if total_weight and barrel_weight and sample_weight and sample_count:
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+    
+    if st.button("บันทึก"):
+        row_data = [woc_number, part_name, employee, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count]
+        row_data = add_timestamp(row_data, 11, "WIP-Forming")
+        fm_sheet.append_row(row_data)
+        summary_sheet.append_row(row_data)  # Save to summary sheet as well
+        st.success("บันทึกข้อมูลสำเร็จ!")
 
-# ฟอร์มการรับงาน (Tapping Receive Mode)
-elif mode == 'Tapping Receive Mode (TP)':
-    with st.form(key='receive_work_form'):
-        st.subheader('Receive Work in Tapping (TP)')
-        woc_number_receive = st.text_input('Enter WOC Number to Receive')
-        department_to_receive = 'Tapping'  # สำหรับการรับในแผนก Tapping
-        
-        receive_button = st.form_submit_button('Receive Work')
-        
-        if receive_button:
-            receive_work(woc_number_receive, department_to_receive)
-            st.success(f'Work with WOC Number {woc_number_receive} has been received in Tapping!')
+# Tapping Mode
+def tapping_mode():
+    st.header("Tapping Mode (TP)")
+    job_data = summary_sheet.get_all_records()  # Fetch all jobs from Summary Sheet
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    job = next(job for job in job_data if job['WOC Number'] == woc_number)
 
-# ฟอร์มการทำงานในแผนก TP (Tapping Work Mode)
-elif mode == 'Tapping Work Mode':
-    with st.form(key='tapping_work_form'):
-        st.subheader('Work in Tapping (TP)')
-        woc_number_tp = st.text_input('WOC Number for Work in Tapping')
-        machine_name = st.selectbox('Select Machine', ['TP Machine 1', 'TP Machine 2', 'TP Machine 3'])
-        tapping_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        start_button = st.form_submit_button('Start Work')
-        
-        if start_button:
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_tp, 'Status'] = f'Used - {machine_name}'
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_tp, 'Timestamp'] = tapping_timestamp
-            st.success(f'Work with WOC Number {woc_number_tp} is in progress on {machine_name}!')
+    if job:
+        st.write(f"ข้อมูลงาน: {job}")
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+        sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
-# ฟอร์มการรับงาน (Final Inspection Receive Mode)
-elif mode == 'Final Inspection Receive Mode (FI)':
-    with st.form(key='receive_final_work_form'):
-        st.subheader('Receive Work in Final Inspection (FI)')
-        woc_number_fi = st.text_input('Enter WOC Number to Receive')
-        department_to_fi = 'Final Inspection'  # สำหรับการรับในแผนก Final Inspection
-        
-        receive_button_fi = st.form_submit_button('Receive Final Work')
-        
-        if receive_button_fi:
-            receive_work(woc_number_fi, department_to_fi)
-            st.success(f'Work with WOC Number {woc_number_fi} has been received in Final Inspection!')
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
 
-# ฟอร์มการทำงานในแผนก FI (Final Work Mode)
-elif mode == 'Final Work Mode (FI Work)':
-    with st.form(key='final_work_form'):
-        st.subheader('Work in Final Inspection (FI Work)')
-        woc_number_fi_work = st.text_input('WOC Number for Work in Final Inspection')
-        machine_name_fi = st.selectbox('Select Machine', ['FI Machine 1', 'FI Machine 2', 'FI Machine 3'])
-        fi_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        start_button_fi = st.form_submit_button('Start Final Work')
-        
-        if start_button_fi:
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_fi_work, 'Status'] = f'Used - {machine_name_fi}'
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_fi_work, 'Timestamp'] = fi_timestamp
-            st.success(f'Work with WOC Number {woc_number_fi_work} is in progress on {machine_name_fi}!')
+        if st.button("คำนวณและเปรียบเทียบ"):
+            # Compare with Forming mode pieces count
+            forming_pieces_count = job['Pieces Count']
+            difference = abs(pieces_count - forming_pieces_count) / forming_pieces_count * 100
+            st.write(f"จำนวนชิ้นงานแตกต่างกัน: {difference:.2f}%")
+            row_data = [woc_number, pieces_count, difference]
+            row_data = add_timestamp(row_data, 12, "WIP-Tapping")
+            tp_sheet.append_row(row_data)
+            summary_sheet.append_row(row_data)  # Save to summary sheet as well
+            st.success("บันทึกข้อมูลสำเร็จ!")
 
-# ฟอร์มการโอนงาน (TP Transfer Mode)
-elif mode == 'TP Transfer Mode':
-    with st.form(key='transfer_work_form'):
-        st.subheader('Transfer Work (TP Transfer Mode)')
-        woc_number_transfer = st.text_input('Enter WOC Number to Transfer')
-        new_woc_number = st.text_input('New WOC Number')
-        
-        transfer_button = st.form_submit_button('Transfer Work')
-        
-        if transfer_button:
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_transfer, 'WOC Number'] = new_woc_number
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_transfer, 'Status'] = 'Transfer'
-            st.success(f'Work with WOC Number {woc_number_transfer} has been transferred to {new_woc_number}!')
+# Main app logic
+def main():
+    st.title("ระบบการโอนถ่ายงานระหว่างแผนก")
+    mode = st.sidebar.selectbox("เลือกโหมด", ['Forming Mode', 'Tapping Mode'])
 
-# ฟอร์มการทำงานในแผนก WH (Completed Mode)
-elif mode == 'Completed Mode (WH)':
-    with st.form(key='completed_work_form'):
-        st.subheader('Work Completed (WH Mode)')
-        woc_number_completed = st.text_input('WOC Number for Completed Work')
-        
-        completed_button = st.form_submit_button('Complete Work')
-        
-        if completed_button:
-            st.session_state['work_history'].loc[st.session_state['work_history']['WOC Number'] == woc_number_completed, 'Status'] = 'Completed'
-            st.success(f'Work with WOC Number {woc_number_completed} has been completed and stored in Warehouse!')
+    if mode == 'Forming Mode':
+        forming_mode()
+    elif mode == 'Tapping Mode':
+        tapping_mode()
 
-# แสดงประวัติการส่งงาน
-show_work_history()
+if __name__ == "__main__":
+    main()
