@@ -1,9 +1,8 @@
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import requests
 from datetime import datetime
-from google.auth.exceptions import RefreshError
+import requests
 
 # ตั้งค่าการเชื่อมต่อ Google Sheets
 google_credentials = st.secrets["google_service_account"]  # ใช้ข้อมูลบัญชี Google จาก Secrets
@@ -16,28 +15,16 @@ client = gspread.authorize(creds)
 # ตั้งชื่อไฟล์ Google Sheets ที่จะใช้
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spreadsheet ID ที่คุณใช้งาน
 
-# ฟังก์ชันสำหรับการจัดการข้อผิดพลาดเมื่อไม่สามารถเชื่อมต่อ Google Sheets ได้
-def connect_to_google_sheets():
-    try:
-        fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming
-        tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping
-        fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection
-        wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
-        summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
-        return fm_sheet, tp_sheet, fi_sheet, wh_sheet, summary_sheet
-    except RefreshError as e:
-        st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อกับ Google Sheets: {e}")
-        st.stop()  # หยุดการทำงานของแอปเมื่อเกิดข้อผิดพลาด
-    except Exception as e:
-        st.error(f"เกิดข้อผิดพลาดที่ไม่คาดคิด: {e}")
-        st.stop()
-
-# เชื่อมต่อกับ Google Sheets
-fm_sheet, tp_sheet, fi_sheet, wh_sheet, summary_sheet = connect_to_google_sheets()
+# เข้าถึงชีตต่าง ๆ ตามแผนกที่กำหนด
+fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming
+tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping
+fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection
+wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
+summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
 
 # Telegram bot สำหรับการแจ้งเตือน
-TELEGRAM_TOKEN = st.secrets["telegram_bot"]["telegram_bot_token"]
-CHAT_ID = st.secrets["telegram_bot"]["chat_id"]
+TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]
+CHAT_ID = st.secrets["chat_id"]
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
@@ -49,13 +36,26 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # เพิ่ม Timestamp ลงในแถว
     return row_data
 
-# Forming Mode (FM)
+# ใช้ @st.cache_data เพื่อแคชข้อมูลที่ดึงมาจาก Google Sheets
+@st.cache_data
+def get_fm_data():
+    return fm_sheet.get_all_records()  # ดึงข้อมูลจาก FM sheet
+
+@st.cache_data
+def get_tp_data():
+    return tp_sheet.get_all_records()  # ดึงข้อมูลจาก TP sheet
+
+@st.cache_data
+def get_fi_data():
+    return fi_sheet.get_all_records()  # ดึงข้อมูลจาก FI sheet
+
+# Forming Mode
 def forming_mode():
     st.header("Forming Mode (FM)")
     department_from = "FM"
     department_to = st.selectbox('แผนกปลายทาง', ['TP', 'FI', 'OS'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])  # ดึงข้อมูลจากชีต
+    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])  # เปลี่ยนเป็นการดึงข้อมูลจากชีต
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -75,12 +75,12 @@ def forming_mode():
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
-# Tapping Mode (TP)
+# Tapping Mode
 def tapping_mode():
     st.header("Tapping Receive Mode (TP)")
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
     department_to = "TP"
-    job_data = fm_sheet.get_all_records()  # ดึงข้อมูลจาก FM
+    job_data = get_fm_data()  # ดึงข้อมูลจาก FM ที่แคชไว้
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
     
     # กรอกข้อมูลการรับ
@@ -102,12 +102,12 @@ def tapping_mode():
         st.success("รับงานสำเร็จ!")
         send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
-# Final Inspection Mode (FI)
+# Final Inspection Mode
 def final_inspection_mode():
     st.header("Final Inspection Receive Mode (FI)")
     department_from = "TP"  # รับงานจาก Tapping
     department_to = "FI"
-    job_data = tp_sheet.get_all_records()  # ดึงข้อมูลจาก TP
+    job_data = get_tp_data()  # ดึงข้อมูลจาก TP ที่แคชไว้
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
     
     # กรอกข้อมูลการรับ
