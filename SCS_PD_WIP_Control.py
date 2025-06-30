@@ -63,17 +63,22 @@ def forming_mode():
     sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
     # คำนวณจำนวนชิ้นงาน
+    pieces_count = 0  # กำหนดค่าเริ่มต้นให้กับ pieces_count
     if total_weight and barrel_weight and sample_weight and sample_count:
         pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
     if st.button("บันทึก"):
-        # บันทึกข้อมูลลงในชีต FM
-        row_data = [woc_number, part_name, "นายคมสันต์", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
-        row_data = add_timestamp(row_data)
-        fm_sheet.append_row(row_data)
-        st.success("บันทึกข้อมูลสำเร็จ!")
-        send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
+        # ตรวจสอบว่า pieces_count มีค่า
+        if pieces_count > 0:
+            # บันทึกข้อมูลลงในชีต FM
+            row_data = [woc_number, part_name, "นายคมสันต์", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
+            row_data = add_timestamp(row_data)
+            fm_sheet.append_row(row_data)
+            st.success("บันทึกข้อมูลสำเร็จ!")
+            send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
+        else:
+            st.error("กรุณากรอกข้อมูลน้ำหนักหรือจำนวนตัวอย่างให้ครบถ้วน")
 
 # Tapping Mode
 def tapping_mode():
