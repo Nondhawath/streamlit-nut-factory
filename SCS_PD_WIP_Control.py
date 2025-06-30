@@ -3,6 +3,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from datetime import datetime
+from google.auth.exceptions import RefreshError
 
 # ตั้งค่าการเชื่อมต่อ Google Sheets
 google_credentials = st.secrets["google_service_account"]  # ใช้ข้อมูลบัญชี Google จาก Secrets
@@ -15,12 +16,24 @@ client = gspread.authorize(creds)
 # ตั้งชื่อไฟล์ Google Sheets ที่จะใช้
 spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spreadsheet ID ที่คุณใช้งาน
 
-# เข้าถึงชีตต่าง ๆ ตามแผนกที่กำหนด
-fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming
-tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping
-fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection
-wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
-summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
+# ฟังก์ชันสำหรับการจัดการข้อผิดพลาดเมื่อไม่สามารถเชื่อมต่อ Google Sheets ได้
+def connect_to_google_sheets():
+    try:
+        fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming
+        tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping
+        fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection
+        wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
+        summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
+        return fm_sheet, tp_sheet, fi_sheet, wh_sheet, summary_sheet
+    except RefreshError as e:
+        st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อกับ Google Sheets: {e}")
+        st.stop()  # หยุดการทำงานของแอปเมื่อเกิดข้อผิดพลาด
+    except Exception as e:
+        st.error(f"เกิดข้อผิดพลาดที่ไม่คาดคิด: {e}")
+        st.stop()
+
+# เชื่อมต่อกับ Google Sheets
+fm_sheet, tp_sheet, fi_sheet, wh_sheet, summary_sheet = connect_to_google_sheets()
 
 # Telegram bot สำหรับการแจ้งเตือน
 TELEGRAM_TOKEN = st.secrets["telegram_bot_token"]
@@ -36,13 +49,13 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # เพิ่ม Timestamp ลงในแถว
     return row_data
 
-# Forming Mode
+# Forming Mode (FM)
 def forming_mode():
     st.header("Forming Mode (FM)")
     department_from = "FM"
     department_to = st.selectbox('แผนกปลายทาง', ['TP', 'FI', 'OS'])
     woc_number = st.text_input("หมายเลข WOC")
-    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])  # เปลี่ยนเป็นการดึงข้อมูลจากชีต
+    part_name = st.selectbox("รหัสงาน / Part Name", ["Part 1", "Part 2", "Part 3"])  # ดึงข้อมูลจากชีต
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -59,11 +72,10 @@ def forming_mode():
         row_data = [woc_number, part_name, "นายคมสันต์", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
         row_data = add_timestamp(row_data)
         fm_sheet.append_row(row_data)
-        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
-# Tapping Mode
+# Tapping Mode (TP)
 def tapping_mode():
     st.header("Tapping Receive Mode (TP)")
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
@@ -87,11 +99,10 @@ def tapping_mode():
         row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Tapping"]
         row_data = add_timestamp(row_data)
         tp_sheet.append_row(row_data)
-        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("รับงานสำเร็จ!")
         send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
-# Final Inspection Mode
+# Final Inspection Mode (FI)
 def final_inspection_mode():
     st.header("Final Inspection Receive Mode (FI)")
     department_from = "TP"  # รับงานจาก Tapping
@@ -115,7 +126,6 @@ def final_inspection_mode():
         row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Final Inspection"]
         row_data = add_timestamp(row_data)
         fi_sheet.append_row(row_data)
-        summary_sheet.append_row(row_data)  # Save to summary sheet as well
         st.success("รับงานจาก Tapping สำเร็จ!")
         send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
 
