@@ -76,6 +76,7 @@ def forming_mode():
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
 # Tapping Mode (Receive)
+# Tapping Receive Mode (TP)
 def tapping_receive_mode():
     st.header("Tapping Receive Mode (TP)")
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
@@ -83,28 +84,33 @@ def tapping_receive_mode():
     job_data = get_fm_data()  # ดึงข้อมูลจาก FM
     woc_data = [job for job in job_data if job['Status'] == 'WIP-Forming']  # กรอง WOC ที่สถานะเป็น WIP-Forming
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
-    
+
     # กรอกข้อมูลการรับ
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
     sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
     sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
 
+    # คำนวณจำนวนชิ้นงาน
+    pieces_count = 0  # กำหนดค่าเริ่มต้น
+    if total_weight and barrel_weight and sample_weight and sample_count:
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+        st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+
     if st.button("รับงาน"):
-        # คำนวณจำนวนชิ้นงาน
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-        
-        # บันทึกข้อมูลลงในชีต TP
-        row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "Tapping-Received"]
-        row_data = add_timestamp(row_data)
-        tp_sheet.append_row(row_data)
-        # เปลี่ยนสถานะใน FM เป็น "Tapping-Received"
-        fm_row = [job for job in woc_data if job['WOC Number'] == woc_number][0]
-        fm_sheet.update_cell(fm_row['row'], fm_sheet.find(woc_number).col, "Tapping-Received")
-        st.success("รับงานสำเร็จ!")
-        send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
+        # ตรวจสอบหาก pieces_count ไม่ได้ค่าเป็น 0
+        if pieces_count > 0:
+            # บันทึกข้อมูลลงในชีต TP
+            row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "Tapping-Received"]
+            row_data = add_timestamp(row_data)
+            tp_sheet.append_row(row_data)
+            # เปลี่ยนสถานะใน FM เป็น "Tapping-Received"
+            fm_row = [job for job in woc_data if job['WOC Number'] == woc_number][0]
+            fm_sheet.update_cell(fm_row['row'], fm_sheet.find(woc_number).col, "Tapping-Received")
+            st.success("รับงานสำเร็จ!")
+            send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
+        else:
+            st.warning("กรุณากรอกข้อมูลให้ครบถ้วนและคำนวณจำนวนชิ้นงานให้ถูกต้อง")
 
 # Final Inspection Mode (Receive)
 def final_inspection_receive_mode():
