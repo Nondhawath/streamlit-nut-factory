@@ -80,8 +80,12 @@ def tapping_receive_mode():
     st.header("Tapping Receive Mode (TP)")
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
     department_to = "TP"
+    
+    # ดึงข้อมูลจาก FM ที่มีสถานะเป็น 'WIP-Forming'
     job_data = get_fm_data()  # ดึงข้อมูลจาก FM
     woc_data = [job for job in job_data if job['Status'] == 'WIP-Forming']  # กรอง WOC ที่สถานะเป็น WIP-Forming
+
+    # แสดงรายการ WOC ที่ยังไม่รับ
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
 
     # กรอกข้อมูลการรับ
@@ -110,7 +114,7 @@ def tapping_receive_mode():
                 # หาตำแหน่งของ WOC ใน FM sheet แล้วอัปเดตสถานะ
                 cell = fm_sheet.find(woc_number)
                 fm_sheet.update_cell(cell.row, cell.col + 1, "Tapping-Received")  # อัปเดตสถานะในคอลัมน์ถัดไป
-            st.success("รับงานสำเร็จ!")
+            st.success(f"รับงานหมายเลข {woc_number} สำเร็จ!")
             send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
         else:
             st.warning("กรุณากรอกข้อมูลให้ครบถ้วนและคำนวณจำนวนชิ้นงานให้ถูกต้อง")
