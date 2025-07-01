@@ -81,7 +81,7 @@ def tapping_receive_mode():
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
     department_to = "TP"
     job_data = get_fm_data()  # ดึงข้อมูลจาก FM
-    woc_data = [job for job in job_data if job['Status'] == 'FM Transfer TP']
+    woc_data = [job for job in job_data if job['Status'] == 'WIP-Forming']  # กรอง WOC ที่สถานะเป็น WIP-Forming
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
     
     # กรอกข้อมูลการรับ
@@ -101,7 +101,8 @@ def tapping_receive_mode():
         row_data = add_timestamp(row_data)
         tp_sheet.append_row(row_data)
         # เปลี่ยนสถานะใน FM เป็น "Tapping-Received"
-        fm_sheet.update_cell(woc_data[0]['row'], fm_sheet.find(woc_number).col, "Tapping-Received")
+        fm_row = [job for job in woc_data if job['WOC Number'] == woc_number][0]
+        fm_sheet.update_cell(fm_row['row'], fm_sheet.find(woc_number).col, "Tapping-Received")
         st.success("รับงานสำเร็จ!")
         send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
@@ -111,7 +112,7 @@ def final_inspection_receive_mode():
     department_from = "TP"  # รับงานจาก Tapping
     department_to = "FI"
     job_data = get_tp_data()  # ดึงข้อมูลจาก TP
-    woc_data = [job for job in job_data if job['Status'] == 'Tapping-Received']
+    woc_data = [job for job in job_data if job['Status'] == 'Tapping-Received']  # กรอง WOC ที่สถานะเป็น Tapping-Received
     woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
     
     # กรอกข้อมูลการรับ
@@ -131,7 +132,8 @@ def final_inspection_receive_mode():
         row_data = add_timestamp(row_data)
         fi_sheet.append_row(row_data)
         # เปลี่ยนสถานะใน TP เป็น "Final Inspection-Received"
-        tp_sheet.update_cell(woc_data[0]['row'], tp_sheet.find(woc_number).col, "Final Inspection-Received")
+        tp_row = [job for job in woc_data if job['WOC Number'] == woc_number][0]
+        tp_sheet.update_cell(tp_row['row'], tp_sheet.find(woc_number).col, "Final Inspection-Received")
         st.success("รับงานจาก Tapping สำเร็จ!")
         send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
 
