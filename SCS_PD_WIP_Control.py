@@ -81,7 +81,8 @@ def tapping_receive_mode():
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
     department_to = "TP"
     job_data = get_fm_data()  # ดึงข้อมูลจาก FM
-    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data if job['Status'] == 'FM Transfer TP'])
+    woc_data = [job for job in job_data if job['Status'] == 'FM Transfer TP']
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
     
     # กรอกข้อมูลการรับ
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
@@ -96,9 +97,11 @@ def tapping_receive_mode():
             st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
         
         # บันทึกข้อมูลลงในชีต TP
-        row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Tapping"]
+        row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "Tapping-Received"]
         row_data = add_timestamp(row_data)
         tp_sheet.append_row(row_data)
+        # เปลี่ยนสถานะใน FM เป็น "Tapping-Received"
+        fm_sheet.update_cell(woc_data[0]['row'], fm_sheet.find(woc_number).col, "Tapping-Received")
         st.success("รับงานสำเร็จ!")
         send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
@@ -108,7 +111,8 @@ def final_inspection_receive_mode():
     department_from = "TP"  # รับงานจาก Tapping
     department_to = "FI"
     job_data = get_tp_data()  # ดึงข้อมูลจาก TP
-    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data if job['Status'] == 'TP Transfer FI'])
+    woc_data = [job for job in job_data if job['Status'] == 'Tapping-Received']
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
     
     # กรอกข้อมูลการรับ
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
@@ -123,9 +127,11 @@ def final_inspection_receive_mode():
             st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
         
         # บันทึกข้อมูลลงในชีต FI
-        row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Final Inspection"]
+        row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "Final Inspection-Received"]
         row_data = add_timestamp(row_data)
         fi_sheet.append_row(row_data)
+        # เปลี่ยนสถานะใน TP เป็น "Final Inspection-Received"
+        tp_sheet.update_cell(woc_data[0]['row'], tp_sheet.find(woc_number).col, "Final Inspection-Received")
         st.success("รับงานจาก Tapping สำเร็จ!")
         send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
 
