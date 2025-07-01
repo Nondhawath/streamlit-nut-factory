@@ -44,6 +44,33 @@ def get_fm_data(client, spreadsheet_id):
         st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก FM sheet: {e}")
         return []
 
+@st.cache_data
+def get_tp_data(client, spreadsheet_id):
+    try:
+        tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')
+        return tp_sheet.get_all_records()  # ดึงข้อมูลจาก TP sheet
+    except Exception as e:
+        st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก TP sheet: {e}")
+        return []
+
+@st.cache_data
+def get_fi_data(client, spreadsheet_id):
+    try:
+        fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')
+        return fi_sheet.get_all_records()  # ดึงข้อมูลจาก FI sheet
+    except Exception as e:
+        st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก FI sheet: {e}")
+        return []
+
+@st.cache_data
+def get_wh_data(client, spreadsheet_id):
+    try:
+        wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')
+        return wh_sheet.get_all_records()  # ดึงข้อมูลจาก WH sheet
+    except Exception as e:
+        st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก WH sheet: {e}")
+        return []
+
 # Forming Mode
 def forming_mode(client, spreadsheet_id):
     st.header("Forming Mode (FM)")
@@ -73,6 +100,66 @@ def forming_mode(client, spreadsheet_id):
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}")
 
+# Tapping Mode
+def tapping_mode(client, spreadsheet_id):
+    st.header("Tapping Receive Mode (TP)")
+    department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
+    department_to = "TP"
+    job_data = get_fm_data(client, spreadsheet_id)  # ดึงข้อมูลจาก FM
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    
+    # กรอกข้อมูลการรับ
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+    if st.button("รับงาน"):
+        # คำนวณจำนวนชิ้นงาน
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+        
+        try:
+            tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')
+            row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Tapping"]
+            row_data = add_timestamp(row_data)
+            tp_sheet.append_row(row_data)
+            st.success("รับงานสำเร็จ!")
+            send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}")
+
+# Final Inspection Mode
+def final_inspection_mode(client, spreadsheet_id):
+    st.header("Final Inspection Receive Mode (FI)")
+    department_from = "TP"  # รับงานจาก Tapping
+    department_to = "FI"
+    job_data = get_tp_data(client, spreadsheet_id)  # ดึงข้อมูลจาก TP
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    
+    # กรอกข้อมูลการรับ
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+    if st.button("รับงาน"):
+        # คำนวณจำนวนชิ้นงาน
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+        
+        try:
+            fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')
+            row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Final Inspection"]
+            row_data = add_timestamp(row_data)
+            fi_sheet.append_row(row_data)
+            st.success("รับงานจาก Tapping สำเร็จ!")
+            send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}")
+
 # Main function to run the app
 def main():
     st.title("ระบบการโอนถ่ายงานระหว่างแผนก")
@@ -86,11 +173,11 @@ def main():
     if mode == "Forming Mode":
         forming_mode(client, spreadsheet_id)
     elif mode == "Tapping Receive Mode":
-        st.write("Tapping Receive Mode")
+        tapping_mode(client, spreadsheet_id)
     elif mode == "Tapping Work Mode":
         st.write("Tapping Work Mode")
     elif mode == "Final Inspection Receive Mode":
-        st.write("Final Inspection Receive Mode")
+        final_inspection_mode(client, spreadsheet_id)
     elif mode == "Final Work Mode":
         st.write("Final Work Mode")
     elif mode == "TP Transfer Mode":
