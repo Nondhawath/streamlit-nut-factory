@@ -75,7 +75,6 @@ def forming_mode():
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
-# Tapping Mode (Receive)
 # Tapping Receive Mode (TP)
 def tapping_receive_mode():
     st.header("Tapping Receive Mode (TP)")
@@ -104,9 +103,13 @@ def tapping_receive_mode():
             row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "Tapping-Received"]
             row_data = add_timestamp(row_data)
             tp_sheet.append_row(row_data)
+
             # เปลี่ยนสถานะใน FM เป็น "Tapping-Received"
-            fm_row = [job for job in woc_data if job['WOC Number'] == woc_number][0]
-            fm_sheet.update_cell(fm_row['row'], fm_sheet.find(woc_number).col, "Tapping-Received")
+            fm_row = next((job for job in woc_data if job['WOC Number'] == woc_number), None)  # หาค่า fm_row ที่ตรงกับ WOC
+            if fm_row:
+                # หาตำแหน่งของ WOC ใน FM sheet แล้วอัปเดตสถานะ
+                cell = fm_sheet.find(woc_number)
+                fm_sheet.update_cell(cell.row, cell.col + 1, "Tapping-Received")  # อัปเดตสถานะในคอลัมน์ถัดไป
             st.success("รับงานสำเร็จ!")
             send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
         else:
