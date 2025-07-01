@@ -113,7 +113,7 @@ def tapping_receive_mode():
             if fm_row:
                 # หาตำแหน่งของ WOC ใน FM sheet แล้วอัปเดตสถานะ
                 cell = fm_sheet.find(woc_number)
-                fm_sheet.update_cell(cell.row, cell.col + 1, "Tapping-Received")  # อัปเดตสถานะในคอลัมน์ถัดไป
+                fm_sheet.update_cell(cell.row, cell.col + 1, "Tapping-Received")  # อัปเดตสถานะในคอลัมน์ Status
             st.success(f"รับงานหมายเลข {woc_number} สำเร็จ!")
             send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
         else:
