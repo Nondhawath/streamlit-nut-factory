@@ -75,13 +75,13 @@ def forming_mode():
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
-# Tapping Mode
-def tapping_mode():
+# Tapping Mode (Receive)
+def tapping_receive_mode():
     st.header("Tapping Receive Mode (TP)")
     department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
     department_to = "TP"
     job_data = get_fm_data()  # ดึงข้อมูลจาก FM
-    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data if job['Status'] == 'FM Transfer TP'])
     
     # กรอกข้อมูลการรับ
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
@@ -102,13 +102,13 @@ def tapping_mode():
         st.success("รับงานสำเร็จ!")
         send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
 
-# Final Inspection Mode
-def final_inspection_mode():
+# Final Inspection Mode (Receive)
+def final_inspection_receive_mode():
     st.header("Final Inspection Receive Mode (FI)")
     department_from = "TP"  # รับงานจาก Tapping
     department_to = "FI"
     job_data = get_tp_data()  # ดึงข้อมูลจาก TP
-    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data if job['Status'] == 'TP Transfer FI'])
     
     # กรอกข้อมูลการรับ
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
@@ -137,11 +137,11 @@ def main():
     if mode == "Forming Mode":
         forming_mode()
     elif mode == "Tapping Receive Mode":
-        tapping_mode()
+        tapping_receive_mode()
     elif mode == "Tapping Work Mode":
         pass  # Add functionality as needed
     elif mode == "Final Inspection Receive Mode":
-        final_inspection_mode()
+        final_inspection_receive_mode()
     elif mode == "Final Work Mode":
         pass  # Add functionality as needed
     elif mode == "TP Transfer Mode":
