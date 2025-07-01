@@ -34,8 +34,7 @@ def add_timestamp(row_data):
     row_data.append(timestamp)  # เพิ่ม Timestamp ลงในแถว
     return row_data
 
-# ฟังก์ชันในการดึงข้อมูลจาก Google Sheets โดยใช้ Cache เพื่อป้องกันการดึงข้อมูลซ้ำ
-@st.cache_data
+# ฟังก์ชันในการดึงข้อมูลจาก Google Sheets
 def get_fm_data(client, spreadsheet_id):
     try:
         fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')
@@ -44,7 +43,6 @@ def get_fm_data(client, spreadsheet_id):
         st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก FM sheet: {e}")
         return []
 
-@st.cache_data
 def get_tp_data(client, spreadsheet_id):
     try:
         tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')
@@ -53,7 +51,6 @@ def get_tp_data(client, spreadsheet_id):
         st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก TP sheet: {e}")
         return []
 
-@st.cache_data
 def get_fi_data(client, spreadsheet_id):
     try:
         fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')
@@ -62,7 +59,6 @@ def get_fi_data(client, spreadsheet_id):
         st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลจาก FI sheet: {e}")
         return []
 
-@st.cache_data
 def get_wh_data(client, spreadsheet_id):
     try:
         wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')
