@@ -96,73 +96,77 @@ def forming_mode(client, spreadsheet_id):
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}")
 
-# Tapping Mode
-def tapping_mode(client, spreadsheet_id):
-    st.header("Tapping Receive Mode (TP)")
-    department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
-    department_to = "TP"
-    job_data = get_fm_data(client, spreadsheet_id)  # ดึงข้อมูลจาก FM
-    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
-    
-    # กรอกข้อมูลการรับ
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-    if st.button("รับงาน"):
-        # คำนวณจำนวนชิ้นงาน
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-        
+# Tapping Work Mode
+def tapping_work_mode(client, spreadsheet_id):
+    st.header("Tapping Work Mode")
+    woc_number = st.text_input("หมายเลข WOC ที่ต้องการทำงาน")
+    machine_name = st.selectbox("เลือกชื่อเครื่อง", ["เครื่อง 1", "เครื่อง 2", "เครื่อง 3"])  # เปลี่ยนให้ดึงข้อมูลจาก Google Sheets
+    if st.button("เริ่มทำงาน"):
         try:
             tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')
-            row_data = [woc_number, "AP00001", "นายคมสันต์", department_from, department_to, "Lot123", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Tapping"]
+            row_data = [woc_number, machine_name, "นายคมสันต์", "TP", "FI", "Lot123", 1000, 200, 100, 10, 50, "Work-Tapping"]
             row_data = add_timestamp(row_data)
             tp_sheet.append_row(row_data)
-            st.success("รับงานสำเร็จ!")
-            send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
+            st.success("ทำงานใน Tapping สำเร็จ!")
+            send_telegram_message(f"Tapping Work on WOC {woc_number} at {machine_name}")
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}")
 
-# Final Inspection Mode
-def final_inspection_mode(client, spreadsheet_id):
-    st.header("Final Inspection Receive Mode (FI)")
-    department_from = "TP"  # รับงานจาก Tapping
-    department_to = "FI"
-    job_data = get_tp_data(client, spreadsheet_id)  # ดึงข้อมูลจาก TP
-    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in job_data])
-    
-    # กรอกข้อมูลการรับ
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
-    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
-
-    if st.button("รับงาน"):
-        # คำนวณจำนวนชิ้นงาน
-        if total_weight and barrel_weight and sample_weight and sample_count:
-            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
-            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
-        
+# Final Work Mode
+def final_work_mode(client, spreadsheet_id):
+    st.header("Final Work Mode")
+    woc_number = st.text_input("หมายเลข WOC ที่ต้องการทำงาน")
+    machine_name = st.selectbox("เลือกชื่อเครื่อง", ["เครื่อง 1", "เครื่อง 2", "เครื่อง 3"])  # เปลี่ยนให้ดึงข้อมูลจาก Google Sheets
+    if st.button("เริ่มทำงาน"):
         try:
             fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')
-            row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Final Inspection"]
+            row_data = [woc_number, machine_name, "นายคมสันต์", "FI", "WH", "Lot123", 1000, 200, 100, 10, 50, "Work-Final Inspection"]
             row_data = add_timestamp(row_data)
             fi_sheet.append_row(row_data)
-            st.success("รับงานจาก Tapping สำเร็จ!")
-            send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
+            st.success("ทำงานใน Final Inspection สำเร็จ!")
+            send_telegram_message(f"Final Inspection Work on WOC {woc_number} at {machine_name}")
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}")
+
+# TP Transfer Mode
+def tp_transfer_mode(client, spreadsheet_id):
+    st.header("TP Transfer Mode")
+    woc_number = st.text_input("หมายเลข WOC ที่จะโอน")
+    department_from = st.selectbox("เลือกแผนกต้นทาง", ["TP", "FI", "OS"])
+    department_to = st.selectbox("เลือกแผนกปลายทาง", ["FI", "OS", "WH"])
+    if st.button("โอนงาน"):
+        try:
+            tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')
+            row_data = [woc_number, "เครื่อง 1", "นายคมสันต์", department_from, department_to, "Lot123", 1000, 200, 100, 10, 50, "Transfer"]
+            row_data = add_timestamp(row_data)
+            tp_sheet.append_row(row_data)
+            st.success(f"โอนงานจาก {department_from} ไปยัง {department_to} สำเร็จ!")
+            send_telegram_message(f"Transfer WOC {woc_number} from {department_from} to {department_to}")
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการโอนงาน: {e}")
+
+# Completed Mode
+def completed_mode(client, spreadsheet_id):
+    st.header("Completed Mode")
+    woc_number = st.text_input("หมายเลข WOC ที่เสร็จสมบูรณ์")
+    if st.button("บันทึกงานที่เสร็จสมบูรณ์"):
+        try:
+            wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')
+            row_data = [woc_number, "นายคมสันต์", "WH", "Lot123", 1000, 200, 100, 10, 50, "Completed"]
+            row_data = add_timestamp(row_data)
+            wh_sheet.append_row(row_data)
+            st.success(f"บันทึกงานที่เสร็จสมบูรณ์หมายเลข WOC {woc_number} สำเร็จ!")
+            send_telegram_message(f"Completed WOC {woc_number} and sent to Warehouse")
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการบันทึกงานที่เสร็จสมบูรณ์: {e}")
 
 # Main function to run the app
 def main():
     st.title("ระบบการโอนถ่ายงานระหว่างแผนก")
     client = connect_google_sheets()
-    if client is None:
-        return
-    
+    if not client:
+        return  # If cannot connect to Google Sheets, stop the app
+
     spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spreadsheet ID ที่คุณใช้งาน
     mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode", "Tapping Receive Mode", "Tapping Work Mode", "Final Inspection Receive Mode", "Final Work Mode", "TP Transfer Mode", "Completed Mode"])
 
@@ -171,15 +175,15 @@ def main():
     elif mode == "Tapping Receive Mode":
         tapping_mode(client, spreadsheet_id)
     elif mode == "Tapping Work Mode":
-        st.write("Tapping Work Mode")
+        tapping_work_mode(client, spreadsheet_id)
     elif mode == "Final Inspection Receive Mode":
         final_inspection_mode(client, spreadsheet_id)
     elif mode == "Final Work Mode":
-        st.write("Final Work Mode")
+        final_work_mode(client, spreadsheet_id)
     elif mode == "TP Transfer Mode":
-        st.write("TP Transfer Mode")
+        tp_transfer_mode(client, spreadsheet_id)
     elif mode == "Completed Mode":
-        st.write("Completed Mode")
+        completed_mode(client, spreadsheet_id)
 
 if __name__ == "__main__":
     main()
