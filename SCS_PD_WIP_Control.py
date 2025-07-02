@@ -62,29 +62,34 @@ def login():
     # ดึงข้อมูลพนักงานจาก Google Sheets
     employees = get_employees_data()
 
+    # แสดงข้อมูลที่ดึงมาเพื่อการตรวจสอบ
+    # st.write("Employee Data:", employees)  # แสดงข้อมูลพนักงานที่ดึงจาก Google Sheets
+
     # ตรวจสอบคอลัมน์ที่ถูกต้องใน Google Sheets
     try:
         employee_names = []
         employee_ids = {}
-        
+
         # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสพนักงาน' โดยให้เฉพาะแถวที่มีข้อมูลครบถ้วน
         for emp in employees:
+            # ตรวจสอบว่าแถวมีทั้ง 'ชื่อพนักงาน' และ 'รหัสพนักงาน'
             if 'ชื่อพนักงาน' in emp and 'รหัสพนักงาน' in emp:
-                employee_names.append(emp['ชื่อพนักงาน'].strip())  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
-                employee_ids[emp['ชื่อพนักงาน'].strip()] = emp['รหัสพนักงาน'].strip()  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
+                # ตรวจสอบว่าไม่มีค่าเป็น None หรือ ค่าว่างใน 'ชื่อพนักงาน' และ 'รหัสพนักงาน'
+                if emp['ชื่อพนักงาน'] and emp['รหัสพนักงาน']:
+                    employee_names.append(emp['ชื่อพนักงาน'].strip())  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
+                    employee_ids[emp['ชื่อพนักงาน'].strip()] = emp['รหัสพนักงาน'].strip()  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
+                else:
+                    st.warning(f"ข้อมูลพนักงาน '{emp['ชื่อพนักงาน']}' ขาดข้อมูลบางส่วน!")
+            else:
+                st.warning("ข้อมูลพนักงานไม่สมบูรณ์: ไม่มีคอลัมน์ 'ชื่อพนักงาน' หรือ 'รหัสพนักงาน'")
 
         if not employee_names or not employee_ids:
-            st.error("ข้อมูลพนักงานหรือรหัสพนักงานไม่ครบถ้วน!")
+            st.error("ไม่มีข้อมูลพนักงานที่ถูกต้อง!")
             return None, None
 
     except KeyError as e:
         st.error(f"Error: คอลัมน์ใน Google Sheets ไม่ตรงกัน - {e}")
         return None, None  # หากไม่พบคอลัมน์ที่ต้องการ
-
-    # ตรวจสอบข้อมูลว่าแต่ละแถวมี 'รหัสพนักงาน' หรือไม่
-    missing_login_data = [emp['ชื่อพนักงาน'] for emp in employees if 'รหัสพนักงาน' not in emp]
-    if missing_login_data:
-        st.warning(f"พนักงานต่อไปนี้ไม่มีข้อมูล 'รหัสพนักงาน': {', '.join(missing_login_data)}")
 
     # ดึงข้อมูลรหัสงานจาก part_code_master
     part_codes = get_part_codes()
