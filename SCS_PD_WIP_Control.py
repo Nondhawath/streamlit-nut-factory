@@ -3,6 +3,7 @@ import psycopg2
 import pandas as pd
 import requests
 from datetime import datetime
+import math
 
 # ====== DATABASE CONNECTION ======
 def get_connection():
@@ -41,11 +42,17 @@ def get_jobs_by_status(status):
     conn.close()
     return df
 
+def get_all_jobs():
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM job_tracking ORDER BY created_at DESC", conn)
+    conn.close()
+    return df
+
 # ====== HELPER ======
 def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
-    return (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+    return math.ceil((total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000))
 
-# ====== MODE 1: FORMING TRANSFER ======
+# ====== MODE FUNCTIONS ======
 def mode_forming_transfer():
     st.header("Forming Transfer")
     dept_from = st.selectbox("แผนกต้นทาง", ["FM"])
@@ -60,7 +67,7 @@ def mode_forming_transfer():
 
     if total and barrel and sample_w and sample_c:
         pieces = calculate_pieces(total, barrel, sample_w, sample_c)
-        st.metric("จำนวนชิ้นงาน", f"{pieces:.2f}")
+        st.metric("จำนวนชิ้นงาน (ปัดขึ้น)", f"{pieces:,}")
 
     if st.button("บันทึก"):
         status = f"{dept_from} Transfer {dept_to}"
@@ -81,106 +88,91 @@ def mode_forming_transfer():
         st.success("บันทึกเรียบร้อย")
         send_telegram_message(f"{dept_from} ส่ง WOC {woc} ไปยัง {dept_to}")
 
-# ====== MODE 2: TAPPING RECEIVE ======
-def mode_tp_receive():
-    st.header("Tapping Receive")
-    df = get_jobs_by_status("FM Transfer TP")
+def mode_receive(dept_to):
+    st.header(f"{dept_to} Receive")
+    from_status = f"TP Transfer {dept_to}" if dept_to != "TP" else "FM Transfer TP"
+    df = get_jobs_by_status(from_status)
     if df.empty:
-        st.warning("ไม่มีงานจาก FM ที่ส่งมา TP")
+        st.warning("ไม่มีงานที่รอรับ")
         return
 
-    woc = st.selectbox("เลือก WOC ที่จะรับ", df["woc_number"].tolist())
+    woc = st.selectbox("เลือก WOC", df["woc_number"])
     selected = df[df["woc_number"] == woc].iloc[0]
 
     if st.button("ตรวจสอบน้ำหนัก"):
         total = st.number_input("น้ำหนักรวม", 0.0)
         barrel = st.number_input("น้ำหนักถัง", 0.0)
-        sample_w = st.number_input("น้ำหนักตัวอย่างรวม", 0.0)
+        sample_w = st.number_input("น้ำหนักรวมของตัวอย่าง", 0.0)
         sample_c = st.number_input("จำนวนตัวอย่าง", 1)
+
         if total and barrel and sample_w and sample_c:
             pieces_new = calculate_pieces(total, barrel, sample_w, sample_c)
-            diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"]) * 100
+            diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"])) * 100
             st.metric("% ต่างกัน", f"{diff_percent:.2f}%")
+
             if st.button("บันทึกรับงาน"):
                 insert_job({
                     "woc_number": selected["woc_number"],
                     "part_name": selected["part_name"],
                     "operator_name": "นายคมสันต์",
-                    "dept_from": "FM",
-                    "dept_to": "TP",
+                    "dept_from": selected["dept_to"],
+                    "dept_to": dept_to,
                     "lot_number": selected["lot_number"],
                     "total_weight": total,
                     "barrel_weight": barrel,
                     "sample_weight": sample_w,
                     "sample_count": sample_c,
                     "pieces_count": pieces_new,
-                    "status": "WIP-TP"
+                    "status": f"WIP-{dept_to}"
                 })
-                update_status(woc, "TP Received")
-                send_telegram_message(f"TP รับ WOC {woc}")
+                update_status(woc, f"{dept_to} Received")
+                send_telegram_message(f"{dept_to} รับ WOC {woc}")
 
-# ====== MODE 3: TAPPING WORK ======
-def mode_tp_work():
-    st.header("Tapping Work")
-    df = get_jobs_by_status("WIP-TP")
+def mode_work(dept):
+    st.header(f"{dept} Work")
+    df = get_jobs_by_status(f"WIP-{dept}")
     if df.empty:
-        st.info("ไม่มีงานที่รอทำ")
+        st.info("ไม่มีงานรอทำ")
         return
+
     woc = st.selectbox("เลือก WOC", df["woc_number"])
-    machine = st.selectbox("เลือกเครื่อง", ["TP30", "TP40"])
-    if st.button("บันทึกงานที่เครื่อง"):
+    machine = st.selectbox("เลือกเครื่อง", [f"{dept}01", f"{dept}30", f"{dept}SM"])
+
+    if st.button("บันทึกการทำงาน"):
         update_status(woc, f"Used - {machine}")
-        send_telegram_message(f"TP ใช้งาน WOC {woc} ที่ {machine}")
+        send_telegram_message(f"{dept} ทำงาน WOC {woc} ที่เครื่อง {machine}")
 
-# ====== MODE 4: TP TRANSFER ======
-def mode_tp_transfer():
-    st.header("TP Transfer")
-    parent_woc = st.selectbox("WOC เดิมที่ต้องการโอน", [row["woc_number"] for row in get_jobs_by_status("Used - TP30").to_dict('records')])
-    woc_new = st.text_input("WOC ใหม่")
-    dept_to = st.selectbox("แผนกปลายทาง", ["FI", "OS"])
-    part_name = st.text_input("Part Name")
-    lot = st.text_input("Lot Number")
-    total = st.number_input("น้ำหนักรวม", 0.0)
-    barrel = st.number_input("น้ำหนักถัง", 0.0)
-    sample_w = st.number_input("น้ำหนักตัวอย่างรวม", 0.0)
-    sample_c = st.number_input("จำนวนตัวอย่าง", 1)
-
-    if st.button("โอนและสร้าง WOC ใหม่"):
-        pieces = calculate_pieces(total, barrel, sample_w, sample_c)
-        insert_job({
-            "woc_number": woc_new,
-            "parent_woc": parent_woc,
-            "part_name": part_name,
-            "operator_name": "นายคมสันต์",
-            "dept_from": "TP",
-            "dept_to": dept_to,
-            "lot_number": lot,
-            "total_weight": total,
-            "barrel_weight": barrel,
-            "sample_weight": sample_w,
-            "sample_count": sample_c,
-            "pieces_count": pieces,
-            "status": f"TP Transfer {dept_to}"
-        })
-        update_status(parent_woc, "Completed")
-        st.success("โอนและสร้าง WOC ใหม่เรียบร้อย")
+# ====== EXPORT MODE ======
+def mode_export():
+    st.header("Export Job Data")
+    df = get_all_jobs()
+    st.dataframe(df)
+    csv = df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button("📥 ดาวน์โหลด Excel (CSV)", data=csv, file_name="job_tracking_export.csv")
 
 # ====== MAIN ======
 def main():
     st.set_page_config(page_title="WOC Job Tracker", layout="wide")
     st.title("📦 ระบบโอนถ่ายงานโรงงาน")
-    menu = st.sidebar.radio("เลือกโหมด", [
-        "Forming Transfer", "Tapping Receive", "Tapping Work", "TP Transfer"
+    menu = st.sidebar.selectbox("เลือกโหมด", [
+        "Forming Transfer", "Tapping Receive", "Tapping Work",
+        "TP Transfer", "Final Inspection Receive", "Final Work", "Export"
     ])
 
     if menu == "Forming Transfer":
         mode_forming_transfer()
     elif menu == "Tapping Receive":
-        mode_tp_receive()
+        mode_receive("TP")
     elif menu == "Tapping Work":
-        mode_tp_work()
+        mode_work("TP")
     elif menu == "TP Transfer":
-        mode_tp_transfer()
+        mode_forming_transfer()  # Reuse form for transfer with TP
+    elif menu == "Final Inspection Receive":
+        mode_receive("FI")
+    elif menu == "Final Work":
+        mode_work("FI")
+    elif menu == "Export":
+        mode_export()
 
 if __name__ == "__main__":
     main()
