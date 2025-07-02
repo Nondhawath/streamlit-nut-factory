@@ -57,25 +57,24 @@ def get_part_codes():
     part_code_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
     return part_code_sheet.get_all_records()
 
-# Login function
+# ฟังก์ชัน login
 def login():
     # ดึงข้อมูลพนักงานจาก Google Sheets
     employees = get_employees_data()
 
-    # แสดงข้อมูลที่ดึงมาเพื่อการตรวจสอบ
-    # st.write("Employee Data:", employees)  # แสดงข้อมูลพนักงานที่ดึงจาก Google Sheets
-
     # ตรวจสอบคอลัมน์ที่ถูกต้องใน Google Sheets
     try:
-        # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสlogin'
+        # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสพนักงาน'
         employee_names = [emp['ชื่อพนักงาน'].strip() for emp in employees]  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
-        employee_ids = {emp['ชื่อพนักงาน'].strip(): emp['รหัสlogin'].strip() for emp in employees if 'รหัสlogin' in emp}  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสlogin พร้อมตัดช่องว่าง
+        employee_ids = {emp['ชื่อพนักงาน'].strip(): emp['รหัสพนักงาน'].strip() for emp in employees if 'รหัสพนักงาน' in emp}  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
     except KeyError as e:
         st.error(f"Error: คอลัมน์ใน Google Sheets ไม่ตรงกัน - {e}")
         return None, None  # หากไม่พบคอลัมน์ที่ต้องการ
 
-    # เพิ่มการแสดงผลข้อมูล employee_ids เพื่อตรวจสอบ
-    # st.write("Employee IDs:", employee_ids)  # แสดงข้อมูลรหัสพนักงานเพื่อการตรวจสอบ (สามารถเอาออกได้ในโปรแกรมจริง)
+    # ตรวจสอบข้อมูลว่าแต่ละแถวมี 'รหัสพนักงาน' หรือไม่
+    missing_login_data = [emp['ชื่อพนักงาน'] for emp in employees if 'รหัสพนักงาน' not in emp]
+    if missing_login_data:
+        st.warning(f"พนักงานต่อไปนี้ไม่มีข้อมูล 'รหัสพนักงาน': {', '.join(missing_login_data)}")
 
     # ดึงข้อมูลรหัสงานจาก part_code_master
     part_codes = get_part_codes()
