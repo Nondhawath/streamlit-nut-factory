@@ -107,7 +107,7 @@ def mode_receive(dept_to):
 
         if total and barrel and sample_w and sample_c:
             pieces_new = calculate_pieces(total, barrel, sample_w, sample_c)
-            diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"])) * 100
+            diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"]) * 100
             st.metric("% ต่างกัน", f"{diff_percent:.2f}%")
 
             if st.button("บันทึกรับงาน"):
