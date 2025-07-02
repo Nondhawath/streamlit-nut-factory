@@ -65,13 +65,13 @@ def login():
     # ตรวจสอบคอลัมน์ที่ถูกต้องใน Google Sheets
     try:
         employee_names = [emp['ชื่อพนักงาน'] for emp in employees]  # คัดเลือกชื่อพนักงาน
-        employee_ids = {emp['ชื่อพนักงาน']: emp['รหัสlogin'] for emp in employees}  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสlogin
+        employee_ids = {emp['ชื่อพนักงาน']: emp['รหัสlogin'].strip() for emp in employees}  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสlogin พร้อมตัดช่องว่าง
     except KeyError as e:
         st.error(f"Error: คอลัมน์ใน Google Sheets ไม่ตรงกัน - {e}")
         return None, None  # หากไม่พบคอลัมน์ที่ต้องการ
 
     # เพิ่มการแสดงผลข้อมูล employee_ids เพื่อตรวจสอบ
-    st.write("Employee IDs:", employee_ids)  # เพิ่มการแสดงผลข้อมูลรหัสพนักงาน
+    # st.write("Employee IDs:", employee_ids)  # แสดงข้อมูลรหัสพนักงานเพื่อการตรวจสอบ (สามารถเอาออกได้ในโปรแกรมจริง)
 
     # ดึงข้อมูลรหัสงานจาก part_code_master
     part_codes = get_part_codes()
@@ -84,6 +84,10 @@ def login():
 
     # เช็คการ login ของพนักงาน
     if employee_name and employee_id:
+        # ตัดช่องว่างจากชื่อพนักงานและรหัสพนักงานทั้งสอง
+        employee_name = employee_name.strip()
+        employee_id = employee_id.strip()
+
         # ตรวจสอบว่า Employee ID ตรงกับที่บันทึกใน Google Sheets
         if employee_ids.get(employee_name) == employee_id:
             st.success(f"Login สำเร็จ! ยินดีต้อนรับ, {employee_name}")
