@@ -88,6 +88,7 @@ def mode_forming_transfer():
         st.success("บันทึกเรียบร้อยแล้ว")
         send_telegram_message(f"{dept_from} ส่ง WOC {woc} ไปยัง {dept_to}")
 
+# ====== RECEIVE MODE ======
 def mode_receive(dept_to):
     st.header(f"{dept_to} Receive")
     from_status = f"TP Transfer {dept_to}" if dept_to != "TP" else "FM Transfer TP"
@@ -95,6 +96,10 @@ def mode_receive(dept_to):
     if df.empty:
         st.warning("ไม่มีงานที่รอรับ")
         return
+
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search) | df["part_name"].str.contains(search)]
 
     woc = st.selectbox("เลือก WOC", df["woc_number"])
     selected = df[df["woc_number"] == woc].iloc[0]
@@ -136,6 +141,7 @@ def mode_receive(dept_to):
                 send_telegram_message(f"{dept_to} รับ WOC {woc}")
                 st.session_state.show_inputs = False
 
+# ====== WORK MODE ======
 def mode_work(dept):
     st.header(f"{dept} Work")
     df = get_jobs_by_status(f"WIP-{dept}")
@@ -155,6 +161,9 @@ def mode_work(dept):
 def mode_export():
     st.header("Export Job Data")
     df = get_all_jobs()
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search) | df["part_name"].str.contains(search)]
     st.dataframe(df)
     csv = df.to_csv(index=False).encode("utf-8-sig")
     st.download_button("\ud83d\udcc5 ดาวน์โหลด Excel (CSV)", data=csv, file_name="job_tracking_export.csv")
