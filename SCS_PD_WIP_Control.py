@@ -62,14 +62,21 @@ def login():
     # ดึงข้อมูลพนักงานจาก Google Sheets
     employees = get_employees_data()
 
-    # แสดงข้อมูลที่ดึงมาเพื่อการตรวจสอบ
-    # st.write("Employee Data:", employees)  # แสดงข้อมูลพนักงานที่ดึงจาก Google Sheets
-
     # ตรวจสอบคอลัมน์ที่ถูกต้องใน Google Sheets
     try:
-        # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสพนักงาน'
-        employee_names = [emp['ชื่อพนักงาน'].strip() for emp in employees if 'ชื่อพนักงาน' in emp]  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
-        employee_ids = {emp['ชื่อพนักงาน'].strip(): emp['รหัสพนักงาน'].strip() for emp in employees if 'รหัสพนักงาน' in emp and 'ชื่อพนักงาน' in emp}  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
+        employee_names = []
+        employee_ids = {}
+        
+        # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสพนักงาน' โดยให้เฉพาะแถวที่มีข้อมูลครบถ้วน
+        for emp in employees:
+            if 'ชื่อพนักงาน' in emp and 'รหัสพนักงาน' in emp:
+                employee_names.append(emp['ชื่อพนักงาน'].strip())  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
+                employee_ids[emp['ชื่อพนักงาน'].strip()] = emp['รหัสพนักงาน'].strip()  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
+
+        if not employee_names or not employee_ids:
+            st.error("ข้อมูลพนักงานหรือรหัสพนักงานไม่ครบถ้วน!")
+            return None, None
+
     except KeyError as e:
         st.error(f"Error: คอลัมน์ใน Google Sheets ไม่ตรงกัน - {e}")
         return None, None  # หากไม่พบคอลัมน์ที่ต้องการ
