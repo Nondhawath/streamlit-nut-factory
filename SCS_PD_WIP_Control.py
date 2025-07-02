@@ -19,6 +19,9 @@ spreadsheet_id = '1GbHXO0d2GNXEwEZfeygGqNEBRQJQUoC_MO1mA-389gE'  # ใส่ Spr
 fm_sheet = client.open_by_key(spreadsheet_id).worksheet('FM_Sheet')  # Forming
 tp_sheet = client.open_by_key(spreadsheet_id).worksheet('TP_Sheet')  # Tapping
 fi_sheet = client.open_by_key(spreadsheet_id).worksheet('FI_Sheet')  # Final Inspection
+wh_sheet = client.open_by_key(spreadsheet_id).worksheet('WH_Sheet')  # Warehouse
+summary_sheet = client.open_by_key(spreadsheet_id).worksheet('Summary')  # ข้อมูลรวม
+part_code_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')  # part_code_master
 
 # Telegram bot สำหรับการแจ้งเตือน
 TELEGRAM_TOKEN = st.secrets["telegram_bot"]["telegram_bot_token"]
@@ -47,104 +50,23 @@ def get_tp_data():
 def get_fi_data():
     return fi_sheet.get_all_records()  # ดึงข้อมูลจาก FI sheet
 
-# ฟังก์ชันดึงข้อมูลพนักงานจากชีท Employees
-def get_employees_data():
-    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-    return employees_sheet.get_all_records()
-
-# ฟังก์ชันดึงข้อมูลรหัสงานจากชีท part_code_master
+# ฟังก์ชันดึงข้อมูลรหัสงานจาก part_code_master
+@st.cache_data
 def get_part_codes():
-    part_code_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-    return part_code_sheet.get_all_records()
-
-# ฟังก์ชัน login
-def login():
-    # ดึงข้อมูลพนักงานจาก Google Sheets
-    employees = get_employees_data()
-
-    # แสดงข้อมูลที่ดึงมาเพื่อการตรวจสอบ
-    # st.write("Employee Data:", employees)  # แสดงข้อมูลพนักงานที่ดึงจาก Google Sheets
-
-    # ตรวจสอบคอลัมน์ที่ถูกต้องใน Google Sheets
-    try:
-        employee_names = []
-        employee_ids = {}
-
-        # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสพนักงาน' โดยให้เฉพาะแถวที่มีข้อมูลครบถ้วน
-        for emp in employees:
-            # ตรวจสอบว่าแถวมีทั้ง 'ชื่อพนักงาน' และ 'รหัสพนักงาน' และค่าของคอลัมน์ไม่เป็น None หรือ ค่าว่าง
-            if 'ชื่อพนักงาน' in emp and 'รหัสพนักงาน' in emp:
-                name = emp['ชื่อพนักงาน'].strip() if emp['ชื่อพนักงาน'] else None
-                login_id = emp['รหัสพนักงาน'].strip() if emp['รหัสพนักงาน'] else None
-
-                # ตรวจสอบว่าค่าที่ดึงมาไม่เป็น None หรือ ค่าว่าง
-                if name and login_id:
-                    employee_names.append(name)  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
-                    employee_ids[name] = login_id  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
-                else:
-                    st.warning(f"ข้อมูลพนักงาน '{emp.get('ชื่อพนักงาน')}' ขาดข้อมูลบางส่วน!")
-            else:
-                st.warning("ข้อมูลพนักงานไม่สมบูรณ์: ไม่มีคอลัมน์ 'ชื่อพนักงาน' หรือ 'รหัสพนักงาน'")
-
-        if not employee_names or not employee_ids:
-            st.error("ไม่มีข้อมูลพนักงานที่ถูกต้อง!")
-            return None, None
-
-    except KeyError as e:
-        st.error(f"Error: คอลัมน์ใน Google Sheets ไม่ตรงกัน - {e}")
-        return None, None  # หากไม่พบคอลัมน์ที่ต้องการ
-
-    # ดึงข้อมูลรหัสงานจาก part_code_master
-    part_codes = get_part_codes()
-    part_names = [part['รหัสงาน'] for part in part_codes]  # คัดเลือกรหัสงาน
-
-    # UI สำหรับเลือกพนักงานและรหัสงาน
-    st.header("Login")
-    employee_name = st.selectbox("เลือกชื่อพนักงาน", employee_names)
-    employee_id = st.text_input("กรอก Employee ID")
-
-    login_button = st.button("Login")
-
-    # เช็คการ login ของพนักงานเมื่อกดปุ่ม
-    if login_button:
-        # ตัดช่องว่างจากชื่อพนักงานและรหัสพนักงานทั้งสอง
-        employee_name = employee_name.strip()
-        employee_id = employee_id.strip()
-
-        # ตรวจสอบว่า Employee ID ตรงกับที่บันทึกใน Google Sheets
-        if employee_ids.get(employee_name) == employee_id:
-            st.success(f"Login สำเร็จ! ยินดีต้อนรับ, {employee_name}")
-            part_code = st.selectbox("เลือก รหัสงาน", part_names)  # ให้เลือก รหัสงาน เมื่อ login สำเร็จ
-            return employee_name, part_code
-        else:
-            st.error("รหัสพนักงานไม่ถูกต้อง!")
-    return None, None  # เมื่อยังไม่ได้ login
-
-    # เช็คการ login ของพนักงานเมื่อกดปุ่ม
-    if login_button:
-        # ตัดช่องว่างจากชื่อพนักงานและรหัสพนักงานทั้งสอง
-        employee_name = employee_name.strip()
-        employee_id = employee_id.strip()
-
-        # ตรวจสอบว่า Employee ID ตรงกับที่บันทึกใน Google Sheets
-        if employee_ids.get(employee_name) == employee_id:
-            st.success(f"Login สำเร็จ! ยินดีต้อนรับ, {employee_name}")
-            part_code = st.selectbox("เลือก รหัสงาน", part_names)  # ให้เลือก รหัสงาน เมื่อ login สำเร็จ
-            return employee_name, part_code
-        else:
-            st.error("รหัสพนักงานไม่ถูกต้อง!")
-    return None, None  # เมื่อยังไม่ได้ login
+    part_codes = part_code_sheet.col_values(1)  # ดึงข้อมูลจากคอลัมน์ "รหัสงาน"
+    return part_codes
 
 # Forming Mode
-def forming_mode(employee_name, part_code):
+def forming_mode():
     st.header("Forming Mode (FM)")
-    st.write(f"พนักงานที่ทำการบันทึก: {employee_name}")
-    st.write(f"รหัสงานที่เลือก: {part_code}")
-
-    # ฟอร์มการกรอกข้อมูล
     department_from = "FM"
     department_to = st.selectbox('แผนกปลายทาง', ['TP', 'FI', 'OS'])
     woc_number = st.text_input("หมายเลข WOC")
+    
+    # ดึงรายการรหัสงานจาก part_code_master
+    part_codes = get_part_codes()  # ดึงข้อมูลรหัสงานจากชีท part_code_master
+    part_name = st.selectbox("รหัสงาน / Part Name", part_codes)  # แสดงรายการรหัสงานให้เลือก
+    
     lot_number = st.text_input("หมายเลข LOT")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
@@ -157,25 +79,110 @@ def forming_mode(employee_name, part_code):
         st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
     
     if st.button("บันทึก"):
-        row_data = [woc_number, part_code, employee_name, department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
+        # บันทึกข้อมูลลงในชีต FM
+        row_data = [woc_number, part_name, "นายคมสันต์", department_from, department_to, lot_number, total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "WIP-Forming"]
         row_data = add_timestamp(row_data)
         fm_sheet.append_row(row_data)
         st.success("บันทึกข้อมูลสำเร็จ!")
         send_telegram_message(f"Forming ส่งงานหมายเลข WOC {woc_number} ไปยัง {department_to}")
 
+# Tapping Receive Mode (TP)
+def tapping_receive_mode():
+    st.header("Tapping Receive Mode (TP)")
+    department_from = "FM"  # สำหรับกรณีรับงานจาก Forming
+    department_to = "TP"
+    
+    # ดึงข้อมูลจาก FM ที่มีสถานะเป็น 'WIP-Forming'
+    job_data = get_fm_data()  # ดึงข้อมูลจาก FM
+    woc_data = [job for job in job_data if job['Status'] == 'WIP-Forming']  # กรอง WOC ที่สถานะเป็น WIP-Forming
+
+    # แสดงรายการ WOC ที่สถานะเป็น 'WIP-Forming'
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
+
+    # ค้นหาข้อมูลของ WOC ที่เลือก
+    selected_job = next((job for job in woc_data if job['WOC Number'] == woc_number), None)
+    if selected_job:
+        part_name = selected_job['Part Name']
+        lot_number = selected_job['Lot Number']
+        total_weight = selected_job['Total Weight']
+        barrel_weight = selected_job['Barrel Weight']
+        sample_weight = selected_job['Sample Weight']
+        sample_count = selected_job['Sample Count']
+        pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+
+        # แสดงข้อมูล WOC ที่เลือก
+        st.write(f"Part Name: {part_name}")
+        st.write(f"Lot Number: {lot_number}")
+        st.write(f"Total Weight: {total_weight}")
+        st.write(f"Barrel Weight: {barrel_weight}")
+        st.write(f"Sample Weight: {sample_weight}")
+        st.write(f"Sample Count: {sample_count}")
+        st.write(f"Pieces Count: {pieces_count:.2f}")
+
+    # รับงานเมื่อกดปุ่ม
+    if st.button("รับงาน"):
+        if selected_job:
+            # อัปเดตสถานะใน FM เป็น "Tapping-Received"
+            fm_row = next((job for job in woc_data if job['WOC Number'] == woc_number), None)  # หาค่า fm_row ที่ตรงกับ WOC
+            if fm_row:
+                # หาตำแหน่งของ WOC ใน FM sheet แล้วอัปเดตสถานะ
+                cell = fm_sheet.find(woc_number)
+                fm_sheet.update_cell(cell.row, cell.col + 1, "Tapping-Received")  # อัปเดตสถานะในคอลัมน์ Status
+            st.success(f"รับงานหมายเลข {woc_number} สำเร็จ!")
+            send_telegram_message(f"Tapping รับงานหมายเลข WOC {woc_number}")
+        else:
+            st.warning("กรุณาเลือก WOC และกรอกข้อมูลให้ครบถ้วน")
+
+# Final Inspection Mode (Receive)
+def final_inspection_receive_mode():
+    st.header("Final Inspection Receive Mode (FI)")
+    department_from = "TP"  # รับงานจาก Tapping
+    department_to = "FI"
+    job_data = get_tp_data()  # ดึงข้อมูลจาก TP
+    woc_data = [job for job in job_data if job['Status'] == 'Tapping-Received']  # กรอง WOC ที่สถานะเป็น Tapping-Received
+    woc_number = st.selectbox("เลือกหมายเลข WOC", [job['WOC Number'] for job in woc_data])
+    
+    # กรอกข้อมูลการรับ
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0)
+    sample_weight = st.number_input("น้ำหนักรวมของตัวอย่าง", min_value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=1)
+
+    if st.button("รับงาน"):
+        # คำนวณจำนวนชิ้นงาน
+        if total_weight and barrel_weight and sample_weight and sample_count:
+            pieces_count = (total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000)
+            st.write(f"จำนวนชิ้นงาน: {pieces_count:.2f}")
+        
+        # บันทึกข้อมูลลงในชีต FI
+        row_data = [woc_number, "AP00002", "นายคมสันต์", department_from, department_to, "Lot124", total_weight, barrel_weight, sample_weight, sample_count, pieces_count, "Final Inspection-Received"]
+        row_data = add_timestamp(row_data)
+        fi_sheet.append_row(row_data)
+        # เปลี่ยนสถานะใน TP เป็น "Final Inspection-Received"
+        tp_row = [job for job in woc_data if job['WOC Number'] == woc_number][0]
+        tp_sheet.update_cell(tp_row['row'], tp_sheet.find(woc_number).col, "Final Inspection-Received")
+        st.success("รับงานจาก Tapping สำเร็จ!")
+        send_telegram_message(f"Final Inspection รับงานหมายเลข WOC {woc_number}")
+
 # Main function to run the app
 def main():
     st.title("ระบบการโอนถ่ายงานระหว่างแผนก")
+    mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode", "Tapping Receive Mode", "Tapping Work Mode", "Final Inspection Receive Mode", "Final Work Mode", "TP Transfer Mode", "Completed Mode"])
 
-    # การ login
-    employee_name, part_code = login()
-
-    if employee_name and part_code:
-        # เมื่อ login สำเร็จ
-        mode = st.sidebar.selectbox("เลือกโหมด", ["Forming Mode"])
-
-        if mode == "Forming Mode":
-            forming_mode(employee_name, part_code)  # ส่งพนักงานและรหัสงานไปที่ฟังก์ชัน Forming Mode
+    if mode == "Forming Mode":
+        forming_mode()
+    elif mode == "Tapping Receive Mode":
+        tapping_receive_mode()
+    elif mode == "Tapping Work Mode":
+        pass  # Add functionality as needed
+    elif mode == "Final Inspection Receive Mode":
+        final_inspection_receive_mode()
+    elif mode == "Final Work Mode":
+        pass  # Add functionality as needed
+    elif mode == "TP Transfer Mode":
+        pass  # Add functionality as needed
+    elif mode == "Completed Mode":
+        pass  # Add functionality as needed
 
 if __name__ == "__main__":
     main()
