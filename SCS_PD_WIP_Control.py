@@ -88,8 +88,6 @@ def mode_forming_transfer():
         st.success("บันทึกเรียบร้อย")
         send_telegram_message(f"{dept_from} ส่ง WOC {woc} ไปยัง {dept_to}")
 
-# รับงาน
-
 def mode_receive(dept_to):
     st.header(f"{dept_to} Receive")
     from_status = f"TP Transfer {dept_to}" if dept_to != "TP" else "FM Transfer TP"
@@ -135,7 +133,7 @@ def mode_receive(dept_to):
                 })
                 update_status(woc, f"{dept_to} Received")
                 send_telegram_message(f"{dept_to} รับ WOC {woc}")
-
+                st.session_state.show_inputs = False  # Reset after submission
 
 def mode_work(dept):
     st.header(f"{dept} Work")
