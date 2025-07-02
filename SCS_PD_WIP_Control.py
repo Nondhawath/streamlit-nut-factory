@@ -121,8 +121,8 @@ def mode_receive(dept_to):
                     "woc_number": selected["woc_number"],
                     "part_name": selected["part_name"],
                     "operator_name": "นายคมสันต์",
-                    "dept_from": selected["dept_to"],
-                    "dept_to": dept_to,
+                    "dept_from": dept_to,
+                    "dept_to": f"{dept_to}-Work",
                     "lot_number": selected["lot_number"],
                     "total_weight": total,
                     "barrel_weight": barrel,
@@ -133,7 +133,7 @@ def mode_receive(dept_to):
                 })
                 update_status(woc, f"{dept_to} Received")
                 send_telegram_message(f"{dept_to} รับ WOC {woc}")
-                st.session_state.show_inputs = False  # Reset after submission
+                st.session_state.show_inputs = False
 
 def mode_work(dept):
     st.header(f"{dept} Work")
