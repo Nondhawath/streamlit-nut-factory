@@ -171,7 +171,7 @@ def mode_export():
 # ====== MAIN ======
 def main():
     st.set_page_config(page_title="WOC Job Tracker", layout="wide")
-    st.title("\ud83d\udce6 ระบบโอนถ่ายงานโรงงาน")
+    st.title("📦 ระบบโอนถ่ายงานโรงงาน")
     menu = st.sidebar.selectbox("เลือกโหมด", [
         "Forming Transfer", "Tapping Receive", "Tapping Work",
         "TP Transfer", "Final Inspection Receive", "Final Work", "Export"
