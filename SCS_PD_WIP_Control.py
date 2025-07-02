@@ -2,7 +2,6 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 import requests
-from datetime import datetime
 import math
 
 # ====== DATABASE CONNECTION ======
@@ -50,9 +49,12 @@ def get_all_jobs():
 
 # ====== HELPER ======
 def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
+    # ปัดขึ้น (round up)
+    if sample_count == 0 or sample_weight == 0:
+        return 0
     return math.ceil((total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000))
 
-# ====== MODE FUNCTIONS ======
+# ====== MODE: Forming Transfer ======
 def mode_forming_transfer():
     st.header("Forming Transfer")
     dept_from = st.selectbox("แผนกต้นทาง", ["FM"])
@@ -63,13 +65,21 @@ def mode_forming_transfer():
     total = st.number_input("น้ำหนักรวม", 0.0)
     barrel = st.number_input("น้ำหนักถัง", 0.0)
     sample_w = st.number_input("น้ำหนักตัวอย่างรวม", 0.0)
-    sample_c = st.number_input("จำนวนตัวอย่าง", 1)
+    sample_c = st.number_input("จำนวนตัวอย่าง", 1, min_value=1, step=1)
 
-    if total and barrel and sample_w and sample_c:
+    pieces = 0
+    if total > 0 and barrel >= 0 and sample_w > 0 and sample_c > 0:
         pieces = calculate_pieces(total, barrel, sample_w, sample_c)
         st.metric("จำนวนชิ้นงาน (ปัดขึ้น)", f"{pieces:,}")
 
     if st.button("บันทึก"):
+        if not woc.strip() or not part_name.strip() or not lot.strip():
+            st.error("กรุณากรอก WOC Number, Part Name และ Lot Number ให้ครบถ้วน")
+            return
+        if total <= 0 or sample_w <= 0 or sample_c <= 0:
+            st.error("กรุณากรอกน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
+            return
+
         status = f"{dept_from} Transfer {dept_to}"
         insert_job({
             "woc_number": woc,
@@ -88,10 +98,18 @@ def mode_forming_transfer():
         st.success("บันทึกเรียบร้อยแล้ว")
         send_telegram_message(f"{dept_from} ส่ง WOC {woc} ไปยัง {dept_to}")
 
-# ====== RECEIVE MODE ======
+# ====== MODE: Receive (สำหรับ Tapping, Final Inspection) ======
 def mode_receive(dept_to):
     st.header(f"{dept_to} Receive")
-    from_status = f"TP Transfer {dept_to}" if dept_to != "TP" else "FM Transfer TP"
+
+    from_status = ""
+    if dept_to == "TP":
+        from_status = "FM Transfer TP"
+    elif dept_to == "FI":
+        from_status = "TP Transfer FI"
+    else:
+        from_status = f"TP Transfer {dept_to}"  # หรืออื่น ๆ ตามแผนก
+
     df = get_jobs_by_status(from_status)
     if df.empty:
         st.warning("ไม่มีงานที่รอรับ")
@@ -99,7 +117,7 @@ def mode_receive(dept_to):
 
     search = st.text_input("ค้นหา WOC หรือ Part Name")
     if search:
-        df = df[df["woc_number"].str.contains(search) | df["part_name"].str.contains(search)]
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) | df["part_name"].str.contains(search, case=False, na=False)]
 
     woc = st.selectbox("เลือก WOC", df["woc_number"])
     selected = df[df["woc_number"] == woc].iloc[0]
@@ -114,14 +132,15 @@ def mode_receive(dept_to):
         total = st.number_input("น้ำหนักรวม", 0.0, key="total")
         barrel = st.number_input("น้ำหนักถัง", 0.0, key="barrel")
         sample_w = st.number_input("น้ำหนักรวมของตัวอย่าง", 0.0, key="sample_w")
-        sample_c = st.number_input("จำนวนตัวอย่าง", 1, key="sample_c")
+        sample_c = st.number_input("จำนวนตัวอย่าง", 1, min_value=1, step=1, key="sample_c")
 
-        if total and barrel and sample_w and sample_c:
+        if total > 0 and barrel >= 0 and sample_w > 0 and sample_c > 0:
             pieces_new = calculate_pieces(total, barrel, sample_w, sample_c)
             diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"]) * 100
             st.metric("% ต่างกัน", f"{diff_percent:.2f}%")
 
-            if st.button("บันทึกรับงาน"):
+            if st.button("ยืนยันการตรวจสอบและรับงาน"):
+                # บันทึกงานรับ
                 insert_job({
                     "woc_number": selected["woc_number"],
                     "part_name": selected["part_name"],
@@ -140,8 +159,10 @@ def mode_receive(dept_to):
                 st.success(f"รับงาน {woc} แล้ว")
                 send_telegram_message(f"{dept_to} รับ WOC {woc}")
                 st.session_state.show_inputs = False
+        else:
+            st.warning("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ครบถ้วนก่อนยืนยัน")
 
-# ====== WORK MODE ======
+# ====== MODE: Work (สำหรับ Tapping Work, Final Work) ======
 def mode_work(dept):
     st.header(f"{dept} Work")
     df = get_jobs_by_status(f"WIP-{dept}")
@@ -163,18 +184,24 @@ def mode_export():
     df = get_all_jobs()
     search = st.text_input("ค้นหา WOC หรือ Part Name")
     if search:
-        df = df[df["woc_number"].str.contains(search) | df["part_name"].str.contains(search)]
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) | df["part_name"].str.contains(search, case=False, na=False)]
+
     st.dataframe(df)
     csv = df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("\ud83d\udcc5 ดาวน์โหลด Excel (CSV)", data=csv, file_name="job_tracking_export.csv")
+    st.download_button("📅 ดาวน์โหลด Excel (CSV)", data=csv, file_name="job_tracking_export.csv")
 
 # ====== MAIN ======
 def main():
     st.set_page_config(page_title="WOC Job Tracker", layout="wide")
     st.title("📦 ระบบโอนถ่ายงานโรงงาน")
     menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer", "Tapping Receive", "Tapping Work",
-        "TP Transfer", "Final Inspection Receive", "Final Work", "Export"
+        "Forming Transfer",
+        "Tapping Receive",
+        "Tapping Work",
+        "TP Transfer",
+        "Final Inspection Receive",
+        "Final Work",
+        "Export"
     ])
 
     if menu == "Forming Transfer":
@@ -184,7 +211,7 @@ def main():
     elif menu == "Tapping Work":
         mode_work("TP")
     elif menu == "TP Transfer":
-        mode_forming_transfer()  # Reuse form for transfer with TP
+        mode_forming_transfer()  # ใช้แบบฟอร์มเดียวกับ Forming Transfer แต่แค่เปลี่ยนค่าต้นทาง-ปลายทาง
     elif menu == "Final Inspection Receive":
         mode_receive("FI")
     elif menu == "Final Work":
