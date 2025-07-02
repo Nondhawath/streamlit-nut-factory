@@ -72,14 +72,17 @@ def login():
 
         # ตรวจสอบว่าในข้อมูลพนักงานมีคอลัมน์ 'ชื่อพนักงาน' และ 'รหัสพนักงาน' โดยให้เฉพาะแถวที่มีข้อมูลครบถ้วน
         for emp in employees:
-            # ตรวจสอบว่าแถวมีทั้ง 'ชื่อพนักงาน' และ 'รหัสพนักงาน'
+            # ตรวจสอบว่าแถวมีทั้ง 'ชื่อพนักงาน' และ 'รหัสพนักงาน' และค่าของคอลัมน์ไม่เป็น None หรือ ค่าว่าง
             if 'ชื่อพนักงาน' in emp and 'รหัสพนักงาน' in emp:
-                # ตรวจสอบว่าไม่มีค่าเป็น None หรือ ค่าว่างใน 'ชื่อพนักงาน' และ 'รหัสพนักงาน'
-                if emp['ชื่อพนักงาน'] and emp['รหัสพนักงาน']:
-                    employee_names.append(emp['ชื่อพนักงาน'].strip())  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
-                    employee_ids[emp['ชื่อพนักงาน'].strip()] = emp['รหัสพนักงาน'].strip()  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
+                name = emp['ชื่อพนักงาน'].strip() if emp['ชื่อพนักงาน'] else None
+                login_id = emp['รหัสพนักงาน'].strip() if emp['รหัสพนักงาน'] else None
+
+                # ตรวจสอบว่าค่าที่ดึงมาไม่เป็น None หรือ ค่าว่าง
+                if name and login_id:
+                    employee_names.append(name)  # คัดเลือกชื่อพนักงานและตัดช่องว่าง
+                    employee_ids[name] = login_id  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสพนักงาน พร้อมตัดช่องว่าง
                 else:
-                    st.warning(f"ข้อมูลพนักงาน '{emp['ชื่อพนักงาน']}' ขาดข้อมูลบางส่วน!")
+                    st.warning(f"ข้อมูลพนักงาน '{emp.get('ชื่อพนักงาน')}' ขาดข้อมูลบางส่วน!")
             else:
                 st.warning("ข้อมูลพนักงานไม่สมบูรณ์: ไม่มีคอลัมน์ 'ชื่อพนักงาน' หรือ 'รหัสพนักงาน'")
 
@@ -101,6 +104,21 @@ def login():
     employee_id = st.text_input("กรอก Employee ID")
 
     login_button = st.button("Login")
+
+    # เช็คการ login ของพนักงานเมื่อกดปุ่ม
+    if login_button:
+        # ตัดช่องว่างจากชื่อพนักงานและรหัสพนักงานทั้งสอง
+        employee_name = employee_name.strip()
+        employee_id = employee_id.strip()
+
+        # ตรวจสอบว่า Employee ID ตรงกับที่บันทึกใน Google Sheets
+        if employee_ids.get(employee_name) == employee_id:
+            st.success(f"Login สำเร็จ! ยินดีต้อนรับ, {employee_name}")
+            part_code = st.selectbox("เลือก รหัสงาน", part_names)  # ให้เลือก รหัสงาน เมื่อ login สำเร็จ
+            return employee_name, part_code
+        else:
+            st.error("รหัสพนักงานไม่ถูกต้อง!")
+    return None, None  # เมื่อยังไม่ได้ login
 
     # เช็คการ login ของพนักงานเมื่อกดปุ่ม
     if login_button:
