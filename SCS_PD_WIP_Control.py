@@ -70,6 +70,9 @@ def login():
         st.error(f"Error: คอลัมน์ใน Google Sheets ไม่ตรงกัน - {e}")
         return None, None  # หากไม่พบคอลัมน์ที่ต้องการ
 
+    # เพิ่มการแสดงผลข้อมูล employee_ids เพื่อตรวจสอบ
+    st.write("Employee IDs:", employee_ids)  # เพิ่มการแสดงผลข้อมูลรหัสพนักงาน
+
     # ดึงข้อมูลรหัสงานจาก part_code_master
     part_codes = get_part_codes()
     part_names = [part['รหัสงาน'] for part in part_codes]  # คัดเลือกรหัสงาน
@@ -81,6 +84,7 @@ def login():
 
     # เช็คการ login ของพนักงาน
     if employee_name and employee_id:
+        # ตรวจสอบว่า Employee ID ตรงกับที่บันทึกใน Google Sheets
         if employee_ids.get(employee_name) == employee_id:
             st.success(f"Login สำเร็จ! ยินดีต้อนรับ, {employee_name}")
             part_code = st.selectbox("เลือก รหัสงาน", part_names)  # ให้เลือก รหัสงาน เมื่อ login สำเร็จ
