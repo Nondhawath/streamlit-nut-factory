@@ -85,7 +85,7 @@ def mode_forming_transfer():
             "pieces_count": pieces,
             "status": status
         })
-        st.success("บันทึกเรียบร้อย")
+        st.success("บันทึกเรียบร้อยแล้ว")
         send_telegram_message(f"{dept_from} ส่ง WOC {woc} ไปยัง {dept_to}")
 
 def mode_receive(dept_to):
@@ -132,6 +132,7 @@ def mode_receive(dept_to):
                     "status": f"WIP-{dept_to}"
                 })
                 update_status(woc, f"{dept_to} Received")
+                st.success(f"รับงาน {woc} แล้ว")
                 send_telegram_message(f"{dept_to} รับ WOC {woc}")
                 st.session_state.show_inputs = False
 
@@ -147,6 +148,7 @@ def mode_work(dept):
 
     if st.button("บันทึกการทำงาน"):
         update_status(woc, f"Used - {machine}")
+        st.success(f"บันทึกการทำงาน WOC {woc} แล้ว")
         send_telegram_message(f"{dept} ทำงาน WOC {woc} ที่เครื่อง {machine}")
 
 # ====== EXPORT MODE ======
@@ -155,12 +157,12 @@ def mode_export():
     df = get_all_jobs()
     st.dataframe(df)
     csv = df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("📥 ดาวน์โหลด Excel (CSV)", data=csv, file_name="job_tracking_export.csv")
+    st.download_button("\ud83d\udcc5 ดาวน์โหลด Excel (CSV)", data=csv, file_name="job_tracking_export.csv")
 
 # ====== MAIN ======
 def main():
     st.set_page_config(page_title="WOC Job Tracker", layout="wide")
-    st.title("📦 ระบบโอนถ่ายงานโรงงาน")
+    st.title("\ud83d\udce6 ระบบโอนถ่ายงานโรงงาน")
     menu = st.sidebar.selectbox("เลือกโหมด", [
         "Forming Transfer", "Tapping Receive", "Tapping Work",
         "TP Transfer", "Final Inspection Receive", "Final Work", "Export"
