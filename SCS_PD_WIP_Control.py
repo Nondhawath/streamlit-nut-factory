@@ -47,6 +47,16 @@ def get_tp_data():
 def get_fi_data():
     return fi_sheet.get_all_records()  # ดึงข้อมูลจาก FI sheet
 
+# ฟังก์ชันดึงข้อมูลพนักงานจากชีท Employees
+def get_employees_data():
+    employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
+    return employees_sheet.get_all_records()
+
+# ฟังก์ชันดึงข้อมูลรหัสงานจากชีท part_code_master
+def get_part_codes():
+    part_code_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
+    return part_code_sheet.get_all_records()
+
 # Login function
 def login():
     # ดึงข้อมูลพนักงานจาก Google Sheets
