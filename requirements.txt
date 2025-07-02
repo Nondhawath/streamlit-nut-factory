@@ -14,3 +14,5 @@ pygsheets
 matplotlib
 seaborn
 firebase-admin
+gspread==5.7.0
+oauth2client==4.1.3
