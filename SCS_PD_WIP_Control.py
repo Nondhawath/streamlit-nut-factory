@@ -50,17 +50,20 @@ def get_fi_data():
 # ฟังก์ชันดึงข้อมูลพนักงานจากชีท Employees
 def get_employees_data():
     employees_sheet = client.open_by_key(spreadsheet_id).worksheet('Employees')
-    return employees_sheet.get_all_records()
+    data = employees_sheet.get_all_records()
+    return data
 
 # ฟังก์ชันดึงข้อมูลรหัสงานจากชีท part_code_master
 def get_part_codes():
     part_code_sheet = client.open_by_key(spreadsheet_id).worksheet('part_code_master')
-    return part_code_sheet.get_all_records()
+    data = part_code_sheet.get_all_records()
+    return data
 
 # Login function
 def login():
     # ดึงข้อมูลพนักงานจาก Google Sheets
     employees = get_employees_data()
+    st.write("Employees data:", employees)  # แสดงข้อมูลพนักงานเพื่อการตรวจสอบ
     employee_names = [emp['ชื่อพนักงาน'] for emp in employees]  # คัดเลือกชื่อพนักงาน
     employee_ids = {emp['ชื่อพนักงาน']: emp['รหัสlogin'] for emp in employees}  # สร้าง dictionary ที่เก็บชื่อพนักงานและรหัสlogin
 
