@@ -99,34 +99,39 @@ def mode_receive(dept_to):
     woc = st.selectbox("เลือก WOC", df["woc_number"])
     selected = df[df["woc_number"] == woc].iloc[0]
 
+    show_inputs = False
     if st.button("ตรวจสอบน้ำหนัก"):
+        show_inputs = True
+
+    if show_inputs:
         total = st.number_input("น้ำหนักรวม", 0.0)
         barrel = st.number_input("น้ำหนักถัง", 0.0)
         sample_w = st.number_input("น้ำหนักรวมของตัวอย่าง", 0.0)
         sample_c = st.number_input("จำนวนตัวอย่าง", 1)
 
-        if total and barrel and sample_w and sample_c:
-            pieces_new = calculate_pieces(total, barrel, sample_w, sample_c)
-            diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"]) * 100
-            st.metric("% ต่างกัน", f"{diff_percent:.2f}%")
+        if st.button("ยืนยันการตรวจสอบน้ำหนัก"):
+            if total and barrel and sample_w and sample_c:
+                pieces_new = calculate_pieces(total, barrel, sample_w, sample_c)
+                diff_percent = abs((pieces_new - selected["pieces_count"]) / selected["pieces_count"])) * 100
+                st.metric("% ต่างกัน", f"{diff_percent:.2f}%")
 
-            if st.button("บันทึกรับงาน"):
-                insert_job({
-                    "woc_number": selected["woc_number"],
-                    "part_name": selected["part_name"],
-                    "operator_name": "นายคมสันต์",
-                    "dept_from": selected["dept_to"],
-                    "dept_to": dept_to,
-                    "lot_number": selected["lot_number"],
-                    "total_weight": total,
-                    "barrel_weight": barrel,
-                    "sample_weight": sample_w,
-                    "sample_count": sample_c,
-                    "pieces_count": pieces_new,
-                    "status": f"WIP-{dept_to}"
-                })
-                update_status(woc, f"{dept_to} Received")
-                send_telegram_message(f"{dept_to} รับ WOC {woc}")
+                if st.button("บันทึกรับงาน"):
+                    insert_job({
+                        "woc_number": selected["woc_number"],
+                        "part_name": selected["part_name"],
+                        "operator_name": "นายคมสันต์",
+                        "dept_from": selected["dept_to"],
+                        "dept_to": dept_to,
+                        "lot_number": selected["lot_number"],
+                        "total_weight": total,
+                        "barrel_weight": barrel,
+                        "sample_weight": sample_w,
+                        "sample_count": sample_c,
+                        "pieces_count": pieces_new,
+                        "status": f"WIP-{dept_to}"
+                    })
+                    update_status(woc, f"{dept_to} Received")
+                    send_telegram_message(f"{dept_to} รับ WOC {woc}")
 
 def mode_work(dept):
     st.header(f"{dept} Work")
