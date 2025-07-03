@@ -61,25 +61,71 @@ def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
 # === Transfer Mode ===
 def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
-    df = get_jobs_by_status("TP Working")  # เลือกงานที่มีสถานะ TP Working
+    prev_woc = ""
+    
+    # เลือก WOC ก่อนหน้า
+    if dept_from != "FM":
+        df = get_jobs_by_status("TP-Working" if dept_from == "TP" else "OS Transfer")
+        prev_woc_options = [""] + list(df["woc_number"].unique())
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+    else:
+        st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
 
-    if df.empty:
-        st.warning("ไม่มีงานที่ต้องการส่งต่อ")
-        return
+    # เพิ่ม WOC ใหม่
+    new_woc = st.text_input("WOC ใหม่")
+    
+    # แสดงชื่อชิ้นงานจาก WOC ก่อนหน้า (ถ้ามี)
+    part_name = ""
+    if prev_woc:
+        df_all = get_all_jobs()
+        part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
+    part_name = st.text_input("Part Name", value=part_name)
 
-    woc_list = df["woc_number"].tolist()
-    woc_selected = st.selectbox("เลือก WOC ที่จะส่งต่อ", woc_list)
-    job = df[df["woc_number"] == woc_selected].iloc[0]
+    dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
+    lot_number = st.text_input("Lot Number")
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
+    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
 
-    st.markdown(f"- **Part Name:** {job['part_name']}")
-    st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
+    pieces_count = 0
+    if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
+        pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
+        st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
 
-    next_dept = st.selectbox("เลือกแผนกถัดไป", ["FI", "OS"])
-    if st.button("ส่งต่อ"):
-        update_status(woc_selected, f"{dept_from} Transfer {next_dept}")
-        st.success(f"ส่ง WOC {woc_selected} ไปแผนก {next_dept}")
-        send_telegram_message(f"{dept_from} ส่ง WOC {woc_selected} ไปแผนก {next_dept}")
+    operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+
+    if st.button("บันทึก Transfer"):
+        if not new_woc.strip():
+            st.error("กรุณากรอก WOC ใหม่")
+            return
+        if pieces_count == 0:
+            st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
+            return
+        
+        # บันทึกข้อมูลในฐานข้อมูล
+        insert_job({
+            "woc_number": new_woc,
+            "part_name": part_name,
+            "operator_name": operator_name,
+            "dept_from": dept_from,
+            "dept_to": dept_to,
+            "lot_number": lot_number,
+            "total_weight": total_weight,
+            "barrel_weight": barrel_weight,
+            "sample_weight": sample_weight,
+            "sample_count": sample_count,
+            "pieces_count": pieces_count,
+            "status": f"{dept_from} Transfer {dept_to}",
+            "created_at": datetime.utcnow()
+        })
+        
+        # ถ้ามี WOC ก่อนหน้า ให้เปลี่ยนสถานะเป็น "Completed"
+        if prev_woc:
+            update_status(prev_woc, "Completed")
+        
+        st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
+        # ไม่ส่ง telegram alert ที่นี่ เพราะเป็นขั้นตอนปกติ
 
 # === Receive Mode ===
 def receive_mode(dept_to):
@@ -148,7 +194,7 @@ def receive_mode(dept_to):
             "status": next_status,
             "created_at": datetime.utcnow()
         })
-        update_status(woc_selected, "TP Received")  # เปลี่ยนสถานะเป็น TP Received
+        update_status(woc_selected, f"{dept_to} Received")
         st.success("รับเข้าเรียบร้อยและบันทึกสถานะ")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected}")
 
