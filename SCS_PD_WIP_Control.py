@@ -60,11 +60,11 @@ def calculate_pieces(total, barrel, sample_weight, sample_count):
 # ====== MODES ======
 def transfer_mode(dept_from):
     st.subheader(f"{dept_from} Transfer")
+    prev_woc = ""
+
     if dept_from != "FM":
         prev_woc_options = [""] + list(get_all_jobs()["woc_number"].unique())
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
-    else:
-        prev_woc = ""
 
     new_woc = st.text_input("WOC ใหม่")
     part_name = ""
@@ -128,11 +128,11 @@ def receive_mode(dept_to):
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
 
     df = get_jobs_by_multiple_status(status_filters)
+    df = df[df["dept_to"] == dept_to]  # filter เฉพาะที่ส่งมาแผนกนี้เท่านั้น
+
     if df.empty:
         st.warning("ไม่มีงานที่รอรับ")
         return
-
-    df = df[df["dept_to"] == dept_to]  # filter เฉพาะที่ส่งมาแผนกนี้เท่านั้น
 
     search = st.text_input("ค้นหา WOC หรือ Part Name")
     if search:
