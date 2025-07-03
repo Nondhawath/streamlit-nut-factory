@@ -81,7 +81,12 @@ def transfer_mode(dept_from):
         part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
     part_name = st.text_input("Part Name", value=part_name)
 
-    dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
+    if dept_from == "OS":
+        dept_to_options = ["FI"]
+    else:
+        dept_to_options = ["TP", "FI", "OS"]
+
+    dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
     lot_number = st.text_input("Lot Number")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
@@ -171,6 +176,7 @@ def receive_mode(dept_to):
         )
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+
     if dept_to == "TP":
         dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
     elif dept_to == "FI":
@@ -211,13 +217,14 @@ def receive_mode(dept_to):
 def work_mode(dept):
     st.header(f"{dept} Work")
 
-    status_filter = ""
-    if dept == "TP":
-        status_filter = "TP Received"
-    elif dept == "FI":
-        status_filter = "FI Received"
-    else:
-        st.warning("ยังไม่รองรับโหมด Work ของแผนกนี้")
+    status_working = {
+        "TP": "TP Received",
+        "FI": "FI Received"
+    }
+    status_filter = status_working.get(dept, "")
+
+    if not status_filter:
+        st.warning("ไม่มีสถานะสำหรับโหมดนี้")
         return
 
     df = get_jobs_by_status(status_filter)
@@ -340,26 +347,33 @@ def main():
     st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
 
     menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer", "Tapping Transfer", "OS Transfer",
-        "Tapping Receive", "Final Receive", "OS Receive",
-        "Tapping Work", "Final Work",
-        "Completion", "Report", "Dashboard"
+        "Forming Transfer",
+        "Tapping Transfer",
+        "Tapping Receive",
+        "Tapping Work",
+        "OS Transfer",
+        "OS Receive",
+        "Final Receive",
+        "Final Work",
+        "Completion",
+        "Report",
+        "Dashboard"
     ])
 
     if menu == "Forming Transfer":
         transfer_mode("FM")
     elif menu == "Tapping Transfer":
         transfer_mode("TP")
-    elif menu == "OS Transfer":
-        transfer_mode("OS")
     elif menu == "Tapping Receive":
         receive_mode("TP")
-    elif menu == "Final Receive":
-        receive_mode("FI")
-    elif menu == "OS Receive":
-        receive_mode("OS")
     elif menu == "Tapping Work":
         work_mode("TP")
+    elif menu == "OS Transfer":
+        transfer_mode("OS")
+    elif menu == "OS Receive":
+        receive_mode("OS")
+    elif menu == "Final Receive":
+        receive_mode("FI")
     elif menu == "Final Work":
         work_mode("FI")
     elif menu == "Completion":
