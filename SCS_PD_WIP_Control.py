@@ -405,3 +405,166 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # ส่วนบนของไฟล์คุณเหมือนเดิมทั้งหมด (import, connection, telegram, login)
+
+# === Admin Panel (แบบใหม่ - พร้อมบันทึกจริง) ===
+def admin_panel():
+    st.title("🛠️ Admin Panel")
+    df = get_all_jobs()
+
+    if df.empty:
+        st.info("ไม่มีข้อมูลในระบบ")
+        return
+
+    grid = AgGrid(df, editable=True, fit_columns_on_grid_load=True)
+    edited_df = grid["data"]
+
+    if st.button("บันทึกการแก้ไขทั้งหมด"):
+        with get_connection() as conn:
+            cur = conn.cursor()
+            for _, row in edited_df.iterrows():
+                update_sql = """
+                    UPDATE job_tracking SET
+                        part_name = %s,
+                        operator_name = %s,
+                        dept_from = %s,
+                        dept_to = %s,
+                        lot_number = %s,
+                        total_weight = %s,
+                        barrel_weight = %s,
+                        sample_weight = %s,
+                        sample_count = %s,
+                        pieces_count = %s,
+                        status = %s
+                    WHERE woc_number = %s
+                """
+                cur.execute(update_sql, (
+                    row["part_name"],
+                    row["operator_name"],
+                    row["dept_from"],
+                    row["dept_to"],
+                    row["lot_number"],
+                    row["total_weight"],
+                    row["barrel_weight"],
+                    row["sample_weight"],
+                    row["sample_count"],
+                    row["pieces_count"],
+                    row["status"],
+                    row["woc_number"]
+                ))
+            conn.commit()
+        st.success("อัปเดตข้อมูลสำเร็จแล้ว")
+
+# === เพิ่ม delete ฟีเจอร์ ===
+    if st.checkbox("🔴 ลบรายการ"):
+        woc_to_delete = st.selectbox("เลือก WOC ที่ต้องการลบ", df["woc_number"].unique())
+        if st.button("ยืนยันการลบ"):
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_to_delete,))
+                conn.commit()
+            st.success(f"ลบ WOC {woc_to_delete} เรียบร้อยแล้ว")
+
+# === Export Excel ===
+def download_excel(df: pd.DataFrame, filename="report.xlsx"):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
+    processed = output.getvalue()
+    b64 = base64.b64encode(processed).decode()
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">📥 ดาวน์โหลด Excel</a>'
+    return href
+
+# === Upload Excel พร้อมตรวจซ้ำ WOC ===
+def upload_job_file():
+    st.title("📤 อัปโหลดไฟล์งานเข้า Database")
+    uploaded = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
+    if uploaded:
+        df = pd.read_excel(uploaded)
+        st.write("Preview:", df.head())
+        status = st.selectbox("เลือกสถานะเริ่มต้นของไฟล์นี้", ["FM Transfer TP", "TP Received", "FI Working"])
+        if st.button("อัปโหลดเข้า Database"):
+            with get_connection() as conn:
+                cur = conn.cursor()
+                for _, row in df.iterrows():
+                    data = row.to_dict()
+                    data["status"] = status
+                    data["created_at"] = datetime.utcnow()
+
+                    # ตรวจซ้ำ woc_number ก่อน insert
+                    cur.execute("SELECT 1 FROM job_tracking WHERE woc_number = %s", (data["woc_number"],))
+                    if cur.fetchone():
+                        continue  # skip ซ้ำ
+
+                    keys = ', '.join(data.keys())
+                    values = ', '.join(['%s'] * len(data))
+                    sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
+                    cur.execute(sql, list(data.values()))
+                conn.commit()
+            st.success("อัปโหลดเรียบร้อยแล้ว")
+
+# === เพิ่มในเมนู main ===
+def main():
+    st.set_page_config(page_title="WOC Tracker Pro", layout="wide")
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    if not st.session_state.logged_in:
+        login_page()
+        return
+
+    role = st.session_state.get("role", "")
+
+    menu = st.sidebar.selectbox("เลือกโหมด", [
+        "Forming Transfer",
+        "Tapping Transfer",
+        "Tapping Receive",
+        "Tapping Work",
+        "OS Transfer",
+        "OS Receive",
+        "Final Receive",
+        "Final Work",
+        "Completion",
+        "Report",
+        "Dashboard",
+        "📤 อัปโหลดงาน",
+        "📥 ดาวน์โหลดรายงาน",
+        "🛠️ Admin จัดการ" if role == "admin" else ""
+    ])
+
+    if menu == "📤 อัปโหลดงาน":
+        upload_job_file()
+    elif menu == "📥 ดาวน์โหลดรายงาน":
+        df = get_all_jobs()
+        st.write(df)
+        st.markdown(download_excel(df), unsafe_allow_html=True)
+    elif menu == "🛠️ Admin จัดการ" and role == "admin":
+        admin_panel()
+
+    # คงโหมดเดิมทั้งหมดไว้:
+    elif menu == "Forming Transfer":
+        transfer_mode("FM")
+    elif menu == "Tapping Transfer":
+        transfer_mode("TP")
+    elif menu == "Tapping Receive":
+        receive_mode("TP")
+    elif menu == "Tapping Work":
+        work_mode("TP")
+    elif menu == "OS Transfer":
+        transfer_mode("OS")
+    elif menu == "OS Receive":
+        receive_mode("OS")
+    elif menu == "Final Receive":
+        receive_mode("FI")
+    elif menu == "Final Work":
+        work_mode("FI")
+    elif menu == "Completion":
+        completion_mode()
+    elif menu == "Report":
+        report_mode()
+    elif menu == "Dashboard":
+        dashboard_mode()
+
+if __name__ == "__main__":
+    main()
+
