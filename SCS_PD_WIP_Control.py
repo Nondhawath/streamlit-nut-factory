@@ -148,14 +148,14 @@ def receive_mode(dept_to):
             "status": next_status,
             "created_at": datetime.utcnow()
         })
-        update_status(woc_selected, f"{dept_to} Received")
+        update_status(woc_selected, "TP Received")  # เปลี่ยนสถานะเป็น TP Received
         st.success("รับเข้าเรียบร้อยและบันทึกสถานะ")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected}")
 
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
-    # แสดงงานที่สถานะ "TP Received" สำหรับแผนก Tapping
+    # ดึงข้อมูลที่สถานะเป็น "TP Received" สำหรับแผนก Tapping
     df = get_jobs_by_status("TP Received")
 
     if df.empty:
@@ -177,7 +177,7 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, "TP Working")
+        update_status(woc_selected, "TP Working")  # เปลี่ยนสถานะเป็น TP Working
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
