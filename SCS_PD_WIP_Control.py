@@ -231,16 +231,23 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    # ดึงงานที่สถานะ Working ใน Final Inspection หรือ OS
-    status_list = ["Used - FI01", "Used - FI30", "Used - FISM", "Used - OS01", "Used - OS30", "Used - OSSM"]
-    df = get_jobs_by_status_list(status_list)
+    # ดึงงานที่สถานะเป็น "FI Working" สำหรับการทำงานในขั้นตอน Completion
+    df = get_jobs_by_status("FI Working")  # เลือกเฉพาะ WOC ที่มีสถานะ FI Working
+
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
 
+    # แสดงรายชื่อ WOC ที่สถานะ FI Working
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
+    job = df[df["woc_number"] == woc_selected].iloc[0]
 
+    st.markdown(f"- **Part Name:** {job['part_name']}")
+    st.markdown(f"- **Lot Number:** {job['lot_number']}")
+    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
+
+    # รับข้อมูลจากผู้ใช้งาน
     ok = st.number_input("จำนวน OK", min_value=0, step=1)
     ng = st.number_input("จำนวน NG", min_value=0, step=1)
     rework = st.number_input("จำนวน Rework", min_value=0, step=1)
@@ -248,12 +255,26 @@ def completion_mode():
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
+    # คำนวณจำนวนรวม
+    total_count = ok + ng + rework + remain
+
     if st.button("บันทึก Completion"):
-        status = "Completed" if remain == 0 else "Remaining"
-        update_status(woc_selected, status)
-        st.success(f"บันทึก Completion เรียบร้อย สถานะอัปเดตเป็น {status}")
+        # ตรวจสอบว่า OK, NG, Rework, Remaining รวมกันต้องเท่ากับจำนวนชิ้นงานเดิมหรือไม่
+        expected_count = job['pieces_count']
+        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
+
+        if diff_pct > 2:
+            st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
+            return
+
+        # หากข้อมูลถูกต้อง เปลี่ยนสถานะ WOC เป็น "Completed"
+        update_status(woc_selected, "Completed")
+        st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
+
+        # ส่งการแจ้งเตือนไปยัง Telegram
         send_telegram_message(
-            f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name}"
+            f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
+            f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
 
 # === Report Mode ===
