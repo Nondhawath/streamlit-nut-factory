@@ -67,8 +67,12 @@ def transfer_mode(dept_from):
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+    elif dept_from == "OS":
+        df = get_jobs_by_status("OS Received")
+        prev_woc_options = [""] + list(df["woc_number"].unique())
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     else:
-        st.write("FM / OS Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
+        st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
 
     new_woc = st.text_input("WOC ใหม่")
 
@@ -167,7 +171,6 @@ def receive_mode(dept_to):
         )
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-
     if dept_to == "TP":
         dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
     elif dept_to == "FI":
@@ -207,8 +210,16 @@ def receive_mode(dept_to):
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
-    
-    status_filter = f"{dept} Received"
+
+    status_filter = ""
+    if dept == "TP":
+        status_filter = "TP Received"
+    elif dept == "FI":
+        status_filter = "FI Received"
+    else:
+        st.warning("ยังไม่รองรับโหมด Work ของแผนกนี้")
+        return
+
     df = get_jobs_by_status(status_filter)
 
     if df.empty:
@@ -221,7 +232,7 @@ def work_mode(dept):
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
+    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
     machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
