@@ -57,84 +57,105 @@ def calculate_pieces(total, barrel, sample_weight, sample_count):
     except ZeroDivisionError:
         return 0
 
-# ====== TRANSFER MODE ======
-def transfer_mode(dept_from):
-    st.subheader(f"{dept_from} Transfer")
-    if dept_from == "FM":
-        prev_woc = ""
+# ====== RECEIVE MODE ======
+def receive_mode(dept_to):
+    st.subheader(f"{dept_to} Receive")
+    from_dept_map = {
+        "TP": ["FM"],
+        "FI": ["TP"],
+        "OS": ["FM", "TP"]
+    }
+    from_depts = from_dept_map.get(dept_to, ["FM"])
+    status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
+
+    df = get_jobs_by_multiple_status(status_filters)
+    if df.empty:
+        st.warning("ไม่มีงานที่รอรับ")
+        return
+
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search, case=False) | df["part_name"].str.contains(search, case=False)]
+
+    woc = st.selectbox("เลือก WOC", df["woc_number"])
+    job = df[df["woc_number"] == woc].iloc[0]
+    st.write(f"Part: {job['part_name']}, Lot: {job['lot_number']}, จำนวนเดิม: {job['pieces_count']}")
+
+    total = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01, value=job["total_weight"])
+    barrel = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01, value=job["barrel_weight"])
+    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01, value=job["sample_weight"])
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=job["sample_count"])
+
+    pieces_new = calculate_pieces(total, barrel, sample_weight, sample_count)
+    st.metric("จำนวนชิ้นงานที่คำนวณได้", f"{pieces_new:,}")
+
+    if job["pieces_count"] == 0:
+        diff_pct = 0.0
     else:
-        prev_woc_options = [""] + list(get_all_jobs()["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+        diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100
+    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
-    new_woc = st.text_input("WOC ใหม่")
-    part_name = ""
-    if prev_woc:
-        df = get_all_jobs()
-        filtered = df[df["woc_number"] == prev_woc]
-        if not filtered.empty:
-            part_name = filtered["part_name"].values[0]
-        st.text_input("Part Name", value=part_name, disabled=True)
-    else:
-        part_name = st.text_input("Part Name")
+    if diff_pct > 2:
+        send_telegram_message(
+            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc} | Part: {job['part_name']} | "
+            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+        )
 
-    dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
-    lot = st.text_input("Lot Number")
-    total = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
-    barrel = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
-    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
-
-    pieces = 0
-    if all([total > 0, barrel >= 0, sample_weight > 0, sample_count > 0]):
-        pieces = calculate_pieces(total, barrel, sample_weight, sample_count)
-        st.metric("จำนวนชิ้นงาน", pieces)
-
-    if st.button("บันทึก Transfer"):
-        if not new_woc.strip():
-            st.error("โปรดกรอก WOC ใหม่")
-            return
-        if pieces == 0:
-            st.error("โปรดกรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้องเพื่อคำนวณจำนวนชิ้นงาน")
-            return
+    if st.button("รับเข้าและส่งต่อ"):
         insert_job({
-            "woc_number": new_woc,
-            "part_name": part_name,
+            "woc_number": woc,
+            "part_name": job["part_name"],
             "operator_name": "นายคมสันต์",
-            "dept_from": dept_from,
-            "dept_to": dept_to,
-            "lot_number": lot,
+            "dept_from": dept_to,
+            "dept_to": f"{dept_to}-On_MC",
+            "lot_number": job["lot_number"],
             "total_weight": total,
             "barrel_weight": barrel,
             "sample_weight": sample_weight,
             "sample_count": sample_count,
-            "pieces_count": pieces,
-            "status": f"{dept_from} Transfer {dept_to}"
+            "pieces_count": pieces_new,
+            "status": f"WIP-{dept_to}"
         })
-        if prev_woc:
-            update_status(prev_woc, "Completed")
-        send_telegram_message(f"{dept_from} ส่ง WOC {new_woc} ไป {dept_to}")
-        st.success("บันทึกเรียบร้อย")
+        update_status(woc, f"{dept_to} Received")
+        send_telegram_message(f"{dept_to} รับ WOC {woc}")
+        st.success("รับเข้าเรียบร้อย")
 
-# ====== OTHER MODES ======
-def receive_mode(dept_to):
-    st.subheader(f"{dept_to} Receive")
-    st.warning("อยู่ระหว่างพัฒนา")
+# ====== DASHBOARD ======
+def dashboard_mode():
+    st.subheader("📊 Dashboard ภาพรวม")
+    df = get_all_jobs()
+    dept_filter = st.selectbox("เลือกแผนก", ["ทั้งหมด", "FM", "TP", "FI", "OS"])
+    if dept_filter != "ทั้งหมด":
+        df = df[df["dept_to"].str.contains(dept_filter)]
+
+    if df.empty:
+        st.warning("ไม่มีข้อมูล")
+        return
+
+    summary = df[df["status"].str.contains("WIP")].groupby("dept_to").agg(
+        จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+        จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+    ).reset_index()
+    st.dataframe(summary)
+
+    st.markdown("### รายการ WIP รายละเอียด")
+    st.dataframe(df[df["status"].str.contains("WIP")][["woc_number", "part_name", "dept_to", "pieces_count"]])
+
+# ====== PLACEHOLDER FOR OTHER MODES ======
+def transfer_mode(dept_from):
+    st.info(f"ยังไม่ได้กำหนดโหมด {dept_from} Transfer")
 
 def work_mode(dept):
-    st.subheader(f"{dept} Work")
-    st.warning("อยู่ระหว่างพัฒนา")
+    st.info(f"ยังไม่ได้กำหนดโหมด {dept} Work")
 
 def completion_mode():
-    st.subheader("Completion")
-    st.warning("อยู่ระหว่างพัฒนา")
+    st.info("ยังไม่ได้กำหนดโหมด Completion")
 
 def export_mode():
-    st.subheader("Export")
-    st.warning("อยู่ระหว่างพัฒนา")
+    st.info("ยังไม่ได้กำหนดโหมด Export")
 
 def report_mode():
-    st.subheader("Report")
-    st.warning("อยู่ระหว่างพัฒนา")
+    st.info("ยังไม่ได้กำหนดโหมด Report")
 
 # ====== MAIN ======
 def main():
@@ -145,7 +166,7 @@ def main():
         "Forming Transfer", "Tapping Transfer", "OS Transfer",
         "Tapping Receive", "Final Receive", "OS Receive",
         "Tapping Work", "Final Work",
-        "Completion", "Export", "Report"
+        "Completion", "Export", "Report", "Dashboard"
     ])
 
     if menu == "Forming Transfer":
@@ -170,6 +191,8 @@ def main():
         export_mode()
     elif menu == "Report":
         report_mode()
+    elif menu == "Dashboard":
+        dashboard_mode()
 
 if __name__ == "__main__":
     main()
