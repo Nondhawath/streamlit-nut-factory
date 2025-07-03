@@ -63,9 +63,9 @@ def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     prev_woc = ""
     
-    # เลือก WOC ก่อนหน้า
-    if dept_from != "FM":
-        df = get_jobs_by_status("TP-Working" if dept_from == "TP" else "OS Transfer")
+    # เลือก WOC ก่อนหน้า (สถานะ TP Working)
+    if dept_from == "TP":
+        df = get_jobs_by_status("TP Working")  # ดึงงานที่มีสถานะ TP Working
         prev_woc_options = [""] + list(df["woc_number"].unique())
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     else:
