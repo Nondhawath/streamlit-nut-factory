@@ -141,6 +141,11 @@ def receive_mode(dept_to):
 
     from_depts = dept_from_map.get(dept_to, [])
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
+    
+    if dept_to == "FI":
+        # แสดงเฉพาะ WOC ที่มีสถานะ 'FM Transfer FI' หรือ 'TP Transfer FI'
+        status_filters = ["FM Transfer FI", "TP Transfer FI"]
+
     df = get_jobs_by_status_list(status_filters)
 
     if df.empty:
@@ -200,154 +205,21 @@ def receive_mode(dept_to):
             "status": next_status,
             "created_at": datetime.utcnow()
         })
-        update_status(woc_selected, f"{dept_to} Received")
-        st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
 
-# === Work Mode ===
-def work_mode(dept):
-    st.header(f"{dept} Work")
-    
-    # แสดงเฉพาะ WOC ที่มีสถานะ "FI Received"
-    df = get_jobs_by_status("FI Received")
+        # เปลี่ยนสถานะของ WOC
+        update_status(woc_selected, next_status)
+        st.success(f"รับเข้า {dept_to} เรียบร้อยแล้ว และส่งต่อไปยัง {dept_to_next}")
 
-    if df.empty:
-        st.info("ไม่มีงานรอทำ")
-        return
-
-    woc_list = df["woc_number"].tolist()
-    woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
-    job = df[df["woc_number"] == woc_selected].iloc[0]
-
-    st.markdown(f"- **Part Name:** {job['part_name']}")
-    st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
-
-    machine_name = st.text_input("ชื่อเครื่องจักร")
-    operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-
-    if st.button("เริ่มทำงาน"):
-        if not machine_name.strip():
-            st.error("กรุณากรอกชื่อเครื่องจักร")
-            return
-        update_status(woc_selected, "FI Working")
-        st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
-
-# === Completion Mode ===
-def completion_mode():
-    st.header("Completion")
-    df = get_jobs_by_status("FI Working")
-
-    if df.empty:
-        st.info("ไม่มีงานรอ Completion")
-        return
-
-    woc_list = df["woc_number"].tolist()
-    woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
-    job = df[df["woc_number"] == woc_selected].iloc[0]
-
-    st.markdown(f"- **Part Name:** {job['part_name']}")
-    st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
-
-    ok = st.number_input("จำนวน OK", min_value=0, step=1)
-    ng = st.number_input("จำนวน NG", min_value=0, step=1)
-    rework = st.number_input("จำนวน Rework", min_value=0, step=1)
-    remain = st.number_input("จำนวนคงเหลือ", min_value=0, step=1)
-
-    total_count = ok + ng + rework + remain
-
-    if st.button("บันทึก Completion"):
-        expected_count = job['pieces_count']
-        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
-
-        if diff_pct > 2:
-            st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
-            return
-
-        update_status(woc_selected, "Completed")
-        st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
-
-# === Report Mode ===
-def report_mode():
-    st.header("รายงานและสรุป WIP")
-    df = get_all_jobs()
-    search = st.text_input("ค้นหา Part Name หรือ WOC")
-    if search:
-        df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
-    st.dataframe(df)
-
-    st.markdown("### สรุป WIP แยกตามแผนก")
-    depts = ["FM", "TP", "FI", "OS"]
-    for d in depts:
-        wip_df = df[df["status"].str.contains(f"WIP-{d}")]
-        if wip_df.empty:
-            st.write(f"แผนก {d}: ไม่มีงาน WIP")
-        else:
-            summary = wip_df.groupby("part_name").agg(
-                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-            ).reset_index()
-            st.write(f"แผนก {d}")
-            st.dataframe(summary)
-
-# === Dashboard Mode ===
-def dashboard_mode():
-    st.header("Dashboard WIP รวม")
-    df = get_all_jobs()
-    depts = ["FM", "TP", "FI", "OS"]
-
-    select_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด"] + depts)
-
-    if select_dept == "ทั้งหมด":
-        filtered = df
-    else:
-        filtered = df[df["dept_to"] == select_dept]
-
-    if filtered.empty:
-        st.warning("ไม่มีข้อมูลสำหรับแผนกนี้")
-        return
-
-    grouped = filtered.groupby(["dept_to", "part_name"]).agg(
-        จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-        จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-    ).reset_index()
-
-    st.dataframe(grouped)
-
-# === Main Function ===
+# === Main App ===
 def main():
-    st.set_page_config(page_title="WOC Tracker", layout="wide")
-    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
+    mode = st.sidebar.radio("เลือกโหมด", ("Tapping Receive", "Final Receive"))
 
-    menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer", "Tapping Transfer", "OS Transfer",
-        "Tapping Receive", "Final Receive", "OS Receive",
-        "Tapping Work", "Final Work",
-        "Completion", "Report", "Dashboard"
-    ])
-
-    if menu == "Forming Transfer":
-        transfer_mode("FM")
-    elif menu == "Tapping Transfer":
-        transfer_mode("TP")
-    elif menu == "OS Transfer":
-        transfer_mode("OS")
-    elif menu == "Tapping Receive":
+    if mode == "Tapping Receive":
+        st.title("Tapping Receive Mode")
         receive_mode("TP")
-    elif menu == "Final Receive":
+    elif mode == "Final Receive":
+        st.title("Final Receive Mode")
         receive_mode("FI")
-    elif menu == "OS Receive":
-        receive_mode("OS")
-    elif menu == "Tapping Work":
-        work_mode("TP")
-    elif menu == "Final Work":
-        work_mode("FI")
-    elif menu == "Completion":
-        completion_mode()
-    elif menu == "Report":
-        report_mode()
-    elif menu == "Dashboard":
-        dashboard_mode()
 
 if __name__ == "__main__":
     main()
