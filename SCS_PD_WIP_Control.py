@@ -81,9 +81,9 @@ def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     prev_woc = ""
     
-    # เลือก WOC ก่อนหน้า (สถานะ OS Received)
-    if dept_from == "OS":
-        df = get_jobs_by_status("OS Received")  # ดึงงานที่มีสถานะ OS Received
+    # เลือก WOC ก่อนหน้า (สถานะ TP Working)
+    if dept_from == "TP":
+        df = get_jobs_by_status("TP Working")  # ดึงงานที่มีสถานะ TP Working
         prev_woc_options = [""] + list(df["woc_number"].unique())  # เพิ่มตัวเลือก "WOC ก่อนหน้า"
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     else:
@@ -141,7 +141,7 @@ def transfer_mode(dept_from):
             "created_at": datetime.utcnow()
         })
         
-        # ถ้ามี WOC ก่อนหน้า ให้เปลี่ยนสถานะเป็น "Completed"
+        # ถ้ามี WOC ก่อนหน้า ที่สถานะเป็น TP Working ให้เปลี่ยนสถานะเป็น Completed
         if prev_woc:
             update_status(prev_woc, "Completed")
         
@@ -152,7 +152,7 @@ def transfer_mode(dept_from):
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
     
-    # กรองงานที่มาจากแผนกอื่น ๆ เช่น "FM Transfer TP", "TP Transfer OS"
+    # กรองงานที่มาจากแผนกอื่น ๆ เช่น "FM Transfer TP", "TP Transfer FI"
     dept_from_map = {
         "TP": ["FM"],
         "FI": ["TP"],
