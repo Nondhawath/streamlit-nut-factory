@@ -169,7 +169,9 @@ def receive_mode(dept_to):
         diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
     except Exception:
         diff_pct = 0
-    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
+
+    # แสดงเปอร์เซ็นต์คลาดเคลื่อน
+    st.write(f"% คลาดเคลื่อน: {diff_pct:.2f}%")
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
