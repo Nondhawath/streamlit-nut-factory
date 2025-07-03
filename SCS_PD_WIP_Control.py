@@ -60,8 +60,12 @@ def calculate_pieces(total, barrel, sample_weight, sample_count):
 # ====== MODES ======
 def transfer_mode(dept_from):
     st.subheader(f"{dept_from} Transfer")
-    prev_woc_options = [""] + list(get_all_jobs()["woc_number"].unique()) if dept_from != "FM" else [""]
-    prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+    if dept_from != "FM":
+        prev_woc_options = [""] + list(get_all_jobs()["woc_number"].unique())
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+    else:
+        prev_woc = ""
+
     new_woc = st.text_input("WOC ใหม่")
     part_name = ""
 
@@ -79,7 +83,7 @@ def transfer_mode(dept_from):
     total = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
     barrel = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
     sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)  # default 0
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
 
     pieces = 0
     if all([total > 0, barrel >= 0, sample_weight > 0, sample_count > 0]):
@@ -115,20 +119,20 @@ def transfer_mode(dept_from):
 def receive_mode(dept_to):
     st.subheader(f"{dept_to} Receive")
 
-    # กำหนดแผนกต้นทางที่รับได้ (OS รับจาก FM หรือ TP)
     from_dept_map = {
         "TP": ["FM"],
         "FI": ["TP"],
         "OS": ["FM", "TP"]
     }
-
-    from_depts = from_dept_map.get(dept_to, ["FM"])
+    from_depts = from_dept_map.get(dept_to, [])
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
 
     df = get_jobs_by_multiple_status(status_filters)
     if df.empty:
         st.warning("ไม่มีงานที่รอรับ")
         return
+
+    df = df[df["dept_to"] == dept_to]  # filter เฉพาะที่ส่งมาแผนกนี้เท่านั้น
 
     search = st.text_input("ค้นหา WOC หรือ Part Name")
     if search:
@@ -138,7 +142,6 @@ def receive_mode(dept_to):
     job = df[df["woc_number"] == woc].iloc[0]
     st.write(f"Part: {job['part_name']}, Lot: {job['lot_number']}, จำนวนเดิม: {job['pieces_count']}")
 
-    # เลือกแผนกถัดไป
     next_dept_options = {
         "TP": f"TP-On_MC",
         "FI": f"FI-On_MC",
@@ -184,105 +187,3 @@ def receive_mode(dept_to):
         update_status(woc, f"{dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc}")
         st.success("รับเข้าเรียบร้อย")
-
-def work_mode(dept):
-    st.subheader(f"{dept} Work")
-    df = get_jobs_by_status(f"WIP-{dept}")
-    if df.empty:
-        st.info("ไม่มีงานรอทำ")
-        return
-
-    woc = st.selectbox("เลือก WOC", df["woc_number"])
-    job = df[df["woc_number"] == woc].iloc[0]
-    st.write(f"Part: {job['part_name']}, Lot: {job['lot_number']}, จำนวน: {job['pieces_count']}")
-    machine = st.selectbox("เลือกเครื่อง", [f"{dept}01", f"{dept}30", f"{dept}SM"])
-
-    if st.button("เริ่มทำงาน"):
-        update_status(woc, f"Used - {machine}")
-        send_telegram_message(f"{dept} เริ่มงาน WOC {woc} ที่เครื่อง {machine}")
-        st.success("บันทึกเริ่มงานเรียบร้อย")
-
-def completion_mode():
-    st.subheader("Completion")
-    # ดึงงานสถานะ Used - FI, Used - OS
-    df = get_jobs_by_multiple_status(["Used - FI01", "Used - FI30", "Used - FISM", "Used - OS01", "Used - OS30", "Used - OSSM"])
-    if df.empty:
-        st.info("ไม่มีงานรอ Completion")
-        return
-
-    woc = st.selectbox("เลือก WOC", df["woc_number"])
-    ok = st.number_input("จำนวน OK", min_value=0, step=1)
-    ng = st.number_input("จำนวน NG", min_value=0, step=1)
-    rw = st.number_input("จำนวน Rework", min_value=0, step=1)
-    remain = st.number_input("คงเหลือ", min_value=0, step=1)
-
-    if st.button("บันทึก Completion"):
-        status = "Completed" if remain == 0 else "Remaining"
-        update_status(woc, status)
-        send_telegram_message(f"📦 Completion WOC {woc} | OK:{ok}, NG:{ng}, Rework:{rw}, Remain:{remain}")
-        st.success(f"สถานะอัปเดตเป็น {status}")
-
-def export_mode():
-    df = get_all_jobs()
-    st.download_button("📥 Export CSV", df.to_csv(index=False).encode("utf-8-sig"), "job_tracking.csv")
-    st.dataframe(df)
-
-def report_mode():
-    st.subheader("Report")
-    df = get_all_jobs()
-    search = st.text_input("ค้นหา Part Name หรือ WOC")
-    if search:
-        df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
-
-    st.dataframe(df)
-
-    st.markdown("### สรุป WIP แยกตามแผนก")
-    depts = ["FM", "TP", "FI", "OS"]
-    for d in depts:
-        wip_df = df[df["status"].str.contains(f"WIP-{d}")]
-        if wip_df.empty:
-            st.write(f"แผนก {d} : ไม่มีงาน WIP")
-        else:
-            summary = wip_df.groupby("part_name").agg(
-                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-            ).reset_index()
-            st.write(f"แผนก {d}")
-            st.dataframe(summary)
-
-def main():
-    st.set_page_config("WOC Tracker", layout="wide")
-    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase)")
-
-    menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer", "Tapping Transfer", "OS Transfer",
-        "Tapping Receive", "Final Receive", "OS Receive",
-        "Tapping Work", "Final Work",
-        "Completion", "Export", "Report"
-    ])
-
-    if menu == "Forming Transfer":
-        transfer_mode("FM")
-    elif menu == "Tapping Transfer":
-        transfer_mode("TP")
-    elif menu == "OS Transfer":
-        transfer_mode("OS")
-    elif menu == "Tapping Receive":
-        receive_mode("TP")
-    elif menu == "Final Receive":
-        receive_mode("FI")
-    elif menu == "OS Receive":
-        receive_mode("OS")
-    elif menu == "Tapping Work":
-        work_mode("TP")
-    elif menu == "Final Work":
-        work_mode("FI")
-    elif menu == "Completion":
-        completion_mode()
-    elif menu == "Export":
-        export_mode()
-    elif menu == "Report":
-        report_mode()
-
-if __name__ == "__main__":
-    main()
