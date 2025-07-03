@@ -137,8 +137,23 @@ def receive_mode(dept_to):
         "OS": ["FM", "TP"]
     }
 
-    from_depts = dept_from_map.get(dept_to, [])
-    status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
+    def receive_mode(dept_to):
+    st.header(f"{dept_to} Receive")
+
+    dept_from_map = {
+        "TP": ["FM", "TP Working"],
+        "OS": ["FM", "TP"]
+    }
+
+    if dept_to == "FI":
+        status_filters = [
+            "FM Transfer FI",
+            "TP Transfer FI",
+            "OS Transfer FI"
+        ]
+    else:
+        from_depts = dept_from_map.get(dept_to, [])
+        status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
     df = get_jobs_by_status_list(status_filters)
 
     if df.empty:
