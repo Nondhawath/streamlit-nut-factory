@@ -131,15 +131,20 @@ def transfer_mode(dept_from):
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
     
-    # เลือกแผนกถัดไป
+    # สำหรับ Final Receive แผนกถัดไปต้องเป็น Final Work เท่านั้น
     dept_from_map = {
         "TP": ["FM", "TP Working"],  # แสดงแผนกที่ส่งมาที่แผนก TP และแผนกที่ต้องทำงานต่อ (TP Working)
         "FI": ["TP"],
         "OS": ["FM", "TP"]
     }
-    
-    from_depts = dept_from_map.get(dept_to, [])
 
+    # สำหรับ "FI Receive", เลือกแค่แผนก Final Work เป็นแผนกถัดไป
+    if dept_to == "FI":
+        dept_to_next = "Final Work"
+    else:
+        dept_to_next = ""
+
+    from_depts = dept_from_map.get(dept_to, [])
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
     df = get_jobs_by_status_list(status_filters)
 
@@ -180,8 +185,9 @@ def receive_mode(dept_to):
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    # เลือกสถานะแผนกถัดไป
-    dept_to_next = st.selectbox("แผนกถัดไป", ["", "TP Working", "FI", "OS"])
+    # เลือกแผนกถัดไป
+    if dept_to == "FI":
+        dept_to_next = "Final Work"  # แผนกถัดไปสำหรับ Final Receive ต้องเป็น "Final Work"
 
     if st.button("รับเข้าและส่งต่อ"):
         if dept_to_next == "":
