@@ -125,20 +125,24 @@ def transfer_mode(dept_from):
             update_status(prev_woc, "Completed")
         
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
+        # ไม่ส่ง telegram alert ที่นี่ เพราะเป็นขั้นตอนปกติ
 
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
     
-    # กรองงานตามแผนกที่ต้องการรับ
+    # สำหรับ Final Receive แผนกถัดไปต้องเป็น Final Work เท่านั้น
     dept_from_map = {
-        "TP": ["FM", "TP Working"],
+        "TP": ["FM", "TP Working"],  # แสดงแผนกที่ส่งมาที่แผนก TP และแผนกที่ต้องทำงานต่อ (TP Working)
         "FI": ["TP"],
         "OS": ["FM", "TP"]
     }
 
-    # แผนกถัดไปจะต้องเป็น "Tapping Work" สำหรับ "Tapping Receive"
-    dept_to_next = "Tapping Work"
+    # สำหรับ "FI Receive", เลือกแค่แผนก Final Work เป็นแผนกถัดไป
+    if dept_to == "FI":
+        dept_to_next = "Final Work"
+    else:
+        dept_to_next = ""
 
     from_depts = dept_from_map.get(dept_to, [])
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
@@ -156,9 +160,6 @@ def receive_mode(dept_to):
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    # ช่องเลือกแผนกถัดไปจะเป็น "Tapping Work" เท่านั้น
-    st.write(f"แผนกถัดไป: {dept_to_next}")
-
     # บันทึกข้อมูลน้ำหนักใหม่
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01, value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01, value=0.0)
@@ -173,11 +174,20 @@ def receive_mode(dept_to):
         diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
     except Exception:
         diff_pct = 0
+    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
-    # แสดงเปอร์เซ็นต์คลาดเคลื่อน
-    st.write(f"% คลาดเคลื่อน: {diff_pct:.2f}%")
+    # แจ้งเตือน Telegram หากคลาดเคลื่อนเกิน 2%
+    if diff_pct > 2:
+        send_telegram_message(
+            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
+            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+        )
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+
+    # เลือกแผนกถัดไป
+    if dept_to == "FI":
+        dept_to_next = "Final Work"  # แผนกถัดไปสำหรับ Final Receive ต้องเป็น "Final Work"
 
     if st.button("รับเข้าและส่งต่อ"):
         if dept_to_next == "":
@@ -202,13 +212,14 @@ def receive_mode(dept_to):
         })
         update_status(woc_selected, f"{dept_to} Received")
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
+        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
     
-    # แสดงเฉพาะ WOC ที่มีสถานะ "FI Received"
-    df = get_jobs_by_status("FI Received")
+    # ดึงข้อมูล WOC ที่มีสถานะ "FI Received" สำหรับโหมด Final Work
+    df = get_jobs_by_status("FI Received")  # เลือกเฉพาะ WOC ที่มีสถานะ FI Received
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
@@ -229,18 +240,21 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, "FI Working")
+        update_status(woc_selected, "FI Working")  # เปลี่ยนสถานะเป็น FI Working
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
+        send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    df = get_jobs_by_status("FI Working")
+    # ดึงงานที่สถานะเป็น "FI Working" สำหรับการทำงานในขั้นตอน Completion
+    df = get_jobs_by_status("FI Working")  # เลือกเฉพาะ WOC ที่มีสถานะ FI Working
 
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
 
+    # แสดงรายชื่อ WOC ที่สถานะ FI Working
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
@@ -249,14 +263,19 @@ def completion_mode():
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
+    # รับข้อมูลจากผู้ใช้งาน
     ok = st.number_input("จำนวน OK", min_value=0, step=1)
     ng = st.number_input("จำนวน NG", min_value=0, step=1)
     rework = st.number_input("จำนวน Rework", min_value=0, step=1)
     remain = st.number_input("จำนวนคงเหลือ", min_value=0, step=1)
 
+    operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+
+    # คำนวณจำนวนรวม
     total_count = ok + ng + rework + remain
 
     if st.button("บันทึก Completion"):
+        # ตรวจสอบว่า OK, NG, Rework, Remaining รวมกันต้องเท่ากับจำนวนชิ้นงานเดิมหรือไม่
         expected_count = job['pieces_count']
         diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
 
@@ -264,8 +283,15 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
+        # หากข้อมูลถูกต้อง เปลี่ยนสถานะ WOC เป็น "Completed"
         update_status(woc_selected, "Completed")
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
+
+        # ส่งการแจ้งเตือนไปยัง Telegram
+        send_telegram_message(
+            f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
+            f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
+        )
 
 # === Report Mode ===
 def report_mode():
