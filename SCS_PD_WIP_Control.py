@@ -137,7 +137,8 @@ def receive_mode(dept_to):
         "OS": ["FM", "TP"]
     }
 
-    dept_to_next = "Final Work" if dept_to == "FI" else ""  # ตั้งค่าแผนกถัดไปในกรณี FI
+    # แผนกถัดไปจะต้องเป็น "Tapping Work" สำหรับ "Tapping Receive"
+    dept_to_next = "Tapping Work"
 
     from_depts = dept_from_map.get(dept_to, [])
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
@@ -154,6 +155,9 @@ def receive_mode(dept_to):
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
+
+    # ช่องเลือกแผนกถัดไปจะเป็น "Tapping Work" เท่านั้น
+    st.write(f"แผนกถัดไป: {dept_to_next}")
 
     # บันทึกข้อมูลน้ำหนักใหม่
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01, value=0.0)
@@ -174,10 +178,6 @@ def receive_mode(dept_to):
     st.write(f"% คลาดเคลื่อน: {diff_pct:.2f}%")
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-
-    # แสดงแผนกถัดไป
-    if dept_to == "FI":
-        dept_to_next = "Final Work"  # ถัดไปจะต้องเป็น "Final Work" สำหรับแผนก FI
 
     if st.button("รับเข้าและส่งต่อ"):
         if dept_to_next == "":
