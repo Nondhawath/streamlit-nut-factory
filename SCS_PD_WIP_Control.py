@@ -5,6 +5,11 @@ import requests
 import math
 from datetime import datetime
 
+import base64
+from io import BytesIO
+from st_aggrid import AgGrid
+
+
 # === Connection ===
 def get_connection():
     return psycopg2.connect(st.secrets["postgres"]["conn_str"])
@@ -363,8 +368,32 @@ def dashboard_mode():
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
 # === Main ===
 def main():
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    if not st.session_state.logged_in:
+        login_page()
+        return
+
+    role = st.session_state.get("role", "")
+    menu = st.sidebar.selectbox("เลือกโหมด", [
+        "Forming Transfer", "Tapping Transfer", "Tapping Receive", "Tapping Work",
+        "OS Transfer", "OS Receive", "Final Receive", "Final Work", "Completion",
+        "📊 Dashboard", "📈 Report", "📤 Upload Jobs", "📥 Export รายงานทั้งหมด"
+    ])
+    if menu == "📊 Dashboard":
+        dashboard_mode()
+    elif menu == "📈 Report":
+        report_mode()
+    elif menu == "📤 Upload Jobs":
+        upload_job_file()
+    elif menu == "📥 Export รายงานทั้งหมด":
+        df = get_all_jobs()
+        st.dataframe(df)
+        st.markdown(download_excel(df), unsafe_allow_html=True)
+
     st.set_page_config(page_title="WOC Tracker", layout="wide")
-    st.title("🏭 SCS Production WIP Management")
+    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
 
     menu = st.sidebar.selectbox("เลือกโหมด", [
         "Forming Transfer",
@@ -413,6 +442,7 @@ def login_page():
     st.title("🔐 Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
+
     if st.button("Login"):
         if username == "admin" and password == "1234":
             st.session_state.logged_in = True
@@ -422,6 +452,20 @@ def login_page():
             st.session_state.role = "staff"
         else:
             st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+
+
+
+# === Export Excel ===
+def download_excel(df: pd.DataFrame, filename="report.xlsx"):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
+    processed = output.getvalue()
+    b64 = base64.b64encode(processed).decode()
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">📥 ดาวน์โหลด Excel</a>'
+    return href
+
+
 
 # === Upload Excel ===
 def upload_job_file():
@@ -448,43 +492,30 @@ def upload_job_file():
                 conn.commit()
             st.success("อัปโหลดเรียบร้อยแล้ว")
 
-# === Export Excel ===
-from io import BytesIO
-import base64
-def download_excel(df: pd.DataFrame, filename="report.xlsx"):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name="Sheet1")
-    processed = output.getvalue()
-    b64 = base64.b64encode(processed).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">📥 ดาวน์โหลด Excel</a>'
-    return href
 
 
-# === Main (Patched) ===
-
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-
-    if not st.session_state.logged_in:
-        login_page()
+# === Dashboard ===
+def dashboard_mode():
+    st.header("📊 Dashboard")
+    df = get_all_jobs()
+    if df.empty:
+        st.info("ไม่มีข้อมูล")
         return
+    st.dataframe(df)
+    st.markdown(download_excel(df), unsafe_allow_html=True)
 
-    role = st.session_state.get("role", "")
 
-    menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer", "Tapping Transfer", "Tapping Receive", "Tapping Work",
-        "OS Transfer", "OS Receive", "Final Receive", "Final Work", "Completion",
-        "📊 Dashboard", "📈 Report", "📤 Upload Jobs", "📥 Export รายงานทั้งหมด"
-    ])
 
-    if menu == "📊 Dashboard":
-        dashboard_mode()
-    elif menu == "📈 Report":
-        report_mode()
-    elif menu == "📤 Upload Jobs":
-        upload_job_file()
-    elif menu == "📥 Export รายงานทั้งหมด":
-        df = get_all_jobs()
-        st.dataframe(df)
-        st.markdown(download_excel(df), unsafe_allow_html=True)
+# === Report Mode ===
+def report_mode():
+    st.header("📈 รายงานตามสถานะ")
+    df = get_all_jobs()
+    if df.empty:
+        st.info("ไม่มีข้อมูล")
+        return
+    statuses = df["status"].unique().tolist()
+    selected = st.multiselect("เลือกสถานะที่ต้องการแสดง", statuses, default=statuses)
+    filtered = df[df["status"].isin(selected)]
+    st.write(f"จำนวนรายการ: {len(filtered)}")
+    st.dataframe(filtered)
+    st.markdown(download_excel(filtered, filename="filtered_report.xlsx"), unsafe_allow_html=True)
