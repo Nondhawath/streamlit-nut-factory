@@ -130,12 +130,15 @@ def transfer_mode(dept_from):
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
-    from_dept_map = {
-        "TP": ["FM"],
+    
+    # เลือกแผนกถัดไป
+    dept_from_map = {
+        "TP": ["FM", "TP Working"],  # แสดงแผนกที่ส่งมาที่แผนก TP และแผนกที่ต้องทำงานต่อ (TP Working)
         "FI": ["TP"],
         "OS": ["FM", "TP"]
     }
-    from_depts = from_dept_map.get(dept_to, [])
+    
+    from_depts = dept_from_map.get(dept_to, [])
 
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
     df = get_jobs_by_status_list(status_filters)
@@ -177,14 +180,21 @@ def receive_mode(dept_to):
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
+    # เลือกสถานะแผนกถัดไป
+    dept_to_next = st.selectbox("แผนกถัดไป", ["", "TP Working", "FI", "OS"])
+
     if st.button("รับเข้าและส่งต่อ"):
-        next_status = f"WIP-{dept_to}"
+        if dept_to_next == "":
+            st.error("กรุณาเลือกแผนกถัดไป")
+            return
+
+        next_status = f"WIP-{dept_to_next}"
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
             "operator_name": operator_name,
             "dept_from": dept_to,
-            "dept_to": "",  # ใส่แผนกต่อไปถ้ามีตาม flow
+            "dept_to": dept_to_next,
             "lot_number": job["lot_number"],
             "total_weight": total_weight,
             "barrel_weight": barrel_weight,
@@ -195,9 +205,9 @@ def receive_mode(dept_to):
             "created_at": datetime.utcnow()
         })
         update_status(woc_selected, f"{dept_to} Received")
-        st.success("รับเข้าเรียบร้อยและบันทึกสถานะ")
-        send_telegram_message(f"{dept_to} รับ WOC {woc_selected}")
-
+        st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
+        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
+        
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
