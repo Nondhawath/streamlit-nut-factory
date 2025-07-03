@@ -207,13 +207,13 @@ def receive_mode(dept_to):
         update_status(woc_selected, f"{dept_to} Received")
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
-        
+
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
     
-    # ดึงข้อมูล WOC ที่มีสถานะ "FI Received" สำหรับแผนก FI
-    df = get_jobs_by_status("FI Received")  # เลือกเฉพาะ WOC ที่มีสถานะ FI Received
+    # ดึงข้อมูล WOC ที่มีสถานะ "TP Received"
+    df = get_jobs_by_status("TP Received")  # เลือกเฉพาะ WOC ที่มีสถานะ TP Received
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
@@ -225,7 +225,7 @@ def work_mode(dept):
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวน:** {job['pieces_count']}")
+    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
     machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
@@ -234,7 +234,7 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, "FI Working")  # เปลี่ยนสถานะเป็น FI Working
+        update_status(woc_selected, "TP Working")  # เปลี่ยนสถานะเป็น TP Working
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
