@@ -131,18 +131,11 @@ def transfer_mode(dept_from):
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
     
-    # สำหรับ Final Receive แผนกถัดไปต้องเป็น Final Work เท่านั้น
     dept_from_map = {
-        "TP": ["FM", "TP Working"],  # แสดงแผนกที่ส่งมาที่แผนก TP และแผนกที่ต้องทำงานต่อ (TP Working)
+        "TP": ["FM", "TP Working"],
         "FI": ["TP"],
         "OS": ["FM", "TP"]
     }
-
-    # สำหรับ "FI Receive", เลือกแค่แผนก Final Work เป็นแผนกถัดไป
-    if dept_to == "FI":
-        dept_to_next = "Final Work"
-    else:
-        dept_to_next = ""
 
     from_depts = dept_from_map.get(dept_to, [])
     status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
@@ -160,7 +153,6 @@ def receive_mode(dept_to):
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    # บันทึกข้อมูลน้ำหนักใหม่
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01, value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01, value=0.0)
     sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01, value=0.0)
@@ -169,14 +161,12 @@ def receive_mode(dept_to):
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
-    # คำนวณ % คลาดเคลื่อน
     try:
         diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
     except Exception:
         diff_pct = 0
     st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
-    # แจ้งเตือน Telegram หากคลาดเคลื่อนเกิน 2%
     if diff_pct > 2:
         send_telegram_message(
             f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
@@ -185,9 +175,16 @@ def receive_mode(dept_to):
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    # เลือกแผนกถัดไป
-    if dept_to == "FI":
-        dept_to_next = "Final Work"  # แผนกถัดไปสำหรับ Final Receive ต้องเป็น "Final Work"
+    # กำหนดแผนกถัดไปตาม dept_to
+    if dept_to == "TP":
+        dept_to_next_options = ["Tapping Work"]
+        dept_to_next = st.selectbox("แผนกถัดไป", dept_to_next_options)
+    elif dept_to == "FI":
+        dept_to_next = "Final Work"
+        st.markdown(f"- แผนกถัดไป: {dept_to_next}")
+    else:
+        dept_to_next = ""
+        st.markdown("- กรุณาระบุแผนกถัดไป")
 
     if st.button("รับเข้าและส่งต่อ"):
         if dept_to_next == "":
