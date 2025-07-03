@@ -62,6 +62,15 @@ def delete_job(woc):
         cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc,))
         conn.commit()
 
+def delete_multiple_jobs(woc_list):
+    with get_connection() as conn:
+        if conn is None:
+            return
+        cur = conn.cursor()
+        for woc in woc_list:
+            cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc,))
+        conn.commit()
+
 def get_jobs_by_status(status):
     with get_connection() as conn:
         if conn is None:
@@ -85,15 +94,6 @@ def get_all_jobs():
             return pd.DataFrame()
         return pd.read_sql("SELECT * FROM job_tracking ORDER BY created_at DESC", conn)
 
-# === Helper ===
-def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
-    if sample_count == 0:
-        return 0
-    try:
-        return math.ceil((total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000))
-    except ZeroDivisionError:
-        return 0
-
 # === Admin Management Mode ===
 def admin_management_mode():
     st.header("Admin Management - แก้ไขข้อมูล WOC")
@@ -104,53 +104,57 @@ def admin_management_mode():
         st.warning("ไม่มี WOC ในระบบ")
         return
     
-    woc_selected = st.selectbox("เลือก WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
-    job = get_all_jobs()[get_all_jobs()["woc_number"] == woc_selected].iloc[0]
+    # เลือกหลาย WOC
+    selected_wocs = st.multiselect("เลือก WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
     
-    st.markdown(f"### ข้อมูลปัจจุบันสำหรับ WOC: {woc_selected}")
-    st.write(f"- **Part Name:** {job['part_name']}")
-    st.write(f"- **สถานะ:** {job['status']}")
-    st.write(f"- **น้ำหนักรวม:** {job['total_weight']}")
-    st.write(f"- **น้ำหนักถัง:** {job['barrel_weight']}")
-    st.write(f"- **น้ำหนักตัวอย่างรวม:** {job['sample_weight']}")
-    st.write(f"- **จำนวนตัวอย่าง:** {job['sample_count']}")
-    st.write(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
+    if selected_wocs:
+        for woc_selected in selected_wocs:
+            job = get_all_jobs()[get_all_jobs()["woc_number"] == woc_selected].iloc[0]
+            
+            st.markdown(f"### ข้อมูลปัจจุบันสำหรับ WOC: {woc_selected}")
+            st.write(f"- **Part Name:** {job['part_name']}")
+            st.write(f"- **สถานะ:** {job['status']}")
+            st.write(f"- **น้ำหนักรวม:** {job['total_weight']}")
+            st.write(f"- **น้ำหนักถัง:** {job['barrel_weight']}")
+            st.write(f"- **น้ำหนักตัวอย่างรวม:** {job['sample_weight']}")
+            st.write(f"- **จำนวนตัวอย่าง:** {job['sample_count']}")
+            st.write(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
 
-    # แสดงแบบฟอร์มแก้ไขข้อมูล
-    part_name = st.text_input("แก้ไขชื่อชิ้นงาน", value=job['part_name'])
-    total_weight = st.number_input("แก้ไขน้ำหนักรวม", value=job['total_weight'], min_value=0.0, step=0.01)
-    barrel_weight = st.number_input("แก้ไขน้ำหนักถัง", value=job['barrel_weight'], min_value=0.0, step=0.01)
-    sample_weight = st.number_input("แก้ไขน้ำหนักตัวอย่างรวม", value=job['sample_weight'], min_value=0.0, step=0.01)
-    sample_count = st.number_input("แก้ไขจำนวนตัวอย่าง", value=job['sample_count'], min_value=0, step=1)
-    
-    # แปลง pieces_count เป็นจำนวนเต็มก่อนใช้ใน number_input
-    pieces_count = st.number_input("แก้ไขจำนวนชิ้นงาน", value=int(job['pieces_count']), min_value=0, step=1)
-    
-    status = st.selectbox("เลือกสถานะใหม่", ["FM Transfer TP", "TP Transfer FI", "FI Transfer OS", "Completed", "WIP"])
+            # แสดงแบบฟอร์มแก้ไขข้อมูล
+            part_name = st.text_input(f"แก้ไขชื่อชิ้นงาน WOC {woc_selected}", value=job['part_name'])
+            total_weight = st.number_input(f"แก้ไขน้ำหนักรวม WOC {woc_selected}", value=job['total_weight'], min_value=0.0, step=0.01)
+            barrel_weight = st.number_input(f"แก้ไขน้ำหนักถัง WOC {woc_selected}", value=job['barrel_weight'], min_value=0.0, step=0.01)
+            sample_weight = st.number_input(f"แก้ไขน้ำหนักตัวอย่างรวม WOC {woc_selected}", value=job['sample_weight'], min_value=0.0, step=0.01)
+            sample_count = st.number_input(f"แก้ไขจำนวนตัวอย่าง WOC {woc_selected}", value=job['sample_count'], min_value=0, step=1)
+            
+            # แปลง pieces_count เป็นจำนวนเต็มก่อนใช้ใน number_input
+            pieces_count = st.number_input(f"แก้ไขจำนวนชิ้นงาน WOC {woc_selected}", value=int(job['pieces_count']), min_value=0, step=1)
+            
+            status = st.selectbox(f"เลือกสถานะใหม่ WOC {woc_selected}", ["FM Transfer TP", "TP Transfer FI", "FI Transfer OS", "Completed", "WIP"])
 
-    # แก้ไขข้อมูลและบันทึก
-    if st.button("บันทึกการแก้ไข"):
-        updated_data = {
-            "part_name": part_name,
-            "total_weight": total_weight,
-            "barrel_weight": barrel_weight,
-            "sample_weight": sample_weight,
-            "sample_count": sample_count,
-            "pieces_count": pieces_count,
-            "status": status
-        }
+            # แก้ไขข้อมูลและบันทึก
+            if st.button(f"บันทึกการแก้ไข WOC {woc_selected}"):
+                updated_data = {
+                    "part_name": part_name,
+                    "total_weight": total_weight,
+                    "barrel_weight": barrel_weight,
+                    "sample_weight": sample_weight,
+                    "sample_count": sample_count,
+                    "pieces_count": pieces_count,
+                    "status": status
+                }
+                
+                update_job(woc_selected, updated_data)
+                st.success(f"บันทึกการแก้ไขข้อมูล WOC {woc_selected} เรียบร้อยแล้ว!")
         
-        update_job(woc_selected, updated_data)
-        st.success(f"บันทึกการแก้ไขข้อมูล WOC {woc_selected} เรียบร้อยแล้ว!")
-    
-    # ปุ่มลบข้อมูล
-    if st.button("ลบข้อมูล WOC"):
-        confirm = st.checkbox("ยืนยันการลบ")
-        if confirm:
-            delete_job(woc_selected)
-            st.success(f"ลบข้อมูล WOC {woc_selected} เรียบร้อยแล้ว!")
-        else:
-            st.warning("กรุณายืนยันการลบก่อน")
+        # ปุ่มลบหลายรายการ
+        if st.button("ลบข้อมูล WOC ที่เลือก"):
+            confirm = st.checkbox("ยืนยันการลบหลาย WOC")
+            if confirm:
+                delete_multiple_jobs(selected_wocs)
+                st.success(f"ลบข้อมูล WOC {', '.join(selected_wocs)} เรียบร้อยแล้ว!")
+            else:
+                st.warning("กรุณายืนยันการลบก่อน")
 
 # === Main Function ===
 def main():
