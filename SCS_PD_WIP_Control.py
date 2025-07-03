@@ -167,11 +167,14 @@ def receive_mode(dept_to):
         )
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+
     if dept_to == "TP":
         dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
     elif dept_to == "FI":
         dept_to_next = "Final Work"
         st.markdown(f"- แผนกถัดไป: {dept_to_next}")
+    elif dept_to == "OS":
+        dept_to_next = st.selectbox("แผนกถัดไป", ["OS Transfer"])
     else:
         dept_to_next = ""
         st.markdown("- กรุณาระบุแผนกถัดไป")
@@ -205,16 +208,9 @@ def receive_mode(dept_to):
 def work_mode(dept):
     st.header(f"{dept} Work")
     
-    status_map = {
-        "TP": "TP Received",
-        "FI": "FI Received"
-    }
-    status = status_map.get(dept, None)
-    if not status:
-        st.error(f"ไม่รองรับโหมด Work สำหรับแผนก {dept}")
-        return
+    status_filter = f"{dept} Received"
+    df = get_jobs_by_status(status_filter)
 
-    df = get_jobs_by_status(status)
     if df.empty:
         st.info("ไม่มีงานรอทำ")
         return
@@ -225,7 +221,7 @@ def work_mode(dept):
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
+    st.markdown(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
 
     machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
