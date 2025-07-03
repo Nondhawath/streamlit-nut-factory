@@ -321,26 +321,40 @@ def report_mode():
 def dashboard_mode():
     st.header("Dashboard WIP รวม")
     df = get_all_jobs()
-    depts = ["FM", "TP", "FI", "OS"]
 
-    select_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด"] + depts)
+    # แผนกและสถานะที่นับว่าเป็น WIP
+    wip_map = {
+        "WIP-FM": [
+            "FM Transfer TP", "FM Transfer OS"
+        ],
+        "WIP-TP": [
+            "TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
+        ],
+        "WIP-OS": [
+            "OS Received", "OS Transfer FI"
+        ],
+        "WIP-FI": [
+            "FI Received", "FI Working", "WIP-Final Work"
+        ],
+        "Completed": [
+            "Completed"
+        ]
+    }
 
-    if select_dept == "ทั้งหมด":
-        filtered = df
-    else:
-        filtered = df[df["dept_to"] == select_dept]
+    for wip_name, statuses in wip_map.items():
+        st.subheader(f"{wip_name}")
+        df_wip = df[df["status"].isin(statuses)]
+        total = df_wip["pieces_count"].sum()
+        st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
 
-    if filtered.empty:
-        st.warning("ไม่มีข้อมูลสำหรับแผนกนี้")
-        return
-
-    grouped = filtered.groupby(["dept_to", "part_name"]).agg(
-        จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-        จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-    ).reset_index()
-
-    st.dataframe(grouped)
-
+        if not df_wip.empty:
+            part_summary = df_wip.groupby("part_name").agg(
+                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+            ).reset_index()
+            st.dataframe(part_summary)
+        else:
+            st.info("ไม่มีข้อมูลในกลุ่มนี้")
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
