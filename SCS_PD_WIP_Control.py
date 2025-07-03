@@ -122,7 +122,10 @@ def admin_management_mode():
     barrel_weight = st.number_input("แก้ไขน้ำหนักถัง", value=job['barrel_weight'], min_value=0.0, step=0.01)
     sample_weight = st.number_input("แก้ไขน้ำหนักตัวอย่างรวม", value=job['sample_weight'], min_value=0.0, step=0.01)
     sample_count = st.number_input("แก้ไขจำนวนตัวอย่าง", value=job['sample_count'], min_value=0, step=1)
-    pieces_count = st.number_input("แก้ไขจำนวนชิ้นงาน", value=job['pieces_count'], min_value=0, step=1)
+    
+    # แปลง pieces_count เป็นจำนวนเต็มก่อนใช้ใน number_input
+    pieces_count = st.number_input("แก้ไขจำนวนชิ้นงาน", value=int(job['pieces_count']), min_value=0, step=1)
+    
     status = st.selectbox("เลือกสถานะใหม่", ["FM Transfer TP", "TP Transfer FI", "FI Transfer OS", "Completed", "WIP"])
 
     # แก้ไขข้อมูลและบันทึก
@@ -142,7 +145,7 @@ def admin_management_mode():
     
     # ปุ่มลบข้อมูล
     if st.button("ลบข้อมูล WOC"):
-        confirm = st.checkbox("ยืนยันการลบข้อมูล")
+        confirm = st.checkbox("ยืนยันการลบ")
         if confirm:
             delete_job(woc_selected)
             st.success(f"ลบข้อมูล WOC {woc_selected} เรียบร้อยแล้ว!")
