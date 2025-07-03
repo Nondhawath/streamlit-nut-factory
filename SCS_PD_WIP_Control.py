@@ -218,8 +218,8 @@ def receive_mode(dept_to):
 def work_mode(dept):
     st.header(f"{dept} Work")
     
-    # ดึงข้อมูล WOC ที่มีสถานะ "TP Received" เท่านั้น
-    df = get_jobs_by_status("TP Received")  # เลือกเฉพาะ WOC ที่มีสถานะ TP Received
+    # ดึงข้อมูล WOC ที่มีสถานะ "FI Received" สำหรับโหมด Final Work
+    df = get_jobs_by_status("FI Received")  # เลือกเฉพาะ WOC ที่มีสถานะ FI Received
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
@@ -240,7 +240,7 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, "TP Working")  # เปลี่ยนสถานะเป็น TP Working
+        update_status(woc_selected, "FI Working")  # เปลี่ยนสถานะเป็น FI Working
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
