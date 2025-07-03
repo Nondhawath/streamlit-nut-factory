@@ -322,6 +322,12 @@ def dashboard_mode():
     st.header("Dashboard WIP รวม")
     df = get_all_jobs()
 
+    # เพิ่มช่องค้นหา
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
+                df["part_name"].str.contains(search, case=False, na=False)]
+
     # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
         "WIP-FM": [
