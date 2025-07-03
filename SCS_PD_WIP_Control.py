@@ -212,7 +212,7 @@ def receive_mode(dept_to):
 def work_mode(dept):
     st.header(f"{dept} Work")
     
-    # ดึงข้อมูล WOC ที่มีสถานะ "TP Received"
+    # ดึงข้อมูล WOC ที่มีสถานะ "TP Received" เท่านั้น
     df = get_jobs_by_status("TP Received")  # เลือกเฉพาะ WOC ที่มีสถานะ TP Received
 
     if df.empty:
