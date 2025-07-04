@@ -421,20 +421,23 @@ def dashboard_mode():
 def admin_management():
     st.header("Admin Management")
     
-    # เลือก WOC ที่ต้องการแก้ไขหรือลบ
-    woc_number = st.text_input("กรอกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ")
+    # ดึงข้อมูล WOC ทั้งหมดจากฐานข้อมูล
+    woc_df = get_all_jobs()  # หรือใช้ get_jobs_by_status("WIP") เพื่อกรองเฉพาะ WIP
     
+    # ตรวจสอบว่ามี WOC ในฐานข้อมูลหรือไม่
+    if woc_df.empty:
+        st.error("ไม่มีข้อมูล WOC ในฐานข้อมูล")
+        return
+
+    # แสดงหมายเลข WOC ใน Dropdown (selectbox)
+    woc_list = woc_df["woc_number"].unique().tolist()
+    woc_number = st.selectbox("เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
+
     if woc_number:
         # ดึงข้อมูลจากฐานข้อมูลที่ตรงกับหมายเลข WOC
-        df = get_jobs_by_status("WIP")  # หรือใช้ get_all_jobs() เพื่อดึงข้อมูลทั้งหมด
-        df = df[df["woc_number"] == woc_number]  # ค้นหา WOC ที่ตรงกับหมายเลขที่ผู้ใช้กรอก
+        job = woc_df[woc_df["woc_number"] == woc_number].iloc[0]
         
-        if df.empty:
-            st.error("ไม่พบข้อมูล WOC นี้ในฐานข้อมูล")
-            return
-
         # แสดงข้อมูลของ WOC ที่เลือก
-        job = df.iloc[0]
         st.write(f"ข้อมูล WOC {woc_number}:")
         st.write(f"- **Part Name:** {job['part_name']}")
         st.write(f"- **Operator Name:** {job['operator_name']}")
@@ -472,7 +475,6 @@ def admin_management():
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
             st.success(f"ลบข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
-
 
 # === Main ===
 def main():
