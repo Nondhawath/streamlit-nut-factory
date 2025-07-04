@@ -5,6 +5,8 @@ import requests
 import math
 from datetime import datetime
 
+"created_at": datetime.utcnow() + timedelta(hours=7),  # ใช้เวลา GMT+7
+
 # === Connection Pool ===
 def get_connection():
     try:
@@ -224,7 +226,7 @@ def upload_wip_from_excel():
                 "sample_count": row.get("sample_count", 0),
                 "pieces_count": row["pieces_count"],
                 "status": "WIP",
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.utcnow() + timedelta(hours=7),  # ใช้เวลา GMT+7
                 "prev_woc_number": row.get("prev_woc_number", ""),
                 "ok_count": row.get("ok_count", 0),
                 "ng_count": row.get("ng_count", 0),
@@ -426,6 +428,17 @@ def report_mode():
             st.write(f"แผนก {d}")
             st.dataframe(summary)
 
+    # ฟังก์ชันสำหรับการแปลง DataFrame เป็นไฟล์ Excel
+    def to_excel(df):
+        return df.to_excel(index=False)
+
+    # เพิ่มปุ่มดาวน์โหลด Excel
+    st.download_button(
+        label="ดาวน์โหลดรายงานเป็น Excel",
+        data=to_excel(df),
+        file_name="wip_report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 # === Dashboard Mode ===
 def dashboard_mode():
     st.header("Dashboard WIP รวม")
