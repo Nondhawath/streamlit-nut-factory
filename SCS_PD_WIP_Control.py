@@ -424,17 +424,15 @@ def report_mode():
             st.dataframe(summary)
     
     # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
-    @st.cache
-    def convert_df_to_excel(df):
-        return df.to_excel(index=False)
-
     excel_file = convert_df_to_excel(df)
+    
     st.download_button(
         label="ดาวน์โหลดเป็นไฟล์ Excel",
         data=excel_file,
         file_name="wip_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 # === Dashboard Mode ===
 def dashboard_mode():
     st.header("Dashboard WIP รวม")
