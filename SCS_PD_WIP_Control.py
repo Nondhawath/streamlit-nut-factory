@@ -472,6 +472,8 @@ def admin_management():
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
             st.success(f"ลบข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
+
+
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
