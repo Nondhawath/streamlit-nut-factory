@@ -67,11 +67,12 @@ def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
         st.error("เกิดข้อผิดพลาดในการคำนวณ: แบ่งด้วยศูนย์")
         return 0
 
-# === Transfer Mode ===
 def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
     prev_woc = ""
+    
+    # เลือก WOC ก่อนหน้า
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
@@ -108,6 +109,11 @@ def transfer_mode(dept_from):
         pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
         st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
 
+    # ตรวจสอบค่าก่อนบันทึก
+    if pieces_count > 10000000:  # ขีดจำกัดที่สมมุติว่า 10 ล้าน
+        st.error("จำนวนชิ้นงานมากเกินไป")
+        return
+
     if st.button("บันทึก Transfer"):
         if not new_woc.strip():
             st.error("กรุณากรอก WOC ใหม่")
@@ -116,7 +122,8 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
-        insert_job({
+        # ข้อมูลที่ต้องการบันทึก
+        data = {
             "woc_number": new_woc,
             "part_name": part_name,
             "operator_name": operator_name,
@@ -129,15 +136,21 @@ def transfer_mode(dept_from):
             "sample_count": sample_count,
             "pieces_count": pieces_count,
             "status": f"{dept_from} Transfer {dept_to}",
-            "created_at": datetime.utcnow()
-        })
+            "created_at": datetime.utcnow(),
+            "prev_woc_number": prev_woc,  # ฟิลด์ใหม่ที่เก็บ WOC ก่อนหน้า
+            "ok_count": st.number_input("จำนวน OK", min_value=0, step=1),
+            "ng_count": st.number_input("จำนวน NG", min_value=0, step=1),
+            "rework_count": st.number_input("จำนวน Rework", min_value=0, step=1),
+            "remain_count": st.number_input("จำนวนคงเหลือ", min_value=0, step=1),
+            "machine_name": st.text_input("ชื่อเครื่องจักร")
+        }
+
+        insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
 
         if prev_woc:
             update_status(prev_woc, "Completed")
 
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
-
-# === Upload WIP from Excel ===
 def upload_wip_from_excel():
     st.header("อัพโหลด WIP จากไฟล์ Excel")
     
@@ -156,7 +169,7 @@ def upload_wip_from_excel():
         required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
         
         # คอลัมน์ที่ไม่จำเป็นต้องมีข้อมูล (แต่ถ้ามีจะต้องไม่เป็นค่าว่าง)
-        optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count"]
+        optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "ok_count", "ng_count", "rework_count", "remain_count", "machine_name"]
 
         # ตรวจสอบคอลัมน์ที่ต้องมีข้อมูล
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -181,21 +194,32 @@ def upload_wip_from_excel():
             # ลบข้อมูล WOC ที่ซ้ำกันในฐานข้อมูล
             delete_existing_woc(row["woc_number"])
 
+            # ตรวจสอบข้อมูลก่อนบันทึก
+            if row["pieces_count"] > 10000000:
+                st.error(f"จำนวนชิ้นงานมากเกินไปใน WOC {row['woc_number']}")
+                continue  # ข้ามข้อมูล WOC นี้
+
             # บันทึกข้อมูลใหม่
             data = {
                 "woc_number": row["woc_number"],
                 "part_name": row["part_name"],
                 "operator_name": row["operator_name"],
-                "dept_from": row.get("dept_from", ""),  # สำหรับ FM ปล่อยเป็นค่าว่าง
+                "dept_from": row.get("dept_from", ""),
                 "dept_to": row["dept_to"],
-                "lot_number": row.get("lot_number", ""),  # ใช้ค่าเริ่มต้นเป็นค่าว่าง
-                "total_weight": row.get("total_weight", 0.0),  # ใช้ค่าเริ่มต้นเป็น 0.0
-                "barrel_weight": row.get("barrel_weight", 0.0),  # ใช้ค่าเริ่มต้นเป็น 0.0
-                "sample_weight": row.get("sample_weight", 0.0),  # ใช้ค่าเริ่มต้นเป็น 0.0
-                "sample_count": row.get("sample_count", 0),  # ใช้ค่าเริ่มต้นเป็น 0
+                "lot_number": row.get("lot_number", ""),
+                "total_weight": row.get("total_weight", 0.0),
+                "barrel_weight": row.get("barrel_weight", 0.0),
+                "sample_weight": row.get("sample_weight", 0.0),
+                "sample_count": row.get("sample_count", 0),
                 "pieces_count": row["pieces_count"],
-                "status": "WIP",  # ตั้งสถานะเริ่มต้นเป็น WIP
-                "created_at": datetime.utcnow()
+                "status": "WIP",
+                "created_at": datetime.utcnow(),
+                "prev_woc_number": row.get("prev_woc_number", ""),
+                "ok_count": row.get("ok_count", 0),
+                "ng_count": row.get("ng_count", 0),
+                "rework_count": row.get("rework_count", 0),
+                "remain_count": row.get("remain_count", 0),
+                "machine_name": row.get("machine_name", ""),
             }
             insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
 
