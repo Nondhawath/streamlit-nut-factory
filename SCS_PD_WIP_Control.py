@@ -226,8 +226,9 @@ def upload_wip_from_excel():
             }
             insert_job(data)  # บันทึกข้อมูล
 
-        if st.button("ยืนยันการอัปโหลด"):
-            st.success("อัปโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
+        # หลังจากบันทึกเสร็จ ไปที่รายงาน
+        st.write("ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกแล้ว")
+        report_mode()  # เรียกฟังก์ชันรายงาน
             
 # === Receive Mode ===
 def receive_mode(dept_to):
