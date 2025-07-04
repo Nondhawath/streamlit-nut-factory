@@ -477,48 +477,48 @@ def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
     st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
 
-   menu = st.sidebar.selectbox("เลือกโหมด", [
-    "Forming Transfer",
-    "Tapping Transfer",
-    "Tapping Receive",
-    "Tapping Work",
-    "OS Transfer",
-    "OS Receive",
-    "Final Receive",
-    "Final Work",
-    "Completion",
-    "Report",
-    "Dashboard",
-    "Upload WIP from Excel",  # เพิ่มโหมดใหม่สำหรับการอัปโหลด Excel
-    "Admin Management"  # เพิ่มโหมดใหม่สำหรับการจัดการข้อมูล WOC
-])
+    menu = st.sidebar.selectbox("เลือกโหมด", [
+        "Forming Transfer",
+        "Tapping Transfer",
+        "Tapping Receive",
+        "Tapping Work",
+        "OS Transfer",
+        "OS Receive",
+        "Final Receive",
+        "Final Work",
+        "Completion",
+        "Report",
+        "Dashboard",
+        "Upload WIP from Excel",  # เพิ่มโหมดใหม่สำหรับการอัปโหลด Excel
+        "Admin Management"  # เพิ่มโหมดใหม่สำหรับการจัดการข้อมูล WOC
+    ])
 
-if menu == "Forming Transfer":
-    transfer_mode("FM")
-elif menu == "Tapping Transfer":
-    transfer_mode("TP")
-elif menu == "Tapping Receive":
-    receive_mode("TP")
-elif menu == "Tapping Work":
-    work_mode("TP")
-elif menu == "OS Transfer":
-    transfer_mode("OS")
-elif menu == "OS Receive":
-    receive_mode("OS")
-elif menu == "Final Receive":
-    receive_mode("FI")
-elif menu == "Final Work":
-    work_mode("FI")
-elif menu == "Completion":
-    completion_mode()
-elif menu == "Report":
-    report_mode()
-elif menu == "Dashboard":
-    dashboard_mode()
-elif menu == "Upload WIP from Excel":
-    upload_wip_from_excel()  # เรียกฟังก์ชันการอัปโหลดข้อมูลจาก Excel
-elif menu == "Admin Management":  # การเลือกโหมด Admin Management
-    admin_management()  # เรียกฟังก์ชันจัดการข้อมูล WOC
+    if menu == "Forming Transfer":
+        transfer_mode("FM")
+    elif menu == "Tapping Transfer":
+        transfer_mode("TP")
+    elif menu == "Tapping Receive":
+        receive_mode("TP")
+    elif menu == "Tapping Work":
+        work_mode("TP")
+    elif menu == "OS Transfer":
+        transfer_mode("OS")
+    elif menu == "OS Receive":
+        receive_mode("OS")
+    elif menu == "Final Receive":
+        receive_mode("FI")
+    elif menu == "Final Work":
+        work_mode("FI")
+    elif menu == "Completion":
+        completion_mode()
+    elif menu == "Report":
+        report_mode()
+    elif menu == "Dashboard":
+        dashboard_mode()
+    elif menu == "Upload WIP from Excel":
+        upload_wip_from_excel()  # เรียกฟังก์ชันการอัปโหลดข้อมูลจาก Excel
+    elif menu == "Admin Management":  # การเลือกโหมด Admin Management
+        admin_management()  # เรียกฟังก์ชันจัดการข้อมูล WOC
 
 if __name__ == "__main__":
     main()
