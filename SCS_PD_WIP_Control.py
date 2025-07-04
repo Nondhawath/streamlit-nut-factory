@@ -447,29 +447,20 @@ def dashboard_mode():
     st.header("Dashboard WIP รวม")
     df = get_all_jobs()
 
-    # เพิ่มช่องค้นหา
+    df['created_at'] = pd.to_datetime(df['created_at']) + timedelta(hours=7)
+    df = df.sort_values("created_at").groupby("woc_number", as_index=False).last()
+
     search = st.text_input("ค้นหา WOC หรือ Part Name")
     if search:
         df = df[df["woc_number"].str.contains(search, case=False, na=False) |
                 df["part_name"].str.contains(search, case=False, na=False)]
 
-    # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
-        "WIP-FM": [
-            "FM Transfer TP", "FM Transfer OS"
-        ],
-        "WIP-TP": [
-            "TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
-        ],
-        "WIP-OS": [
-            "OS Received", "OS Transfer FI"
-        ],
-        "WIP-FI": [
-            "FI Received", "FI Working", "WIP-Final Work"
-        ],
-        "Completed": [
-            "Completed"
-        ]
+        "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
+        "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
+        "WIP-OS": ["OS Received", "OS Transfer FI"],
+        "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
+        "Completed": ["Completed"]
     }
 
     for wip_name, statuses in wip_map.items():
