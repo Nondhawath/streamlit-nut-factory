@@ -150,8 +150,19 @@ def upload_wip_from_excel():
                 st.error(f"คอลัมน์ '{col}' ขาดในไฟล์ Excel")
                 return
 
-        # บันทึกข้อมูลลงในฐานข้อมูล
+        # ฟังก์ชันเพื่อลบข้อมูล WOC ที่ซ้ำในฐานข้อมูล
+        def delete_existing_woc(woc_number):
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
+                conn.commit()
+
+        # ฟังก์ชันเพื่อลบข้อมูล WOC ซ้ำก่อนการบันทึกข้อมูลใหม่
         for _, row in df.iterrows():
+            # ลบข้อมูล WOC ที่ซ้ำกันในฐานข้อมูล
+            delete_existing_woc(row["woc_number"])
+
+            # บันทึกข้อมูลใหม่
             data = {
                 "woc_number": row["woc_number"],
                 "part_name": row["part_name"],
@@ -169,8 +180,9 @@ def upload_wip_from_excel():
             }
             insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
 
-        st.success("อัพโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
-
+        # ปุ่มยืนยันการอัปโหลด
+        if st.button("ยืนยันการอัปโหลด"):
+            st.success("อัปโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
