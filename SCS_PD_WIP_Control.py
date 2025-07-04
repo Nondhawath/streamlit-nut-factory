@@ -394,11 +394,12 @@ def completion_mode():
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
+# === Convert DataFrame to Excel ===
 @st.cache_data
 def convert_df_to_excel(df):
     """แปลง DataFrame เป็นไฟล์ Excel"""
     return df.to_excel(index=False)
-    
+
 # === Report Mode ===
 def report_mode():
     st.header("รายงานและสรุป WIP")
@@ -427,7 +428,8 @@ def report_mode():
             st.dataframe(summary)
     
     # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
-
+    excel_file = convert_df_to_excel(df)
+    
     st.download_button(
         label="ดาวน์โหลดเป็นไฟล์ Excel",
         data=excel_file,
