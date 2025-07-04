@@ -151,6 +151,18 @@ def transfer_mode(dept_from):
             update_status(prev_woc, "Completed")
 
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
+# ฟังก์ชันการตรวจสอบข้อมูลก่อนบันทึก
+def validate_data(row):
+    # ตรวจสอบค่าว่างในคอลัมน์ที่สำคัญ
+    if pd.isnull(row["lot_number"]) or pd.isnull(row["total_weight"]) or pd.isnull(row["barrel_weight"]) or pd.isnull(row["sample_weight"]):
+        st.warning(f"คอลัมน์บางคอลัมน์ใน WOC {row['woc_number']} มีค่าว่าง")
+        return False
+    # ตรวจสอบค่ามากเกินไปในจำนวนชิ้นงานหรือค่าน้ำหนัก
+    if row["total_weight"] > 1000000 or row["pieces_count"] > 10000000:
+        st.error(f"ข้อมูลใน WOC {row['woc_number']} เกินขีดจำกัด")
+        return False
+    return True
+
 def upload_wip_from_excel():
     st.header("อัพโหลด WIP จากไฟล์ Excel")
     
@@ -191,13 +203,12 @@ def upload_wip_from_excel():
 
         # ฟังก์ชันเพื่อลบข้อมูล WOC ซ้ำก่อนการบันทึกข้อมูลใหม่
         for _, row in df.iterrows():
+            # ตรวจสอบข้อมูลก่อนบันทึก
+            if not validate_data(row):
+                continue  # ข้ามข้อมูล WOC นี้
+
             # ลบข้อมูล WOC ที่ซ้ำกันในฐานข้อมูล
             delete_existing_woc(row["woc_number"])
-
-            # ตรวจสอบข้อมูลก่อนบันทึก
-            if row["pieces_count"] > 10000000:
-                st.error(f"จำนวนชิ้นงานมากเกินไปใน WOC {row['woc_number']}")
-                continue  # ข้ามข้อมูล WOC นี้
 
             # บันทึกข้อมูลใหม่
             data = {
