@@ -5,8 +5,6 @@ import requests
 import math
 from datetime import datetime, timedelta
 
-"created_at": datetime.utcnow() + timedelta(hours=7),  # ใช้เวลา GMT+7
-
 # === Connection Pool ===
 def get_connection():
     try:
@@ -30,6 +28,9 @@ def send_telegram_message(message):
 
 # === Database Operations ===
 def insert_job(data):
+    # เพิ่มการปรับเวลาเป็น GMT+7
+    data["created_at"] = datetime.utcnow() + timedelta(hours=7)
+    
     with get_connection() as conn:
         cur = conn.cursor()
         keys = ', '.join(data.keys())
@@ -168,51 +169,42 @@ def validate_data(row):
 def upload_wip_from_excel():
     st.header("อัพโหลด WIP จากไฟล์ Excel")
     
-    # ให้ผู้ใช้เลือกไฟล์ Excel
     uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
     
     if uploaded_file is not None:
-        # อ่านข้อมูลจากไฟล์ Excel
         df = pd.read_excel(uploaded_file)
 
-        # แสดงข้อมูลตัวอย่างจากไฟล์ Excel
         st.write("ข้อมูลในไฟล์ Excel:")
         st.dataframe(df.head())
 
-        # คอลัมน์ที่จำเป็นต้องมีข้อมูล
         required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
         
-        # คอลัมน์ที่ไม่จำเป็นต้องมีข้อมูล (แต่ถ้ามีจะต้องไม่เป็นค่าว่าง)
         optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "ok_count", "ng_count", "rework_count", "remain_count", "machine_name"]
 
-        # ตรวจสอบคอลัมน์ที่ต้องมีข้อมูล
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"คอลัมน์ต่อไปนี้ขาดในไฟล์ Excel: {', '.join(missing_columns)}")
             return
 
-        # ตรวจสอบคอลัมน์ที่ไม่จำเป็นต้องมีข้อมูล แต่ถ้ามีต้องมีค่าที่ไม่ว่าง
+        # ตรวจสอบคอลัมน์ที่มีค่าว่าง
         for col in optional_columns:
             if col in df.columns and df[col].isnull().any():
                 st.warning(f"คอลัมน์ '{col}' มีข้อมูลที่เป็นค่าว่าง แต่ยังคงสามารถดำเนินการได้")
 
-        # ฟังก์ชันเพื่อลบข้อมูล WOC ที่ซ้ำในฐานข้อมูล
         def delete_existing_woc(woc_number):
             with get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
 
-        # ฟังก์ชันเพื่อลบข้อมูล WOC ซ้ำก่อนการบันทึกข้อมูลใหม่
         for _, row in df.iterrows():
             # ตรวจสอบข้อมูลก่อนบันทึก
             if not validate_data(row):
                 continue  # ข้ามข้อมูล WOC นี้
 
-            # ลบข้อมูล WOC ที่ซ้ำกันในฐานข้อมูล
             delete_existing_woc(row["woc_number"])
 
-            # บันทึกข้อมูลใหม่
+            # เพิ่มการปรับเวลา GMT+7 ในข้อมูล
             data = {
                 "woc_number": row["woc_number"],
                 "part_name": row["part_name"],
@@ -234,9 +226,8 @@ def upload_wip_from_excel():
                 "remain_count": row.get("remain_count", 0),
                 "machine_name": row.get("machine_name", ""),
             }
-            insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
+            insert_job(data)  # บันทึกข้อมูล
 
-        # ปุ่มยืนยันการอัปโหลด
         if st.button("ยืนยันการอัปโหลด"):
             st.success("อัปโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
 # === Receive Mode ===
@@ -410,12 +401,16 @@ def report_mode():
     st.header("รายงานและสรุป WIP")
     df = get_all_jobs()
     search = st.text_input("ค้นหา Part Name หรือ WOC")
+    
     if search:
         df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
+    
     st.dataframe(df)
 
+    # สรุปข้อมูลแยกตามแผนก
     st.markdown("### สรุป WIP แยกตามแผนก")
     depts = ["FM", "TP", "FI", "OS"]
+    
     for d in depts:
         wip_df = df[df["status"].str.contains(f"WIP-{d}")]
         if wip_df.empty:
@@ -427,15 +422,16 @@ def report_mode():
             ).reset_index()
             st.write(f"แผนก {d}")
             st.dataframe(summary)
-
-    # ฟังก์ชันสำหรับการแปลง DataFrame เป็นไฟล์ Excel
-    def to_excel(df):
+    
+    # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
+    @st.cache
+    def convert_df_to_excel(df):
         return df.to_excel(index=False)
 
-    # เพิ่มปุ่มดาวน์โหลด Excel
+    excel_file = convert_df_to_excel(df)
     st.download_button(
-        label="ดาวน์โหลดรายงานเป็น Excel",
-        data=to_excel(df),
+        label="ดาวน์โหลดเป็นไฟล์ Excel",
+        data=excel_file,
         file_name="wip_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
