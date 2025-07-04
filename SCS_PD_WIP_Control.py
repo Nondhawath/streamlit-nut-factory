@@ -59,58 +59,59 @@ def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
         return 0
 
 # === Admin Management Mode ===
-def edit_job(woc_number):
+def edit_job(woc_numbers):
     # ดึงข้อมูล WOC ที่ต้องการแก้ไข
     with get_connection() as conn:
-        df = pd.read_sql(f"SELECT * FROM job_tracking WHERE woc_number = '{woc_number}'", conn)
+        df = pd.read_sql(f"SELECT * FROM job_tracking WHERE woc_number IN ({', '.join([f'\'{woc}\'' for woc in woc_numbers])})", conn)
     
     if df.empty:
-        st.error(f"ไม่พบข้อมูล WOC: {woc_number}")
+        st.error(f"ไม่พบข้อมูล WOC: {', '.join(woc_numbers)}")
         return
     
     # แสดงข้อมูลที่ต้องการแก้ไข
-    job = df.iloc[0]
-    st.write(f"ข้อมูลที่จะแก้ไข: WOC {job['woc_number']} - Part Name: {job['part_name']}")
+    st.write(f"ข้อมูลที่จะแก้ไข: {', '.join(woc_numbers)}")
 
     new_status = st.selectbox("สถานะใหม่", ["FM Transfer TP", "TP Working", "Completed", "WIP-TP", "FI Working"], index=0)
-    new_part_name = st.text_input("Part Name", value=job['part_name'])
-    new_operator_name = st.text_input("Operator Name", value=job['operator_name'])
+    new_part_name = st.text_input("Part Name")
+    new_operator_name = st.text_input("Operator Name")
     
     # การบันทึกการแก้ไข
     if st.button("บันทึกการแก้ไข"):
         try:
             with get_connection() as conn:
                 cur = conn.cursor()
-                update_query = """
-                    UPDATE job_tracking
-                    SET status = %s, part_name = %s, operator_name = %s
-                    WHERE woc_number = %s
-                """
-                cur.execute(update_query, (new_status, new_part_name, new_operator_name, woc_number))
+                for woc_number in woc_numbers:
+                    update_query = """
+                        UPDATE job_tracking
+                        SET status = %s, part_name = %s, operator_name = %s
+                        WHERE woc_number = %s
+                    """
+                    cur.execute(update_query, (new_status, new_part_name, new_operator_name, woc_number))
                 conn.commit()
                 st.success("บันทึกการแก้ไขเรียบร้อยแล้ว")
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
 
-def delete_job(woc_number):
+def delete_job(woc_numbers):
     # ตรวจสอบการเลือก WOC ที่ต้องการลบ
     with get_connection() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM job_tracking WHERE woc_number = %s", (woc_number,))
-        job = cur.fetchone()
+        cur.execute(f"SELECT * FROM job_tracking WHERE woc_number IN ({', '.join([f'\'{woc}\'' for woc in woc_numbers])})", )
+        jobs = cur.fetchall()
 
-    if not job:
-        st.error(f"ไม่พบข้อมูล WOC: {woc_number}")
+    if not jobs:
+        st.error(f"ไม่พบข้อมูล WOC: {', '.join(woc_numbers)}")
         return
     
-    st.write(f"คุณกำลังจะลบข้อมูล WOC: {woc_number} - Part Name: {job[2]}")  # แสดงข้อมูลบางส่วน
+    st.write(f"คุณกำลังจะลบข้อมูล WOC: {', '.join(woc_numbers)}")
 
     # ยืนยันการลบ
     if st.button("ยืนยันการลบ"):
         try:
             with get_connection() as conn:
                 cur = conn.cursor()
-                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
+                for woc_number in woc_numbers:
+                    cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
                 st.success("ลบข้อมูล WOC เรียบร้อยแล้ว")
         except Exception as e:
@@ -124,12 +125,12 @@ def admin_management_mode():
     action = st.selectbox("เลือกการดำเนินการ", ["แก้ไขข้อมูล", "ลบข้อมูล"])
 
     if action == "แก้ไขข้อมูล":
-        woc_to_edit = st.text_input("กรุณากรอก WOC ที่ต้องการแก้ไข")
+        woc_to_edit = st.multiselect("กรุณาเลือก WOC ที่ต้องการแก้ไข", options=[job['woc_number'] for job in get_all_jobs().to_dict('records')])
         if woc_to_edit:
             edit_job(woc_to_edit)
 
     elif action == "ลบข้อมูล":
-        woc_to_delete = st.text_input("กรุณากรอก WOC ที่ต้องการลบ")
+        woc_to_delete = st.multiselect("กรุณาเลือก WOC ที่ต้องการลบ", options=[job['woc_number'] for job in get_all_jobs().to_dict('records')])
         if woc_to_delete:
             delete_job(woc_to_delete)
 
