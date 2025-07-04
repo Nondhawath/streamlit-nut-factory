@@ -133,75 +133,33 @@ def admin_management_mode():
         if woc_to_delete:
             delete_job(woc_to_delete)
 
-# === Transfer Mode ===
-def transfer_mode(dept_from):
-    st.header(f"{dept_from} Transfer")
-    df_all = get_all_jobs()
-    prev_woc = ""
-    if dept_from == "TP":
-        df = get_jobs_by_status("TP Working")
-        prev_woc_options = [""] + list(df["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
-    elif dept_from == "OS":
-        df = get_jobs_by_status("OS Received")
-        prev_woc_options = [""] + list(df["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
-    else:
-        st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
+# === Report Mode ===
+def report_mode():
+    st.header("รายงานและสรุป WIP")
+    
+    # ดึงข้อมูลทั้งหมดจากฐานข้อมูล
+    df = get_all_jobs()
 
-    new_woc = st.text_input("WOC ใหม่")
+    # เพิ่มช่องค้นหา
+    search = st.text_input("ค้นหา Part Name หรือ WOC")
+    if search:
+        df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
+    
+    st.dataframe(df)  # แสดงตารางทั้งหมดที่กรองตามคำค้นหา
 
-    part_name = ""
-    if prev_woc:
-        part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
-    part_name = st.text_input("Part Name", value=part_name)
-
-    if dept_from == "OS":
-        dept_to_options = ["FI"]
-    else:
-        dept_to_options = ["TP", "FI", "OS"]
-
-    dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
-    lot_number = st.text_input("Lot Number")
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
-    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
-    operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-
-    pieces_count = 0
-    if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
-        pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
-        st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
-
-    if st.button("บันทึก Transfer"):
-        if not new_woc.strip():
-            st.error("กรุณากรอก WOC ใหม่")
-            return
-        if pieces_count == 0:
-            st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
-            return
-
-        insert_job({
-            "woc_number": new_woc,
-            "part_name": part_name,
-            "operator_name": operator_name,
-            "dept_from": dept_from,
-            "dept_to": dept_to,
-            "lot_number": lot_number,
-            "total_weight": total_weight,
-            "barrel_weight": barrel_weight,
-            "sample_weight": sample_weight,
-            "sample_count": sample_count,
-            "pieces_count": pieces_count,
-            "status": f"{dept_from} Transfer {dept_to}",
-            "created_at": datetime.utcnow()
-        })
-
-        if prev_woc:
-            update_status(prev_woc, "Completed")
-
-        st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
+    st.markdown("### สรุป WIP แยกตามแผนก")
+    depts = ["FM", "TP", "FI", "OS"]
+    for d in depts:
+        wip_df = df[df["status"].str.contains(f"WIP-{d}")]
+        if wip_df.empty:
+            st.write(f"แผนก {d}: ไม่มีงาน WIP")
+        else:
+            summary = wip_df.groupby("part_name").agg(
+                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+            ).reset_index()
+            st.write(f"แผนก {d}")
+            st.dataframe(summary)
 
 # === Main ===
 def main():
