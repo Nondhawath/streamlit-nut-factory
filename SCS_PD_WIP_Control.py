@@ -6,16 +6,14 @@ import math
 from datetime import datetime
 
 # === Connection Pool ===
-# สร้าง pool สำหรับการเชื่อมต่อฐานข้อมูล
-db_pool = psycopg2.pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=st.secrets["postgres"]["conn_str"])
-
 def get_connection():
     try:
-        return db_pool.getconn()
+        # ใช้ psycopg2.connect แทนการใช้ Connection Pool
+        conn = psycopg2.connect(st.secrets["postgres"]["conn_str"])
+        return conn
     except psycopg2.DatabaseError as e:
         st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
         return None
-
 # === Telegram Notification ===
 def send_telegram_message(message):
     token = st.secrets["telegram"]["token"]
