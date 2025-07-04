@@ -417,50 +417,108 @@ def dashboard_mode():
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
 
+# === Admin Management Mode ===
+def admin_management():
+    st.header("Admin Management")
+    
+    # เลือก WOC ที่ต้องการแก้ไขหรือลบ
+    woc_number = st.text_input("กรอกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ")
+    
+    if woc_number:
+        # ดึงข้อมูลจากฐานข้อมูลที่ตรงกับหมายเลข WOC
+        df = get_jobs_by_status_list([woc_number])
+        
+        if df.empty:
+            st.error("ไม่พบข้อมูล WOC นี้ในฐานข้อมูล")
+            return
+
+        # แสดงข้อมูลของ WOC ที่เลือก
+        job = df.iloc[0]
+        st.write(f"ข้อมูล WOC {woc_number}:")
+        st.write(f"- **Part Name:** {job['part_name']}")
+        st.write(f"- **Operator Name:** {job['operator_name']}")
+        st.write(f"- **Dept From:** {job['dept_from']}")
+        st.write(f"- **Dept To:** {job['dept_to']}")
+        st.write(f"- **Lot Number:** {job['lot_number']}")
+        st.write(f"- **Total Weight:** {job['total_weight']}")
+        st.write(f"- **Barrel Weight:** {job['barrel_weight']}")
+        st.write(f"- **Sample Weight:** {job['sample_weight']}")
+        st.write(f"- **Sample Count:** {job['sample_count']}")
+        st.write(f"- **Pieces Count:** {job['pieces_count']}")
+        st.write(f"- **Status:** {job['status']}")
+        
+        # ให้ผู้ใช้เลือกการแก้ไขข้อมูล
+        edit_fields = ['part_name', 'operator_name', 'dept_from', 'dept_to', 'lot_number', 
+                       'total_weight', 'barrel_weight', 'sample_weight', 'sample_count', 'pieces_count', 'status']
+        
+        updated_data = {}
+        for field in edit_fields:
+            new_value = st.text_input(f"แก้ไข {field}:", value=str(job[field]) if pd.notna(job[field]) else "")
+            updated_data[field] = new_value
+        
+        if st.button("บันทึกการแก้ไข"):
+            # บันทึกข้อมูลใหม่หากมีการแก้ไข
+            updated_data["woc_number"] = woc_number
+            updated_data["created_at"] = datetime.utcnow()
+            insert_job(updated_data)
+            st.success(f"แก้ไขข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
+        
+        # ให้เลือกลบข้อมูล
+        if st.button("ลบข้อมูล WOC นี้"):
+            # ลบข้อมูล WOC
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
+                conn.commit()
+            st.success(f"ลบข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
+
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
     st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
 
-    menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer",
-        "Tapping Transfer",
-        "Tapping Receive",
-        "Tapping Work",
-        "OS Transfer",
-        "OS Receive",
-        "Final Receive",
-        "Final Work",
-        "Completion",
-        "Report",
-        "Dashboard",
-        "Upload WIP from Excel"  # เพิ่มโหมดใหม่สำหรับการอัพโหลด Excel
-    ])
+   menu = st.sidebar.selectbox("เลือกโหมด", [
+    "Forming Transfer",
+    "Tapping Transfer",
+    "Tapping Receive",
+    "Tapping Work",
+    "OS Transfer",
+    "OS Receive",
+    "Final Receive",
+    "Final Work",
+    "Completion",
+    "Report",
+    "Dashboard",
+    "Upload WIP from Excel",  # เพิ่มโหมดใหม่สำหรับการอัปโหลด Excel
+    "Admin Management"  # เพิ่มโหมดใหม่สำหรับการจัดการข้อมูล WOC
+])
 
-    if menu == "Forming Transfer":
-        transfer_mode("FM")
-    elif menu == "Tapping Transfer":
-        transfer_mode("TP")
-    elif menu == "Tapping Receive":
-        receive_mode("TP")
-    elif menu == "Tapping Work":
-        work_mode("TP")
-    elif menu == "OS Transfer":
-        transfer_mode("OS")
-    elif menu == "OS Receive":
-        receive_mode("OS")
-    elif menu == "Final Receive":
-        receive_mode("FI")
-    elif menu == "Final Work":
-        work_mode("FI")
-    elif menu == "Completion":
-        completion_mode()
-    elif menu == "Report":
-        report_mode()
-    elif menu == "Dashboard":
-        dashboard_mode()
-    elif menu == "Upload WIP from Excel":  # การเลือกโหมดใหม่
-        upload_wip_from_excel()  # เรียกฟังก์ชันการอัพโหลดข้อมูลจาก Excel
+if menu == "Forming Transfer":
+    transfer_mode("FM")
+elif menu == "Tapping Transfer":
+    transfer_mode("TP")
+elif menu == "Tapping Receive":
+    receive_mode("TP")
+elif menu == "Tapping Work":
+    work_mode("TP")
+elif menu == "OS Transfer":
+    transfer_mode("OS")
+elif menu == "OS Receive":
+    receive_mode("OS")
+elif menu == "Final Receive":
+    receive_mode("FI")
+elif menu == "Final Work":
+    work_mode("FI")
+elif menu == "Completion":
+    completion_mode()
+elif menu == "Report":
+    report_mode()
+elif menu == "Dashboard":
+    dashboard_mode()
+elif menu == "Upload WIP from Excel":
+    upload_wip_from_excel()  # เรียกฟังก์ชันการอัปโหลดข้อมูลจาก Excel
+elif menu == "Admin Management":  # การเลือกโหมด Admin Management
+    admin_management()  # เรียกฟังก์ชันจัดการข้อมูล WOC
 
 if __name__ == "__main__":
     main()
