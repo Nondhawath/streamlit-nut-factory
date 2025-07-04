@@ -143,12 +143,22 @@ def upload_wip_from_excel():
         st.write("ข้อมูลในไฟล์ Excel:")
         st.dataframe(df.head())
 
-        # ตรวจสอบคอลัมน์ในข้อมูล
-        required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "pieces_count"]
-        for col in required_columns:
-            if col not in df.columns:
-                st.error(f"คอลัมน์ '{col}' ขาดในไฟล์ Excel")
-                return
+        # คอลัมน์ที่จำเป็นต้องมีข้อมูล
+        required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
+        
+        # คอลัมน์ที่ไม่จำเป็นต้องมีข้อมูล (แต่ถ้ามีจะต้องไม่เป็นค่าว่าง)
+        optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count"]
+
+        # ตรวจสอบคอลัมน์ที่ต้องมีข้อมูล
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"คอลัมน์ต่อไปนี้ขาดในไฟล์ Excel: {', '.join(missing_columns)}")
+            return
+
+        # ตรวจสอบคอลัมน์ที่ไม่จำเป็นต้องมีข้อมูล แต่ถ้ามีต้องมีค่าที่ไม่ว่าง
+        for col in optional_columns:
+            if col in df.columns and df[col].isnull().any():
+                st.warning(f"คอลัมน์ '{col}' มีข้อมูลที่เป็นค่าว่าง แต่ยังคงสามารถดำเนินการได้")
 
         # ฟังก์ชันเพื่อลบข้อมูล WOC ที่ซ้ำในฐานข้อมูล
         def delete_existing_woc(woc_number):
@@ -167,13 +177,13 @@ def upload_wip_from_excel():
                 "woc_number": row["woc_number"],
                 "part_name": row["part_name"],
                 "operator_name": row["operator_name"],
-                "dept_from": row["dept_from"],
+                "dept_from": row.get("dept_from", ""),  # สำหรับ FM ปล่อยเป็นค่าว่าง
                 "dept_to": row["dept_to"],
-                "lot_number": row["lot_number"],
-                "total_weight": row["total_weight"],
-                "barrel_weight": row["barrel_weight"],
-                "sample_weight": row["sample_weight"],
-                "sample_count": row["sample_count"],
+                "lot_number": row.get("lot_number", ""),  # ใช้ค่าเริ่มต้นเป็นค่าว่าง
+                "total_weight": row.get("total_weight", 0.0),  # ใช้ค่าเริ่มต้นเป็น 0.0
+                "barrel_weight": row.get("barrel_weight", 0.0),  # ใช้ค่าเริ่มต้นเป็น 0.0
+                "sample_weight": row.get("sample_weight", 0.0),  # ใช้ค่าเริ่มต้นเป็น 0.0
+                "sample_count": row.get("sample_count", 0),  # ใช้ค่าเริ่มต้นเป็น 0
                 "pieces_count": row["pieces_count"],
                 "status": "WIP",  # ตั้งสถานะเริ่มต้นเป็น WIP
                 "created_at": datetime.utcnow()
