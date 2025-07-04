@@ -426,7 +426,8 @@ def admin_management():
     
     if woc_number:
         # ดึงข้อมูลจากฐานข้อมูลที่ตรงกับหมายเลข WOC
-        df = get_jobs_by_status_list([woc_number])
+        df = get_jobs_by_status("WIP")  # หรือใช้ get_all_jobs() เพื่อดึงข้อมูลทั้งหมด
+        df = df[df["woc_number"] == woc_number]  # ค้นหา WOC ที่ตรงกับหมายเลขที่ผู้ใช้กรอก
         
         if df.empty:
             st.error("ไม่พบข้อมูล WOC นี้ในฐานข้อมูล")
@@ -471,7 +472,6 @@ def admin_management():
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
             st.success(f"ลบข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
-
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
