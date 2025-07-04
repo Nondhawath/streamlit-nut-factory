@@ -29,8 +29,7 @@ def send_telegram_message(message):
 # === Database Operations ===
 def insert_job(data):
     # เพิ่มการปรับเวลาเป็น GMT+7
-    data["created_at"] = datetime.utcnow() + timedelta(hours=7)
-    
+    data["created_at"] = datetime.utcnow() + timedelta(hours=7)  # ปรับเวลาเป็น GMT+7
     with get_connection() as conn:
         cur = conn.cursor()
         keys = ', '.join(data.keys())
@@ -186,7 +185,6 @@ def upload_wip_from_excel():
             st.error(f"คอลัมน์ต่อไปนี้ขาดในไฟล์ Excel: {', '.join(missing_columns)}")
             return
 
-        # ตรวจสอบคอลัมน์ที่มีค่าว่าง
         for col in optional_columns:
             if col in df.columns and df[col].isnull().any():
                 st.warning(f"คอลัมน์ '{col}' มีข้อมูลที่เป็นค่าว่าง แต่ยังคงสามารถดำเนินการได้")
@@ -230,6 +228,7 @@ def upload_wip_from_excel():
 
         if st.button("ยืนยันการอัปโหลด"):
             st.success("อัปโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
+            
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
@@ -424,7 +423,10 @@ def report_mode():
             st.dataframe(summary)
     
     # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
-    excel_file = convert_df_to_excel(df)
+    @st.cache_data
+def convert_df_to_excel(df):
+    """แปลง DataFrame เป็นไฟล์ Excel"""
+    return df.to_excel(index=False)
     
     st.download_button(
         label="ดาวน์โหลดเป็นไฟล์ Excel",
