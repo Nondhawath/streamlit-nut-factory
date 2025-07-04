@@ -394,7 +394,7 @@ def completion_mode():
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
-    @st.cache_data
+@st.cache_data
 def convert_df_to_excel(df):
     """แปลง DataFrame เป็นไฟล์ Excel"""
     return df.to_excel(index=False)
