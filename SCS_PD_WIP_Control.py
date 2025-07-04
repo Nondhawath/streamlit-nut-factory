@@ -5,9 +5,16 @@ import requests
 import math
 from datetime import datetime
 
-# === Connection ===
+# === Connection Pool ===
+# สร้าง pool สำหรับการเชื่อมต่อฐานข้อมูล
+db_pool = psycopg2.pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=st.secrets["postgres"]["conn_str"])
+
 def get_connection():
-    return psycopg2.connect(st.secrets["postgres"]["conn_str"])
+    try:
+        return db_pool.getconn()
+    except psycopg2.DatabaseError as e:
+        st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
+        return None
 
 # === Telegram Notification ===
 def send_telegram_message(message):
@@ -15,7 +22,9 @@ def send_telegram_message(message):
     chat_id = st.secrets["telegram"]["chat_id"]
     url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
     try:
-        requests.get(url)
+        response = requests.get(url)
+        if response.status_code != 200:
+            st.error(f"Telegram แจ้งเตือนไม่สำเร็จ: {response.status_code}")
     except Exception as e:
         st.error(f"Telegram แจ้งเตือนไม่สำเร็จ: {e}")
 
@@ -51,11 +60,13 @@ def get_all_jobs():
 
 # === Helper ===
 def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
-    if sample_count == 0:
+    if total_weight <= barrel_weight or sample_weight <= 0 or sample_count <= 0:
+        st.warning("ค่าที่กรอกไม่ถูกต้อง: น้ำหนักรวม, น้ำหนักตัวอย่าง, และจำนวนตัวอย่างต้องเป็นค่าบวกที่ถูกต้อง")
         return 0
     try:
         return math.ceil((total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000))
     except ZeroDivisionError:
+        st.error("เกิดข้อผิดพลาดในการคำนวณ: แบ่งด้วยศูนย์")
         return 0
 
 # === Transfer Mode ===
