@@ -3,7 +3,7 @@ import psycopg2
 import pandas as pd
 import requests
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
 "created_at": datetime.utcnow() + timedelta(hours=7),  # ใช้เวลา GMT+7
 
