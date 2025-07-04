@@ -128,6 +128,49 @@ def transfer_mode(dept_from):
 
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
 
+# === Upload WIP from Excel ===
+def upload_wip_from_excel():
+    st.header("อัพโหลด WIP จากไฟล์ Excel")
+    
+    # ให้ผู้ใช้เลือกไฟล์ Excel
+    uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
+    
+    if uploaded_file is not None:
+        # อ่านข้อมูลจากไฟล์ Excel
+        df = pd.read_excel(uploaded_file)
+
+        # แสดงข้อมูลตัวอย่างจากไฟล์ Excel
+        st.write("ข้อมูลในไฟล์ Excel:")
+        st.dataframe(df.head())
+
+        # ตรวจสอบคอลัมน์ในข้อมูล
+        required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "pieces_count"]
+        for col in required_columns:
+            if col not in df.columns:
+                st.error(f"คอลัมน์ '{col}' ขาดในไฟล์ Excel")
+                return
+
+        # บันทึกข้อมูลลงในฐานข้อมูล
+        for _, row in df.iterrows():
+            data = {
+                "woc_number": row["woc_number"],
+                "part_name": row["part_name"],
+                "operator_name": row["operator_name"],
+                "dept_from": row["dept_from"],
+                "dept_to": row["dept_to"],
+                "lot_number": row["lot_number"],
+                "total_weight": row["total_weight"],
+                "barrel_weight": row["barrel_weight"],
+                "sample_weight": row["sample_weight"],
+                "sample_count": row["sample_count"],
+                "pieces_count": row["pieces_count"],
+                "status": "WIP",  # ตั้งสถานะเริ่มต้นเป็น WIP
+                "created_at": datetime.utcnow()
+            }
+            insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
+
+        st.success("อัพโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
+
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
@@ -361,6 +404,7 @@ def dashboard_mode():
             st.dataframe(part_summary)
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
+
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
@@ -377,7 +421,8 @@ def main():
         "Final Work",
         "Completion",
         "Report",
-        "Dashboard"
+        "Dashboard",
+        "Upload WIP from Excel"  # เพิ่มโหมดใหม่สำหรับการอัพโหลด Excel
     ])
 
     if menu == "Forming Transfer":
@@ -402,81 +447,8 @@ def main():
         report_mode()
     elif menu == "Dashboard":
         dashboard_mode()
+    elif menu == "Upload WIP from Excel":  # การเลือกโหมดใหม่
+        upload_wip_from_excel()  # เรียกฟังก์ชันการอัพโหลดข้อมูลจาก Excel
 
 if __name__ == "__main__":
     main()
-# === Admin Management Mode ===
-def edit_job(woc_numbers):
-    # ดึงข้อมูล WOC ที่ต้องการแก้ไข
-    with get_connection() as conn:
-        df = pd.read_sql(f"SELECT * FROM job_tracking WHERE woc_number IN ({', '.join([f'\'{woc}\'' for woc in woc_numbers])})", conn)
-    
-    if df.empty:
-        st.error(f"ไม่พบข้อมูล WOC: {', '.join(woc_numbers)}")
-        return
-    
-    # แสดงข้อมูลที่ต้องการแก้ไข
-    st.write(f"ข้อมูลที่จะแก้ไข: {', '.join(woc_numbers)}")
-
-    new_status = st.selectbox("สถานะใหม่", ["FM Transfer TP", "TP Working", "Completed", "WIP-TP", "FI Working"], index=0)
-    new_part_name = st.text_input("Part Name")
-    new_operator_name = st.text_input("Operator Name")
-    
-    # การบันทึกการแก้ไข
-    if st.button("บันทึกการแก้ไข"):
-        try:
-            with get_connection() as conn:
-                cur = conn.cursor()
-                for woc_number in woc_numbers:
-                    update_query = """
-                        UPDATE job_tracking
-                        SET status = %s, part_name = %s, operator_name = %s
-                        WHERE woc_number = %s
-                    """
-                    cur.execute(update_query, (new_status, new_part_name, new_operator_name, woc_number))
-                conn.commit()
-                st.success("บันทึกการแก้ไขเรียบร้อยแล้ว")
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
-
-def delete_job(woc_numbers):
-    # ตรวจสอบการเลือก WOC ที่ต้องการลบ
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(f"SELECT * FROM job_tracking WHERE woc_number IN ({', '.join([f'\'{woc}\'' for woc in woc_numbers])})", )
-        jobs = cur.fetchall()
-
-    if not jobs:
-        st.error(f"ไม่พบข้อมูล WOC: {', '.join(woc_numbers)}")
-        return
-    
-    st.write(f"คุณกำลังจะลบข้อมูล WOC: {', '.join(woc_numbers)}")
-
-    # ยืนยันการลบ
-    if st.button("ยืนยันการลบ"):
-        try:
-            with get_connection() as conn:
-                cur = conn.cursor()
-                for woc_number in woc_numbers:
-                    cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
-                conn.commit()
-                st.success("ลบข้อมูล WOC เรียบร้อยแล้ว")
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการลบข้อมูล: {e}")
-
-# === Admin Management Mode ===
-def admin_management_mode():
-    st.header("Admin Management")
-
-    # เลือกฟังก์ชันที่ต้องการ
-    action = st.selectbox("เลือกการดำเนินการ", ["แก้ไขข้อมูล", "ลบข้อมูล"])
-
-    if action == "แก้ไขข้อมูล":
-        woc_to_edit = st.multiselect("กรุณาเลือก WOC ที่ต้องการแก้ไข", options=[job['woc_number'] for job in get_all_jobs().to_dict('records')])
-        if woc_to_edit:
-            edit_job(woc_to_edit)
-
-    elif action == "ลบข้อมูล":
-        woc_to_delete = st.multiselect("กรุณาเลือก WOC ที่ต้องการลบ", options=[job['woc_number'] for job in get_all_jobs().to_dict('records')])
-        if woc_to_delete:
-            delete_job(woc_to_delete)
