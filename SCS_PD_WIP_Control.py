@@ -398,7 +398,12 @@ def completion_mode():
 @st.cache_data
 def convert_df_to_excel(df):
     """แปลง DataFrame เป็นไฟล์ Excel"""
-    return df.to_excel(index=False)
+    from io import BytesIO
+    # สร้าง buffer ของ BytesIO เพื่อเก็บข้อมูลไฟล์ Excel
+    excel_buffer = BytesIO()
+    df.to_excel(excel_buffer, index=False, engine='openpyxl')  # ระบุ engine ให้ชัดเจน
+    excel_buffer.seek(0)  # กลับไปที่จุดเริ่มต้นของ buffer
+    return excel_buffer
 
 # === Report Mode ===
 def report_mode():
