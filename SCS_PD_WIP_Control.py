@@ -5,6 +5,7 @@ import requests
 import math
 from datetime import datetime, timedelta
 import numpy as np
+import io
 
 # แทนค่าที่เป็น inf, -inf ด้วย NaN และเติมค่าว่างใน df (ถ้ามี)
 # (หากมี df อยู่แล้ว ควรเรียกในส่วนที่เหมาะสม)
@@ -480,17 +481,22 @@ def report_mode():
 # === Excel Converter Helper ===
 import io
 def convert_df_to_excel(df: pd.DataFrame) -> bytes:
-    df = df.copy()
-    df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df.fillna("", inplace=True)
+    df_clean = df.copy()
+
+    # แปลง inf/-inf เป็น NaN
+    df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    # แทนที่ NaN ด้วย string ว่าง
+    df_clean.fillna("", inplace=True)
 
     # แปลงคอลัมน์ object เป็น string เพื่อป้องกัน error
-    for col in df.select_dtypes(include=["object"]).columns:
-        df[col] = df[col].astype(str)
+    for col in df_clean.select_dtypes(include=["object"]).columns:
+        # แปลงให้เป็น string แบบปลอดภัย (กรณีมี list/dict)
+        df_clean[col] = df_clean[col].apply(lambda x: str(x) if not pd.isna(x) else "")
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name="Report")
+        df_clean.to_excel(writer, index=False, sheet_name="Report")
     processed_data = output.getvalue()
     return processed_data
 
