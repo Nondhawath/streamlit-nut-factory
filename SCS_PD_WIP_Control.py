@@ -4,17 +4,11 @@ import pandas as pd
 import requests
 import math
 from datetime import datetime
-import numpy as np  # เพิ่มการนำเข้า numpy
 
 # === Connection ===
 def get_connection():
-    # เพิ่มการตั้งค่า search_path ในการเชื่อมต่อฐานข้อมูล
-    return psycopg2.connect(st.secrets["postgres"]["conn_str"], options="-c search_path=public")
+    return psycopg2.connect(st.secrets["postgres"]["conn_str"])
 
-# === Database Operations ===
-def get_jobs_by_status(status):
-    with get_connection() as conn:
-        return pd.read_sql("SELECT * FROM job_tracking WHERE status = %s ORDER BY created_at DESC", conn, params=(status,))
 # === Telegram Notification ===
 def send_telegram_message(message):
     token = st.secrets["telegram"]["token"]
@@ -27,9 +21,6 @@ def send_telegram_message(message):
 
 # === Database Operations ===
 def insert_job(data):
-    # แปลงค่าทุกตัวที่เป็น numpy.int64 ให้เป็น int
-    data = {key: int(value) if isinstance(value, np.int64) else value for key, value in data.items()}
-
     with get_connection() as conn:
         cur = conn.cursor()
         keys = ', '.join(data.keys())
@@ -72,15 +63,14 @@ def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
     prev_woc = ""
-    
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)  # เลือก WOC ก่อนหน้า
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     elif dept_from == "OS":
         df = get_jobs_by_status("OS Received")
         prev_woc_options = [""] + list(df["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)  # เลือก WOC ก่อนหน้า
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     else:
         st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
 
@@ -91,8 +81,18 @@ def transfer_mode(dept_from):
         part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
     part_name = st.text_input("Part Name", value=part_name)
 
-    dept_to_options = ["TP", "FI", "OS"]
+    # กำหนดแผนกปลายทาง (Department to)
+    if dept_from == "OS":
+        dept_to_options = ["FI"]
+    else:
+        dept_to_options = ["TP", "FI", "OS"]
+
     dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
+    
+    # ตรวจสอบว่าแผนกปลายทางไม่ใช่แผนกต้นทาง
+    if dept_from == dept_to:
+        st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
+        return  # หยุดการทำงานถ้าพบว่ามีการโอนย้ายไปยังแผนกเดียวกัน
 
     lot_number = st.text_input("Lot Number")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
@@ -114,7 +114,7 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
-        # บันทึกข้อมูล Transfer
+        # ทำการบันทึกข้อมูล Transfer
         insert_job({
             "woc_number": new_woc,
             "part_name": part_name,
@@ -128,7 +128,6 @@ def transfer_mode(dept_from):
             "sample_count": sample_count,
             "pieces_count": pieces_count,
             "status": f"{dept_from} Transfer {dept_to}",
-            "prev_woc_number": prev_woc,  # บันทึกหมายเลข WOC ก่อนหน้า
             "created_at": datetime.utcnow()
         })
 
@@ -226,9 +225,10 @@ def receive_mode(dept_to):
 def work_mode(dept):
     st.header(f"{dept} Work")
 
+    # กรองสถานะที่ต้องการ
     status_working = {
-        "TP": "TP Received",  
-        "FI": "FI Working"
+        "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
+        "FI": "FI Received"
     }
     status_filter = status_working.get(dept, "")
 
@@ -236,17 +236,17 @@ def work_mode(dept):
         st.warning("ไม่มีสถานะสำหรับโหมดนี้")
         return
 
-    # กรอง WOC ที่ยังไม่ถูกเลือกหรือทำงาน
+    # กรอง WOC ที่มีสถานะล่าสุด (ไม่ซ้ำกัน)
     df = get_jobs_by_status(status_filter)
+    df = df.sort_values('created_at', ascending=False)  # จัดเรียงตามเวลาสร้างล่าสุด
+    df = df.drop_duplicates(subset=['woc_number'], keep='first')  # ลบ WOC ซ้ำ
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
         return
 
-    # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
-    woc_list = df["woc_number"].drop_duplicates().tolist()
-
-    # เพิ่มกรองข้อมูลเพื่อไม่ให้ WOC ซ้ำ
+    # เลือก WOC ที่จะทำงาน
+    woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
@@ -261,29 +261,7 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-
-        # บันทึกเวลาเครื่องจักร
-        on_machine_time = datetime.utcnow()  # ใช้เวลา timestamp เมื่อบันทึก
-
-        # บันทึกข้อมูลการทำงาน
-        insert_job({
-            "woc_number": woc_selected,
-            "part_name": job["part_name"],
-            "operator_name": operator_name,
-            "dept_from": dept,
-            "dept_to": dept,
-            "lot_number": job["lot_number"],
-            "total_weight": job["total_weight"],
-            "barrel_weight": job["barrel_weight"],
-            "sample_weight": job["sample_weight"],
-            "sample_count": job["sample_count"],
-            "pieces_count": job["pieces_count"],
-            "machine_name": machine_name,  # ชื่อเครื่องจักรที่พนักงานกรอก
-            "on_machine_time": on_machine_time,  # ใช้เวลา timestamp ที่บันทึก
-            "status": f"{dept} Working",
-            "created_at": datetime.utcnow()
-        })
-
+        update_status(woc_selected, f"{dept} Working")  # เปลี่ยนสถานะเป็น "Working"
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
@@ -380,8 +358,10 @@ def dashboard_mode():
         ],
         "WIP-FI": [
             "FI Received", "FI Working", "WIP-Final Work"
+        ],
+        "Completed": [
+            "Completed"
         ]
-        
     }
 
     for wip_name, statuses in wip_map.items():
@@ -402,7 +382,7 @@ def dashboard_mode():
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
-    st.title("🏭 SCS Production Management)")
+    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
 
     menu = st.sidebar.selectbox("เลือกโหมด", [
         "Forming Transfer",
