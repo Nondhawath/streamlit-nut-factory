@@ -165,6 +165,17 @@ def validate_data(row):
         st.error(f"ข้อมูลใน WOC {row['woc_number']} เกินขีดจำกัด")
         return False
     return True
+    
+def update_status_to_on_machine(woc_number):
+    # เปลี่ยนสถานะของ WOC เป็น "On Machine" พร้อมบันทึกเวลา
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE job_tracking 
+            SET status = %s, on_machine_time = %s 
+            WHERE woc_number = %s
+        """, ("On Machine", datetime.utcnow() + timedelta(hours=7), woc_number))
+        conn.commit()
 
 def upload_wip_from_excel():
     st.header("อัพโหลด WIP จากไฟล์ Excel")
@@ -416,9 +427,14 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working")
-        st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
-        send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
+
+        # เปลี่ยนสถานะจาก TP Working เป็น On Machine
+        update_status_to_on_machine(woc_selected)  # เปลี่ยนสถานะไปที่ On Machine
+        st.success(f"เปลี่ยนสถานะ WOC {woc_selected} เป็น On Machine")
+
+        # เมื่อการทำงานเสร็จสิ้นและโอนงานไปยังแผนกถัดไป
+        update_status(woc_selected, "Completed")  # เปลี่ยนสถานะเป็น Completed
+        st.success(f"สถานะ WOC {woc_selected} เป็น Completed")
 
 # === Completion Mode ===
 def completion_mode():
@@ -521,36 +537,27 @@ def dashboard_mode():
     st.header("Dashboard WIP รวม")
     df = get_all_jobs()
 
-    df['created_at'] = pd.to_datetime(df['created_at']) + timedelta(hours=7)
-    df = df.sort_values("created_at").groupby("woc_number", as_index=False).last()
+    # ฟิลเตอร์แสดงเฉพาะสถานะ On Machine
+    df_on_machine = df[df["status"] == "On Machine"]
 
-    search = st.text_input("ค้นหา WOC หรือ Part Name")
-    if search:
-        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
-                df["part_name"].str.contains(search, case=False, na=False)]
+    if not df_on_machine.empty:
+        st.subheader("งานที่กำลังทำงานบนเครื่องจักร (On Machine)")
 
-    wip_map = {
-        "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
-        "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
-        "WIP-OS": ["OS Received", "OS Transfer FI"],
-        "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
-        "Completed": ["Completed"]
-    }
+        # แสดงข้อมูลที่ต้องการในรูปแบบตาราง
+        for _, row in df_on_machine.iterrows():
+            part_name = row["part_name"]
+            woc_number = row["woc_number"]
+            pieces_count = row["pieces_count"]
+            on_machine_time = row["on_machine_time"]
 
-    for wip_name, statuses in wip_map.items():
-        st.subheader(f"{wip_name}")
-        df_wip = df[df["status"].isin(statuses)]
-        total = df_wip["pieces_count"].sum()
-        st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
+            st.markdown(f"### WOC: {woc_number}")
+            st.markdown(f"- **Part Name**: {part_name}")
+            st.markdown(f"- **จำนวนชิ้นงาน**: {pieces_count}")
+            st.markdown(f"- **เริ่มทำงานที่**: {on_machine_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        if not df_wip.empty:
-            part_summary = df_wip.groupby("part_name").agg(
-                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-            ).reset_index()
-            st.dataframe(part_summary)
-        else:
-            st.info("ไม่มีข้อมูลในกลุ่มนี้")
+    else:
+        st.info("ไม่มีงานที่กำลังทำงานบนเครื่องจักร")
+
 
 # === Admin Management Mode ===
 def admin_management():
