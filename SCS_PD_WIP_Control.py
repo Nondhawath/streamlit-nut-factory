@@ -8,7 +8,7 @@ import numpy as np  # เพิ่มการนำเข้า numpy
 
 # === Connection ===
 def get_connection():
-    return psycopg2.connect(st.secrets["postgres"]["conn_str"])
+    return psycopg2.connect(st.secrets["postgres"]["conn_str"], options="-c search_path=public")
 
 # === Telegram Notification ===
 def send_telegram_message(message):
