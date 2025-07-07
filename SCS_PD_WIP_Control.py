@@ -221,32 +221,39 @@ def upload_wip_from_excel():
             if pd.isnull(row["woc_number"]):
                 continue
 
+            try:
+                pieces = int(row["pieces_count"])
+            except Exception:
+                st.error(f"WOC {row['woc_number']} มีจำนวนชิ้นงานไม่ถูกต้อง: {row['pieces_count']}")
+                continue
+
             delete_existing_woc(row["woc_number"])
 
             # คำนวณสถานะจาก dept_from และ dept_to
             status = f"{row['dept_from']} Transfer {row['dept_to']}"
 
             data = {
-                "woc_number": row["woc_number"],
-                "part_name": row["part_name"],
-                "operator_name": row["operator_name"],
-                "dept_from": row.get("dept_from", ""),
-                "dept_to": row["dept_to"],
-                "lot_number": row.get("lot_number", ""),
-                "total_weight": row.get("total_weight", 0.0),
-                "barrel_weight": row.get("barrel_weight", 0.0),
-                "sample_weight": row.get("sample_weight", 0.0),
-                "sample_count": row.get("sample_count", 0),
-                "pieces_count": row["pieces_count"],
+                "woc_number": str(row["woc_number"]),
+                "part_name": str(row["part_name"]),
+                "operator_name": str(row["operator_name"]),
+                "dept_from": str(row.get("dept_from", "")),
+                "dept_to": str(row["dept_to"]),
+                "lot_number": str(row.get("lot_number", "")),
+                "total_weight": float(row.get("total_weight", 0.0) or 0.0),
+                "barrel_weight": float(row.get("barrel_weight", 0.0) or 0.0),
+                "sample_weight": float(row.get("sample_weight", 0.0) or 0.0),
+                "sample_count": int(row.get("sample_count", 0) or 0),
+                "pieces_count": pieces,
                 "status": status,
                 "created_at": datetime.utcnow() + timedelta(hours=7),
-                "prev_woc_number": row.get("prev_woc_number", ""),
-                "ok_count": row.get("ok_count", 0),
-                "ng_count": row.get("ng_count", 0),
-                "rework_count": row.get("rework_count", 0),
-                "remain_count": row.get("remain_count", 0),
-                "machine_name": row.get("machine_name", ""),
+                "prev_woc_number": str(row.get("prev_woc_number", "")),
+                "ok_count": int(row.get("ok_count", 0) or 0),
+                "ng_count": int(row.get("ng_count", 0) or 0),
+                "rework_count": int(row.get("rework_count", 0) or 0),
+                "remain_count": int(row.get("remain_count", 0) or 0),
+                "machine_name": str(row.get("machine_name", "")),
             }
+
             insert_job(data)
 
         st.success("📥 ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกเรียบร้อยแล้ว")
