@@ -227,13 +227,17 @@ def work_mode(dept):
         st.warning("ไม่มีสถานะสำหรับโหมดนี้")
         return
 
+    # กรอง WOC ที่ยังไม่ถูกเลือกหรือทำงาน
     df = get_jobs_by_status(status_filter)
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
         return
 
-    woc_list = df["woc_number"].tolist()
+    # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
+    woc_list = df["woc_number"].drop_duplicates().tolist()
+
+    # เพิ่มกรองข้อมูลเพื่อไม่ให้ WOC ซ้ำ
     woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
@@ -241,16 +245,14 @@ def work_mode(dept):
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    # ให้กรอกชื่อเครื่องจักร
     machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    # ตรวจสอบว่าเครื่องจักรไม่ว่าง
     if st.button("เริ่มทำงาน"):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        
+
         # บันทึกเวลาเครื่องจักร
         on_machine_time = datetime.utcnow()  # ใช้เวลา timestamp เมื่อบันทึก
 
