@@ -321,7 +321,6 @@ def completion_mode():
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
 
-
 # === Report Mode ===
 def report_mode():
     st.header("รายงานและสรุป WIP")
