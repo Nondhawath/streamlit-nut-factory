@@ -566,9 +566,15 @@ def admin_management():
 
     # แสดงหมายเลข WOC ใน Dropdown (selectbox) หรือให้เลือกหลายรายการ
     woc_list = woc_df["woc_number"].unique().tolist()
-    
-    # ให้เลือกหลาย WOC ได้
-    woc_selected = st.multiselect("เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
+
+    # ปุ่มเลือกทั้งหมด
+    select_all = st.checkbox("เลือกทั้งหมด", value=False)
+
+    # ถ้าเลือกทั้งหมด ให้เลือก WOC ทั้งหมด
+    if select_all:
+        woc_selected = woc_list
+    else:
+        woc_selected = st.multiselect("เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
 
     if woc_selected:
         # แสดงข้อมูลของ WOC ที่เลือก
