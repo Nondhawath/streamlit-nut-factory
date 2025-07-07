@@ -378,12 +378,14 @@ def work_mode(dept):
         "FI": "FI Received"
     }.get(dept, "")
 
+    # ดึงข้อมูลจากฐานข้อมูลที่มีสถานะที่ตรงกับที่กำหนด
     df = get_jobs_by_status(status_filter)
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
         return
 
+    # แสดง WOC ที่สามารถเลือกได้
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
@@ -395,16 +397,23 @@ def work_mode(dept):
     machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
+    # เมื่อกดเริ่มทำงาน
     if st.button("เริ่มทำงาน"):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        # Update status to "Completed" if it was previously "Received"
+        
+        # ถ้าสถานะเป็น TP Received หรือ FI Received เปลี่ยนสถานะเป็น Completed ก่อน
         if job['status'] == "TP Received" or job['status'] == "FI Received":
             update_status(woc_selected, "Completed")
+            st.info(f"สถานะของ WOC {woc_selected} ถูกเปลี่ยนเป็น Completed ก่อนเริ่มทำงาน")
 
+        # เปลี่ยนสถานะของ WOC เป็น "Working"
         update_status(woc_selected, f"{dept} Working")
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
+
+        # ส่งข้อความแจ้งเตือน (ถ้าต้องการ)
+        send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
 # === Completion Mode ===
 def completion_mode():
