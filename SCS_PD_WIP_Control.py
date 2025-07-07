@@ -274,7 +274,10 @@ def completion_mode():
         st.info("ไม่มีงานรอ Completion")
         return
 
-    woc_list = df["woc_number"].tolist()
+    # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
+    woc_list = df["woc_number"].drop_duplicates().tolist()
+    
+    # เลือก WOC ที่จะทำ Completion
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
