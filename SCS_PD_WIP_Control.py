@@ -268,14 +268,13 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
+    
+    # กรองข้อมูลสถานะ FI Working พร้อมชื่อเครื่องจักร
+    df = get_jobs_by_status("FI Working")  # ดึงข้อมูลที่มีสถานะ "FI Working"
 
-    # กรองข้อมูลที่มีสถานะ FI Working ที่ตามด้วยชื่อเครื่องจักร (เช่น FI Working-SM01)
-    df = get_jobs_by_status("FI Working")  # ค้นหางานที่มีสถานะ FI Working
+    # กรองแค่สถานะที่มีชื่อเครื่องจักร (เช่น FI Working-SM20)
+    df = df[df['status'].str.contains('FI Working-', case=False, na=False)]  # ตรวจสอบสถานะที่มี "-"
 
-    # กรองแค่สถานะที่มีชื่อเครื่องจักร (เช่น FI Working-SM01)
-    df = df[df['status'].str.contains('FI Working-', case=False, na=False)]
-
-    # ถ้ามีการกรองสถานะ FI Working-SM01 หรือชื่อเครื่องจักรอื่นๆ ต่อท้าย
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
@@ -326,7 +325,6 @@ def completion_mode():
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
 
-        
 # === Report Mode ===
 def report_mode():
     st.header("รายงานและสรุป WIP")
