@@ -479,26 +479,34 @@ def report_mode():
     st.download_button(label="ดาวน์โหลดรายงานเป็น Excel", data=excel_data, file_name="job_report.xlsx")
 
 # === Excel Converter Helper ===
-def convert_df_to_excel(df: pd.DataFrame) -> bytes:
+@st.cache_data
+def convert_df_to_excel(df):
+    from io import BytesIO
+    import numpy as np
+
     df_clean = df.copy()
 
-    # แปลง inf/-inf เป็น NaN
+    # จัดการ NaN, inf, -inf
     df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-    # แทนที่ NaN ด้วย string ว่าง
     df_clean.fillna("", inplace=True)
 
-    # แปลงคอลัมน์ object เป็น string เพื่อป้องกัน error
-    for col in df_clean.select_dtypes(include=["object"]).columns:
-        # แปลงให้เป็น string แบบปลอดภัย (กรณีมี list/dict)
-        df_clean[col] = df_clean[col].apply(lambda x: str(x) if not pd.isna(x) else "")
+    # แปลงทุกคอลัมน์ให้เป็น string ปลอดภัย
+    for col in df_clean.columns:
+        df_clean[col] = df_clean[col].astype(str)
 
-    output = io.BytesIO()
+    # แปลง datetime เป็น string ด้วย
+    for col in df_clean.columns:
+        if df_clean[col].str.contains("Timestamp|datetime|NaT", case=False).any():
+            df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+            df_clean[col].fillna("", inplace=True)
+
+    output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_clean.to_excel(writer, index=False, sheet_name="Report")
-    processed_data = output.getvalue()
-    return processed_data
 
+    output.seek(0)
+    return output
+    
 # === Admin Management ===
 def admin_management():
     st.header("Admin Management")
