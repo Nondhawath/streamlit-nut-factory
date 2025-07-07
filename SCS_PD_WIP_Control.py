@@ -506,7 +506,42 @@ def convert_df_to_excel(df):
 
     output.seek(0)
     return output
-    
+#Dashboard_Mode
+def dashboard_mode():
+    st.header("Dashboard WIP รวม")
+    df = get_all_jobs()
+
+    df['created_at'] = pd.to_datetime(df['created_at']) + timedelta(hours=7)
+    df = df.sort_values("created_at").groupby("woc_number", as_index=False).last()
+
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
+                df["part_name"].str.contains(search, case=False, na=False)]
+
+    wip_map = {
+        "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
+        "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
+        "WIP-OS": ["OS Received", "OS Transfer FI"],
+        "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
+        "Completed": ["Completed"]
+    }
+
+    for wip_name, statuses in wip_map.items():
+        st.subheader(f"{wip_name}")
+        df_wip = df[df["status"].isin(statuses)]
+        total = df_wip["pieces_count"].sum()
+        st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
+
+        if not df_wip.empty:
+            part_summary = df_wip.groupby("part_name").agg(
+                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+            ).reset_index()
+            st.dataframe(part_summary)
+        else:
+            st.info("ไม่มีข้อมูลในกลุ่มนี้")
+
 # === Admin Management ===
 def admin_management():
     st.header("Admin Management")
