@@ -544,30 +544,39 @@ def dashboard_mode():
 
 # === Admin Management ===
 def admin_management():
-    st.header("Admin Management")
+    st.header("🛠️ Admin Management")
 
     df = get_all_jobs()
-    st.dataframe(df)
 
-    woc_selected = st.text_input("กรอก WOC เพื่อแก้ไขข้อมูล")
+    if df.empty:
+        st.warning("ไม่มีข้อมูลในฐานข้อมูล")
+        return
 
-    if woc_selected:
-        job_df = df[df["woc_number"] == woc_selected]
-        if job_df.empty:
-            st.warning("ไม่พบข้อมูล WOC ที่ระบุ")
-            return
+    df_display = df[["woc_number", "part_name", "dept_from", "dept_to", "status", "pieces_count", "created_at"]]
 
-        job = job_df.iloc[0]
+    selected_wocs = st.multiselect(
+        "เลือก WOC ที่ต้องการลบ",
+        options=df_display["woc_number"].unique().tolist()
+    )
 
-        # ตัวอย่างแก้ไข fields
-        part_name = st.text_input("Part Name", value=job["part_name"])
-        operator_name = st.text_input("Operator Name", value=job["operator_name"])
-        status = st.text_input("Status", value=job["status"])
+    if st.checkbox("เลือกทั้งหมด"):
+        selected_wocs = df_display["woc_number"].unique().tolist()
 
-        if st.button("บันทึกข้อมูลแก้ไข"):
-            # สำหรับแก้ไขจริงควรใช้ SQL UPDATE แทน insert ใหม่
-            st.warning("ฟังก์ชันแก้ไขยังไม่สมบูรณ์ (ควร implement UPDATE SQL)")
+    st.dataframe(df_display[df_display["woc_number"].isin(selected_wocs)])
 
+    if selected_wocs:
+        if st.button(f"🗑️ ลบรายการที่เลือกทั้งหมด ({len(selected_wocs)} รายการ)"):
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.executemany(
+                    "DELETE FROM job_tracking WHERE woc_number = %s",
+                    [(woc,) for woc in selected_wocs]
+                )
+                conn.commit()
+            st.success(f"✅ ลบข้อมูล WOC ทั้งหมด {len(selected_wocs)} รายการเรียบร้อยแล้ว")
+    else:
+        st.info("กรุณาเลือกรายการ WOC ก่อนลบ")
+        
 # === Main Application ===
 def main():
     st.title("ระบบจัดการงานในโรงงาน")
