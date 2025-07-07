@@ -423,7 +423,6 @@ def admin_management()
 def main()
     st.set_page_config(page_title=WOC Tracker, layout=wide)
     st.title(🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit))
-
     menu = st.sidebar.selectbox(เลือกโหมด, [
         Forming Transfer,
         Tapping Transfer,
