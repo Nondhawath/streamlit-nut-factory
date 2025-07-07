@@ -228,7 +228,7 @@ def work_mode(dept):
     # กรองสถานะที่ต้องการ
     status_working = {
         "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
-        "FI": "FI Received"
+        "FI": "FI Working"
     }
     status_filter = status_working.get(dept, "")
 
