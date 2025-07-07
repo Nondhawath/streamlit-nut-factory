@@ -193,7 +193,7 @@ def receive_mode(dept_to):
             st.error("กรุณาเลือกแผนกถัดไป")
             return
 
-        next_status = f"WIP-Tapping Work"  # เปลี่ยนสถานะเป็น WIP-Tapping Work
+        next_status = f"WIP-{dept_to_next}"
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -218,7 +218,7 @@ def work_mode(dept):
     st.header(f"{dept} Work")
 
     status_working = {
-        "TP": "WIP-Tapping Work",  # เปลี่ยนสถานะเป็น WIP-Tapping Work
+        "TP": "TP Received",
         "FI": "FI Received"
     }
     status_filter = status_working.get(dept, "")
@@ -248,7 +248,7 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, "TP Working")  # เปลี่ยนสถานะเป็น TP Working
+        update_status(woc_selected, f"{dept} Working")
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
@@ -331,16 +331,16 @@ def dashboard_mode():
     # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
         "WIP-FM": [
-            "FM Transfer TP", "FM Transfer OS","FM Transfer FI"
+            "FM Transfer TP", "FM Transfer OS"
         ],
         "WIP-TP": [
-            "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
+            "TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
         ],
         "WIP-OS": [
             "OS Received", "OS Transfer FI"
         ],
         "WIP-FI": [
-            "FI Working", "WIP-Final Work"
+            "FI Received", "FI Working", "WIP-Final Work"
         ],
         "Completed": [
             "Completed"
