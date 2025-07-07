@@ -269,7 +269,7 @@ def work_mode(dept):
 def completion_mode():
     st.header("Completion")
     
-    # กรองสถานะ FI Working ที่เริ่มต้นด้วย 'FI Working-'
+    # กรองสถานะ FI Working ที่เริ่มต้นด้วย 'FI Working-' และมีชื่อเครื่องจักรต่อท้าย
     df = get_jobs_by_status("FI Working")
 
     # ตรวจสอบว่าไม่มีข้อมูลที่มีสถานะ FI Working
@@ -278,7 +278,7 @@ def completion_mode():
         return
 
     # กรองสถานะ FI Working ที่เริ่มต้นด้วย 'FI Working-'
-    df_filtered = df[df['status'].str.startswith('FI Working-', na=False)]
+    df_filtered = df[df['status'].str.contains('FI Working-', na=False)]
 
     if df_filtered.empty:
         st.info("ไม่มีงานรอ Completion ในสถานะ FI Working-")
@@ -320,6 +320,7 @@ def completion_mode():
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
+
 # === Report Mode ===
 def report_mode():
     st.header("รายงานและสรุป WIP")
