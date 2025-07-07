@@ -59,10 +59,12 @@ def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
         return 0
 
 # === Transfer Mode ===
+# === Transfer Mode ===
 def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
     prev_woc = ""
+    
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
@@ -128,6 +130,7 @@ def transfer_mode(dept_from):
             "sample_count": sample_count,
             "pieces_count": pieces_count,
             "status": f"{dept_from} Transfer {dept_to}",
+            "prev_woc_number": prev_woc,  # เพิ่มฟิลด์ prev_woc_number
             "created_at": datetime.utcnow()
         })
 
@@ -222,12 +225,12 @@ def receive_mode(dept_to):
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
+# === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
 
-    # กรองสถานะที่ต้องการ
     status_working = {
-        "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
+        "TP": "WIP-Tapping Work",  # เปลี่ยนสถานะเป็น WIP-Tapping Work
         "FI": "FI Received"
     }
     status_filter = status_working.get(dept, "")
@@ -236,16 +239,12 @@ def work_mode(dept):
         st.warning("ไม่มีสถานะสำหรับโหมดนี้")
         return
 
-    # กรอง WOC ที่มีสถานะล่าสุด (ไม่ซ้ำกัน)
     df = get_jobs_by_status(status_filter)
-    df = df.sort_values('created_at', ascending=False)  # จัดเรียงตามเวลาสร้างล่าสุด
-    df = df.drop_duplicates(subset=['woc_number'], keep='first')  # ลบ WOC ซ้ำ
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
         return
 
-    # เลือก WOC ที่จะทำงาน
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
@@ -256,12 +255,33 @@ def work_mode(dept):
 
     machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+    on_machine_time = st.number_input("เวลาทำงานบนเครื่อง (ชั่วโมง)", min_value=0.0, step=0.1)  # เพิ่มเวลา
 
     if st.button("เริ่มทำงาน"):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working")  # เปลี่ยนสถานะเป็น "Working"
+        update_status(woc_selected, f"{dept} Working")
+
+        # บันทึกข้อมูลการทำงาน
+        insert_job({
+            "woc_number": woc_selected,
+            "part_name": job["part_name"],
+            "operator_name": operator_name,
+            "dept_from": dept,
+            "dept_to": dept,  # แผนกปลายทางยังคงเหมือนเดิม
+            "lot_number": job["lot_number"],
+            "total_weight": job["total_weight"],
+            "barrel_weight": job["barrel_weight"],
+            "sample_weight": job["sample_weight"],
+            "sample_count": job["sample_count"],
+            "pieces_count": job["pieces_count"],
+            "machine_name": machine_name,  # เพิ่มฟิลด์ machine_name
+            "on_machine_time": on_machine_time,  # เพิ่มฟิลด์ on_machine_time
+            "status": f"{dept} Working",
+            "created_at": datetime.utcnow()
+        })
+
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
