@@ -268,18 +268,18 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    
-    # กรองข้อมูลที่มีสถานะ "FI Working" โดยไม่จำกัดชื่อเครื่องจักร
+
+    # กรองข้อมูลที่มีสถานะ "FI Working" รวมถึงสถานะที่มีเครื่องจักรติดท้าย
     df = get_jobs_by_status("FI Working")
 
-    # หากสถานะที่เลือกมีเครื่องจักรในชื่อสถานะ FI Working-SM01
+    # ถ้ามีการกรองสถานะ FI Working-SM01 หรือชื่อเครื่องจักรอื่นๆ ต่อท้าย
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
 
     # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
     woc_list = df["woc_number"].drop_duplicates().tolist()
-    
+
     # เลือก WOC ที่จะทำ Completion
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
