@@ -555,61 +555,67 @@ def dashboard_mode():
 # === Admin Management Mode ===
 def admin_management():
     st.header("Admin Management")
-    
+
     # ดึงข้อมูล WOC ทั้งหมดจากฐานข้อมูล
     woc_df = get_all_jobs()  # หรือใช้ get_jobs_by_status("WIP") เพื่อกรองเฉพาะ WIP
-    
+
     # ตรวจสอบว่ามี WOC ในฐานข้อมูลหรือไม่
     if woc_df.empty:
         st.error("ไม่มีข้อมูล WOC ในฐานข้อมูล")
         return
 
-    # แสดงหมายเลข WOC ใน Dropdown (selectbox)
+    # แสดงหมายเลข WOC ใน Dropdown (selectbox) หรือให้เลือกหลายรายการ
     woc_list = woc_df["woc_number"].unique().tolist()
-    woc_number = st.selectbox("เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
+    
+    # ให้เลือกหลาย WOC ได้
+    woc_selected = st.multiselect("เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
 
-    if woc_number:
-        # ดึงข้อมูลจากฐานข้อมูลที่ตรงกับหมายเลข WOC
-        job = woc_df[woc_df["woc_number"] == woc_number].iloc[0]
-        
+    if woc_selected:
         # แสดงข้อมูลของ WOC ที่เลือก
-        st.write(f"ข้อมูล WOC {woc_number}:")
-        st.write(f"- **Part Name:** {job['part_name']}")
-        st.write(f"- **Operator Name:** {job['operator_name']}")
-        st.write(f"- **Dept From:** {job['dept_from']}")
-        st.write(f"- **Dept To:** {job['dept_to']}")
-        st.write(f"- **Lot Number:** {job['lot_number']}")
-        st.write(f"- **Total Weight:** {job['total_weight']}")
-        st.write(f"- **Barrel Weight:** {job['barrel_weight']}")
-        st.write(f"- **Sample Weight:** {job['sample_weight']}")
-        st.write(f"- **Sample Count:** {job['sample_count']}")
-        st.write(f"- **Pieces Count:** {job['pieces_count']}")
-        st.write(f"- **Status:** {job['status']}")
-        
-        # ให้ผู้ใช้เลือกการแก้ไขข้อมูล
-        edit_fields = ['part_name', 'operator_name', 'dept_from', 'dept_to', 'lot_number', 
-                       'total_weight', 'barrel_weight', 'sample_weight', 'sample_count', 'pieces_count', 'status']
-        
-        updated_data = {}
-        for field in edit_fields:
-            new_value = st.text_input(f"แก้ไข {field}:", value=str(job[field]) if pd.notna(job[field]) else "")
-            updated_data[field] = new_value
-        
-        if st.button("บันทึกการแก้ไข"):
-            # บันทึกข้อมูลใหม่หากมีการแก้ไข
-            updated_data["woc_number"] = woc_number
-            updated_data["created_at"] = datetime.utcnow()
-            insert_job(updated_data)
-            st.success(f"แก้ไขข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
-        
-        # ให้เลือกลบข้อมูล
-        if st.button("ลบข้อมูล WOC นี้"):
-            # ลบข้อมูล WOC
-            with get_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
-                conn.commit()
-            st.success(f"ลบข้อมูล WOC {woc_number} เรียบร้อยแล้ว")
+        st.write("ข้อมูล WOC ที่เลือก:")
+        selected_wocs = woc_df[woc_df["woc_number"].isin(woc_selected)]
+        st.dataframe(selected_wocs)
+
+        # สถานะการลบ
+        total_to_delete = len(woc_selected)
+        deleted_count = 0
+
+        # เพิ่มปุ่มให้ลบ WOC ที่เลือก
+        if st.button("ลบ WOC ที่เลือก"):
+            for woc_number in woc_selected:
+                # ลบ WOC
+                with get_connection() as conn:
+                    cur = conn.cursor()
+                    cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
+                    conn.commit()
+                deleted_count += 1
+                st.success(f"ลบ WOC {woc_number} เรียบร้อยแล้ว")
+
+            # แสดงสถานะการลบ
+            st.info(f"ลบแล้ว {deleted_count}/{total_to_delete} WOC")
+
+            # อัพเดทข้อมูลหลังการลบ
+            woc_df = get_all_jobs()  # รีเฟรชข้อมูล WOC หลังจากลบ
+
+        # เพิ่มปุ่มลบทั้งหมด
+        if st.button("ลบทั้งหมด"):
+            confirm_delete = st.radio("คุณแน่ใจหรือไม่ว่าต้องการลบทั้งหมด?", ["ไม่", "ใช่"])
+            if confirm_delete == "ใช่":
+                # ลบข้อมูลทั้งหมด
+                with get_connection() as conn:
+                    cur = conn.cursor()
+                    cur.execute("DELETE FROM job_tracking")
+                    conn.commit()
+                st.success("ลบข้อมูลทั้งหมดเรียบร้อยแล้ว")
+                woc_df = get_all_jobs()  # รีเฟรชข้อมูล WOC หลังจากลบทั้งหมด
+
+                # แสดงสถานะการลบ
+                st.info(f"ลบแล้ว {total_to_delete}/{total_to_delete} WOC")
+            else:
+                st.warning("การลบทั้งหมดถูกยกเลิก")
+
+    else:
+        st.info("กรุณาเลือก WOC ที่ต้องการจัดการ")
 
 # === Main ===
 def main():
