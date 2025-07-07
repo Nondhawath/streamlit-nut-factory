@@ -174,7 +174,11 @@ def upload_wip_from_excel():
     uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
 
     if uploaded_file is not None:
+        # โหลดข้อมูลจากไฟล์ Excel
         df = pd.read_excel(uploaded_file)
+
+        # แทนค่าที่เป็น np.inf และ -np.inf ด้วย NaN
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
         # ===== Mapping ชื่อคอลัมน์ =====
         column_map = {
@@ -280,7 +284,7 @@ def upload_wip_from_excel():
         st.success("📥 ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกเรียบร้อยแล้ว")
         st.info("สามารถไปใช้งานต่อได้ในโหมด Receive / Work / Completion / Dashboard / Report")
         report_mode()
-        
+
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
