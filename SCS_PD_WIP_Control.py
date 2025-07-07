@@ -505,62 +505,50 @@ def report_mode():
 
 
 # === Dashboard Mode ===
+# === Dashboard Mode ===
 def dashboard_mode():
     st.header("Dashboard WIP รวม")
-
-    # ดึงข้อมูลทั้งหมดจากฐานข้อมูล
     df = get_all_jobs()
 
-    # ตัวเลือกให้เลือกแผนก
-    department_options = ["WIP-All", "WIP-TP", "WIP-FM", "WIP-FI", "WIP-OS"]
-    selected_dept = st.radio("เลือกแผนกเพื่อดู WIP", department_options)
+    # เพิ่มช่องค้นหา
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
+                df["part_name"].str.contains(search, case=False, na=False)]
 
-    # ฟิลเตอร์แสดงตามแผนกที่เลือก
-    if selected_dept == "WIP-All":
-        # แสดงข้อมูล WIP ทั้งหมด
-        st.write(f"**แสดง WIP ทั้งหมด**")
-        df_wip = df[df["status"].str.contains("WIP")]
-        st.dataframe(df_wip)
-    
-    # แสดงข้อมูลตามแผนก TP
-    elif selected_dept == "WIP-TP":
-        status_filters = ["TP Received", "TP Working", "TP Transfer FI", "TP Transfer OS", "WIP-Tapping Work"]
-        df_wip = df[df["status"].isin(status_filters)]
-        st.subheader("WIP-TP")
-        if df_wip.empty:
-            st.write("ไม่มีงาน WIP ในแผนก TP")
-        else:
-            st.dataframe(df_wip)
+    # แผนกและสถานะที่นับว่าเป็น WIP
+    wip_map = {
+        "WIP-FM": [
+            "FM Transfer TP", "FM Transfer OS", "FM Transfer FI"  # เพิ่มสถานะ FM Transfer FI สำหรับ WIP-FM
+        ],
+        "WIP-TP": [
+            "TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
+        ],
+        "WIP-OS": [
+            "OS Received", "OS Transfer FI"
+        ],
+        "WIP-FI": [
+            "FI Received", "FI Working", "WIP-Final Work"
+        ],
+        "Completed": [
+            "Completed"
+        ]
+    }
 
-    # แสดงข้อมูลตามแผนก FM
-    elif selected_dept == "WIP-FM":
-        status_filters = ["FM Transfer TP", "FM Transfer OS"]
-        df_wip = df[df["status"].isin(status_filters)]
-        st.subheader("WIP-FM")
-        if df_wip.empty:
-            st.write("ไม่มีงาน WIP ในแผนก FM")
-        else:
-            st.dataframe(df_wip)
+    for wip_name, statuses in wip_map.items():
+        st.subheader(f"{wip_name}")
+        df_wip = df[df["status"].isin(statuses)]
+        total = df_wip["pieces_count"].sum()
+        st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
 
-    # แสดงข้อมูลตามแผนก FI
-    elif selected_dept == "WIP-FI":
-        status_filters = ["FI Received", "FI Working", "WIP-Final Work"]
-        df_wip = df[df["status"].isin(status_filters)]
-        st.subheader("WIP-FI")
-        if df_wip.empty:
-            st.write("ไม่มีงาน WIP ในแผนก FI")
+        if not df_wip.empty:
+            part_summary = df_wip.groupby("part_name").agg(
+                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+            ).reset_index()
+            st.dataframe(part_summary)
         else:
-            st.dataframe(df_wip)
-
-    # แสดงข้อมูลตามแผนก OS
-    elif selected_dept == "WIP-OS":
-        status_filters = ["OS Received", "OS Transfer FI"]
-        df_wip = df[df["status"].isin(status_filters)]
-        st.subheader("WIP-OS")
-        if df_wip.empty:
-            st.write("ไม่มีงาน WIP ในแผนก OS")
-        else:
-            st.dataframe(df_wip)
+            st.info("ไม่มีข้อมูลในกลุ่มนี้")
 
     # ฟิลเตอร์แสดงเฉพาะสถานะ On Machine
     st.subheader("WIP On Machine")
