@@ -218,7 +218,7 @@ def work_mode(dept):
     st.header(f"{dept} Work")
 
     status_working = {
-        "TP": "WIP-Tapping Work",  
+        "TP": "TP Received",  
         "FI": "FI Working"
     }
     status_filter = status_working.get(dept, "")
