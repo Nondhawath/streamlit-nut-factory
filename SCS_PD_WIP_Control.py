@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import math
 from datetime import datetime
+import numpy as np  # เพิ่มการนำเข้า numpy
 
 # === Connection ===
 def get_connection():
@@ -22,22 +23,15 @@ def send_telegram_message(message):
 # === Database Operations ===
 def insert_job(data):
     # แปลงค่าทุกตัวที่เป็น numpy.int64 ให้เป็น int
-    data = {key: int(value) if isinstance(value, pd._libs.tslibs.np_datetime.Timestamp) else value for key, value in data.items()}
+    data = {key: int(value) if isinstance(value, np.int64) else value for key, value in data.items()}
 
     with get_connection() as conn:
-        try:
-            cur = conn.cursor()
-            keys = ', '.join(data.keys())
-            values = ', '.join(['%s'] * len(data))
-            sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
-            cur.execute(sql, list(data.values()))
-            conn.commit()
-        except psycopg2.Error as e:
-            st.error(f"Database error: {e}")
-            raise
-        except Exception as e:
-            st.error(f"Error during data insertion: {e}")
-            raise
+        cur = conn.cursor()
+        keys = ', '.join(data.keys())
+        values = ', '.join(['%s'] * len(data))
+        sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
+        cur.execute(sql, list(data.values()))
+        conn.commit()
 
 def update_status(woc, new_status):
     with get_connection() as conn:
