@@ -286,12 +286,16 @@ def upload_wip_from_excel():
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
-    
-    status_filters = {
-        "FI": ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"],
-        "TP": ["FM", "TP Working"],
-        "OS": ["FM", "TP"]
-    }.get(dept_to, [])
+
+    if dept_to == "FI":
+        status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
+    else:
+        dept_from_map = {
+            "TP": ["FM", "TP Working"],
+            "OS": ["FM", "TP"]
+        }
+        from_depts = dept_from_map.get(dept_to, [])
+        status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
 
     df = get_jobs_by_status_list(status_filters)
 
@@ -314,17 +318,43 @@ def receive_mode(dept_to):
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
+    try:
+        diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
+    except Exception:
+        diff_pct = 0
+    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
+
+    if diff_pct > 2:
+        send_telegram_message(
+            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
+            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+        )
+
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    if st.button("รับเข้าและส่งต่อ"):
-        next_status = f"WIP-{dept_to}"
+    if dept_to == "TP":
+        dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
+    elif dept_to == "FI":
+        dept_to_next = "Final Work"
+        st.markdown(f"- แผนกถัดไป: {dept_to_next}")
+    elif dept_to == "OS":
+        dept_to_next = st.selectbox("แผนกถัดไป", ["OS Transfer"])
+    else:
+        dept_to_next = ""
+        st.markdown("- กรุณาระบุแผนกถัดไป")
 
+    if st.button("รับเข้าและส่งต่อ"):
+        if not dept_to_next:
+            st.error("กรุณาเลือกแผนกถัดไป")
+            return
+
+        next_status = f"WIP-{dept_to_next}"
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
             "operator_name": operator_name,
             "dept_from": dept_to,
-            "dept_to": dept_to,
+            "dept_to": dept_to_next,
             "lot_number": job["lot_number"],
             "total_weight": total_weight,
             "barrel_weight": barrel_weight,
@@ -335,11 +365,12 @@ def receive_mode(dept_to):
             "created_at": datetime.utcnow()
         })
 
-        # Update status to "Completed" if it was previously "Received"
+        # ตรวจสอบและเปลี่ยนสถานะ WOC เดิมเป็น "Completed"
         if job['status'] == "TP Received":
             update_status(woc_selected, "Completed")
 
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
+        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
 def work_mode(dept):
