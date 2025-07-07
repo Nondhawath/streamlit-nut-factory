@@ -270,7 +270,7 @@ def completion_mode():
     st.header("Completion")
 
     # กรองข้อมูลที่มีสถานะ "FI Working" รวมถึงสถานะที่มีเครื่องจักรติดท้าย
-    df = get_jobs_by_status("FI Working")  # ค้นหางานที่มีสถานะ "FI Working"
+    df = get_jobs_by_status("FI Working-")  # ค้นหางานที่มีสถานะ "FI Working"
 
     # ถ้ามีการกรองสถานะ FI Working-SM01 หรือชื่อเครื่องจักรอื่นๆ ต่อท้าย
     if df.empty:
