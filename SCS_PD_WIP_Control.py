@@ -393,7 +393,7 @@ def dashboard_mode():
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
-    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
+    st.title("🏭 SCS Production Management)")
 
     menu = st.sidebar.selectbox("เลือกโหมด", [
         "Forming Transfer",
