@@ -535,38 +535,71 @@ def report_mode():
 # === Dashboard Mode ===
 def dashboard_mode():
     st.header("Dashboard WIP รวม")
-    
+
     # ดึงข้อมูลทั้งหมดจากฐานข้อมูล
     df = get_all_jobs()
-    
-    # กรองข้อมูลสถานะ WIP ทั้งหมด
-    wip_map = {
-        "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
-        "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
-        "WIP-OS": ["OS Received", "OS Transfer FI"],
-        "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
-        "Completed": ["Completed"]
-    }
-    
-    # แสดงข้อมูล WIP All แยกตามแผนก
-    st.subheader("WIP All แยกแผนก")
-    
-    for wip_name, statuses in wip_map.items():
-        st.subheader(f"{wip_name}")
-        df_wip = df[df["status"].isin(statuses)]
-        total = df_wip["pieces_count"].sum()
-        st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
 
-        if not df_wip.empty:
-            part_summary = df_wip.groupby("part_name").agg(
-                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-            ).reset_index()
-            st.dataframe(part_summary)
-        else:
-            st.info("ไม่มีข้อมูลในกลุ่มนี้")
+    # ตัวเลือกให้เลือกแผนก
+    department_options = ["WIP-All", "WIP-TP", "WIP-FM", "WIP-FI", "WIP-OS"]
+    selected_dept = st.radio("เลือกแผนกเพื่อดู WIP", department_options)
 
-    # แสดง WIP On Machine (เฉพาะงานที่กำลังทำงานบนเครื่องจักร)
+    # ฟิลเตอร์แสดงตามแผนกที่เลือก
+    if selected_dept == "WIP-All":
+        # แสดงข้อมูล WIP ทั้งหมด
+        wip_map = {
+            "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
+            "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
+            "WIP-OS": ["OS Received", "OS Transfer FI"],
+            "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
+            "Completed": ["Completed"]
+        }
+
+        st.subheader("WIP All แยกแผนก")
+        
+        for wip_name, statuses in wip_map.items():
+            st.subheader(f"{wip_name}")
+            df_wip = df[df["status"].isin(statuses)]
+            total = df_wip["pieces_count"].sum()
+            st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
+
+            if not df_wip.empty:
+                part_summary = df_wip.groupby("part_name").agg(
+                    จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+                    จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+                ).reset_index()
+                st.dataframe(part_summary)
+            else:
+                st.info("ไม่มีข้อมูลในกลุ่มนี้")
+    
+    elif selected_dept == "WIP-TP":
+        status_filters = ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"]
+        df_wip = df[df["status"].isin(status_filters)]
+        st.subheader("WIP-TP")
+        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-TP)**: {len(df_wip)} ชิ้น")
+        st.dataframe(df_wip)
+
+    elif selected_dept == "WIP-FM":
+        status_filters = ["FM Transfer TP", "FM Transfer OS"]
+        df_wip = df[df["status"].isin(status_filters)]
+        st.subheader("WIP-FM")
+        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-FM)**: {len(df_wip)} ชิ้น")
+        st.dataframe(df_wip)
+
+    elif selected_dept == "WIP-FI":
+        status_filters = ["FI Received", "FI Working", "WIP-Final Work"]
+        df_wip = df[df["status"].isin(status_filters)]
+        st.subheader("WIP-FI")
+        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-FI)**: {len(df_wip)} ชิ้น")
+        st.dataframe(df_wip)
+
+    elif selected_dept == "WIP-OS":
+        status_filters = ["OS Received", "OS Transfer FI"]
+        df_wip = df[df["status"].isin(status_filters)]
+        st.subheader("WIP-OS")
+        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-OS)**: {len(df_wip)} ชิ้น")
+        st.dataframe(df_wip)
+
+    # ฟิลเตอร์แสดงเฉพาะสถานะ On Machine
     st.subheader("WIP On Machine")
     df_on_machine = df[df["status"] == "On Machine"]
 
@@ -594,22 +627,6 @@ def dashboard_mode():
         df = df[df["woc_number"].str.contains(search, case=False, na=False) |
                 df["part_name"].str.contains(search, case=False, na=False)]
 
-    # สรุปข้อมูลแยกตามแผนก
-    st.markdown("### สรุป WIP แยกตามแผนก")
-    depts = ["FM", "TP", "FI", "OS"]
-    
-    for d in depts:
-        wip_df = df[df["status"].str.contains(f"WIP-{d}")]
-        if wip_df.empty:
-            st.write(f"แผนก {d}: ไม่มีงาน WIP")
-        else:
-            summary = wip_df.groupby("part_name").agg(
-                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-            ).reset_index()
-            st.write(f"แผนก {d}")
-            st.dataframe(summary)
-    
     # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
     excel_file = convert_df_to_excel(df)
     
