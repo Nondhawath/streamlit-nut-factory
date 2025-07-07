@@ -266,8 +266,10 @@ def work_mode(dept):
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
 # === Completion Mode ===
+# === Completion Mode ===
 def completion_mode():
     st.header("Completion")
+    # กรองสถานะที่มีชื่อเครื่องจักร
     df = get_jobs_by_status("FI Working")  # กรองเฉพาะ FI Working
 
     if df.empty:
@@ -284,6 +286,7 @@ def completion_mode():
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
+    st.markdown(f"- **เครื่องจักร:** {job['status'].split('-')[1]}")  # แสดงชื่อเครื่องจักรจากสถานะ
 
     ok = st.number_input("จำนวน OK", min_value=0, step=1)
     ng = st.number_input("จำนวน NG", min_value=0, step=1)
@@ -309,7 +312,7 @@ def completion_mode():
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
-
+        
 # === Report Mode ===
 def report_mode():
     st.header("รายงานและสรุป WIP")
