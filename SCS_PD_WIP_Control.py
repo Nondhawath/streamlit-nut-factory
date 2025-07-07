@@ -268,17 +268,21 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    
+
     # กรองสถานะ FI Working ที่มีชื่อเครื่องจักร
     df = get_jobs_by_status("FI Working")
 
-    # ตรวจสอบว่าไม่มีข้อมูลที่มีสถานะ FI Working
+    # ตรวจสอบว่ามีข้อมูลที่มีสถานะ FI Working
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
 
-    # กรองสถานะ FI Working ที่เริ่มต้นด้วย 'FI Working-'
+    # กรองสถานะ FI Working ที่มีเครื่องจักร
     df_filtered = df[df['status'].str.contains('FI Working-', na=False)]
+
+    # ตรวจสอบผลการกรอง
+    st.write("Filtered Data:")
+    st.write(df_filtered)  # ดูข้อมูลที่กรองได้
 
     if df_filtered.empty:
         st.info("ไม่มีงานรอ Completion ในสถานะ FI Working-")
