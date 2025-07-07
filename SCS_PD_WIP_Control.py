@@ -21,6 +21,9 @@ def send_telegram_message(message):
 
 # === Database Operations ===
 def insert_job(data):
+    # แปลงค่าทุกตัวที่เป็น numpy.int64 ให้เป็น int
+    data = {key: int(value) if isinstance(value, pd._libs.tslibs.np_datetime.Timestamp) else value for key, value in data.items()}
+
     with get_connection() as conn:
         try:
             cur = conn.cursor()
