@@ -278,7 +278,7 @@ def completion_mode():
         return
 
     # กรองสถานะที่มีชื่อเครื่องจักรหลัง 'FI Working-'
-    df_filtered = df[df['status'].str.contains('FI Working-', na=False)]
+    df_filtered = df[df['status'].str.startswith('FI Working-', na=False)]
 
     if df_filtered.empty:
         st.info("ไม่มีงานรอ Completion ในสถานะ FI Working-")
