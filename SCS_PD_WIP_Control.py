@@ -81,12 +81,19 @@ def transfer_mode(dept_from):
         part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
     part_name = st.text_input("Part Name", value=part_name)
 
+    # กำหนดแผนกปลายทาง (Department to)
     if dept_from == "OS":
         dept_to_options = ["FI"]
     else:
         dept_to_options = ["TP", "FI", "OS"]
 
     dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
+    
+    # ตรวจสอบว่าแผนกปลายทางไม่ใช่แผนกต้นทาง
+    if dept_from == dept_to:
+        st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
+        return  # หยุดการทำงานถ้าพบว่ามีการโอนย้ายไปยังแผนกเดียวกัน
+
     lot_number = st.text_input("Lot Number")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
@@ -107,6 +114,7 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
+        # ทำการบันทึกข้อมูล Transfer
         insert_job({
             "woc_number": new_woc,
             "part_name": part_name,
