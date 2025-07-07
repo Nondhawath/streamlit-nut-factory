@@ -217,12 +217,28 @@ def upload_wip_from_excel():
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
 
+        def safe_int(val):
+            try:
+                if pd.isna(val):
+                    return 0
+                return int(float(val))
+            except:
+                return 0
+
+        def safe_float(val):
+            try:
+                if pd.isna(val):
+                    return 0.0
+                return float(val)
+            except:
+                return 0.0
+
         for _, row in df.iterrows():
             if pd.isnull(row["woc_number"]):
                 continue
 
             try:
-                pieces = int(float(row["pieces_count"]))
+                pieces = safe_int(row["pieces_count"])
             except Exception:
                 st.error(f"WOC {row['woc_number']} มีจำนวนชิ้นงานไม่ถูกต้อง: {row['pieces_count']}")
                 continue
@@ -240,18 +256,18 @@ def upload_wip_from_excel():
                     "dept_from": str(row.get("dept_from", "")),
                     "dept_to": str(row["dept_to"]),
                     "lot_number": str(row.get("lot_number", "")),
-                    "total_weight": float(row.get("total_weight", 0.0) or 0.0),
-                    "barrel_weight": float(row.get("barrel_weight", 0.0) or 0.0),
-                    "sample_weight": float(row.get("sample_weight", 0.0) or 0.0),
-                    "sample_count": int(float(row.get("sample_count", 0) or 0)),
+                    "total_weight": safe_float(row.get("total_weight", 0.0)),
+                    "barrel_weight": safe_float(row.get("barrel_weight", 0.0)),
+                    "sample_weight": safe_float(row.get("sample_weight", 0.0)),
+                    "sample_count": safe_int(row.get("sample_count", 0)),
                     "pieces_count": pieces,
                     "status": status,
                     "created_at": datetime.utcnow() + timedelta(hours=7),
                     "prev_woc_number": str(row.get("prev_woc_number", "")),
-                    "ok_count": int(float(row.get("ok_count", 0) or 0)),
-                    "ng_count": int(float(row.get("ng_count", 0) or 0)),
-                    "rework_count": int(float(row.get("rework_count", 0) or 0)),
-                    "remain_count": int(float(row.get("remain_count", 0) or 0)),
+                    "ok_count": safe_int(row.get("ok_count", 0)),
+                    "ng_count": safe_int(row.get("ng_count", 0)),
+                    "rework_count": safe_int(row.get("rework_count", 0)),
+                    "remain_count": safe_int(row.get("remain_count", 0)),
                     "machine_name": str(row.get("machine_name", "")),
                 }
                 insert_job(data)
@@ -261,7 +277,7 @@ def upload_wip_from_excel():
         st.success("📥 ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกเรียบร้อยแล้ว")
         st.info("สามารถไปใช้งานต่อได้ในโหมด Receive / Work / Completion / Dashboard / Report")
         report_mode()
-
+        
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
