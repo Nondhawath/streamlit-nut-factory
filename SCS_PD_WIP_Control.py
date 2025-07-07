@@ -358,10 +358,8 @@ def dashboard_mode():
         ],
         "WIP-FI": [
             "FI Received", "FI Working", "WIP-Final Work"
-        ],
-        "Completed": [
-            "Completed"
         ]
+        
     }
 
     for wip_name, statuses in wip_map.items():
