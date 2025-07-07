@@ -4,6 +4,9 @@ import pandas as pd
 import requests
 import math
 from datetime import datetime, timedelta
+import numpy as np
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+df.fillna("", inplace=True)  # แทนค่าว่างด้วย string ว่าง
 
 # === Connection Pool ===
 def get_connection():
