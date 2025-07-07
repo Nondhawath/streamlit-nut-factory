@@ -479,7 +479,6 @@ def report_mode():
     st.download_button(label="ดาวน์โหลดรายงานเป็น Excel", data=excel_data, file_name="job_report.xlsx")
 
 # === Excel Converter Helper ===
-import io
 def convert_df_to_excel(df: pd.DataFrame) -> bytes:
     df_clean = df.copy()
 
