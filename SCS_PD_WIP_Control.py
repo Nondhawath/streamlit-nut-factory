@@ -141,11 +141,7 @@ def transfer_mode(dept_from):
             "status": f"{dept_from} Transfer {dept_to}",
             "created_at": datetime.utcnow(),
             "prev_woc_number": prev_woc,  # ฟิลด์ใหม่ที่เก็บ WOC ก่อนหน้า
-            "ok_count": st.number_input("จำนวน OK", min_value=0, step=1),
-            "ng_count": st.number_input("จำนวน NG", min_value=0, step=1),
-            "rework_count": st.number_input("จำนวน Rework", min_value=0, step=1),
-            "remain_count": st.number_input("จำนวนคงเหลือ", min_value=0, step=1),
-            "machine_name": st.text_input("ชื่อเครื่องจักร")
+            # ลบจำนวน OK, NG, Rework, Remain และเครื่องจักรจากข้อมูลที่ต้องบันทึก
         }
 
         insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
@@ -154,18 +150,7 @@ def transfer_mode(dept_from):
             update_status(prev_woc, "Completed")
 
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
-# ฟังก์ชันการตรวจสอบข้อมูลก่อนบันทึก
-def validate_data(row):
-    # ตรวจสอบค่าว่างในคอลัมน์ที่สำคัญ
-    if pd.isnull(row["lot_number"]) or pd.isnull(row["total_weight"]) or pd.isnull(row["barrel_weight"]) or pd.isnull(row["sample_weight"]):
-        st.warning(f"คอลัมน์บางคอลัมน์ใน WOC {row['woc_number']} มีค่าว่าง")
-        return False
-    # ตรวจสอบค่ามากเกินไปในจำนวนชิ้นงานหรือค่าน้ำหนัก
-    if row["total_weight"] > 1000000 or row["pieces_count"] > 10000000:
-        st.error(f"ข้อมูลใน WOC {row['woc_number']} เกินขีดจำกัด")
-        return False
-    return True
-    
+
 def update_status_to_on_machine(woc_number):
     # เปลี่ยนสถานะของ WOC เป็น "On Machine" พร้อมบันทึกเวลา
     with get_connection() as conn:
