@@ -269,35 +269,32 @@ def work_mode(dept):
 def completion_mode():
     st.header("Completion")
     
-    # กรองข้อมูลสถานะ FI Working พร้อมชื่อเครื่องจักร
-    df = get_jobs_by_status("FI Working")  # ดึงข้อมูลที่มีสถานะ "FI Working"
+    # กรองสถานะที่ต้องการ
+    df = get_jobs_by_status("FI Working")
 
-    # กรองแค่สถานะที่มีชื่อเครื่องจักร (เช่น FI Working-SM20)
-    df = df[df['status'].str.contains('FI Working-', case=False, na=False)]  # ตรวจสอบสถานะที่มี "-"
-
+    # ตรวจสอบว่าไม่มีข้อมูลที่มีสถานะ "FI Working" พร้อมชื่อเครื่องจักร
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
 
+    # กรองสถานะ FI Working-<ชื่อเครื่องจักร>
+    df_filtered = df[df['status'].str.contains('FI Working-', na=False)]
+
+    if df_filtered.empty:
+        st.info("ไม่มีงานรอ Completion ในสถานะ FI Working พร้อมชื่อเครื่องจักร")
+        return
+
     # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
-    woc_list = df["woc_number"].drop_duplicates().tolist()
-    
+    woc_list = df_filtered["woc_number"].drop_duplicates().tolist()
+
     # เลือก WOC ที่จะทำ Completion
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
-    job = df[df["woc_number"] == woc_selected].iloc[0]
+    job = df_filtered[df_filtered["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    # แสดงชื่อเครื่องจักรจากสถานะ
-    if '-' in job['status']:
-        machine_name = job['status'].split('-')[1]  # แยกชื่อเครื่องจักรออกจากสถานะ
-    else:
-        machine_name = 'ไม่พบเครื่องจักร'
-    st.markdown(f"- **เครื่องจักร:** {machine_name}")
-
-    # รับข้อมูลจากผู้ใช้งานเกี่ยวกับผลการทำงาน
     ok = st.number_input("จำนวน OK", min_value=0, step=1)
     ng = st.number_input("จำนวน NG", min_value=0, step=1)
     rework = st.number_input("จำนวน Rework", min_value=0, step=1)
@@ -307,7 +304,6 @@ def completion_mode():
 
     total_count = ok + ng + rework + remain
 
-    # เมื่อผู้ใช้งานคลิกบันทึก Completion
     if st.button("บันทึก Completion"):
         expected_count = job['pieces_count']
         diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
@@ -316,7 +312,7 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
-        # อัปเดตสถานะเป็น Completed
+        # อัปเดตสถานะเป็น "Completed"
         update_status(woc_selected, "Completed")
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
