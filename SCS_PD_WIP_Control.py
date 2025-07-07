@@ -468,16 +468,28 @@ def convert_df_to_excel(df):
     from io import BytesIO
     import numpy as np
 
+    # ทำการคัดลอกข้อมูล
     df_clean = df.copy()
-    df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df_clean.fillna("", inplace=True)
-    for col in df_clean.columns:
-        if df_clean[col].dtype == 'object':
-            df_clean[col] = df_clean[col].astype(str)
 
+    # แทนที่ค่า np.inf และ -np.inf ด้วย NaN
+    df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    # เติมค่าที่เป็น NaN ด้วย "" (ค่าว่าง)
+    df_clean.fillna("", inplace=True)
+
+    # แปลงข้อมูลที่เป็น NaN หรือ None ให้เป็น string
+    for col in df_clean.columns:
+        df_clean[col] = df_clean[col].astype(str)
+
+    # สร้าง buffer สำหรับไฟล์ Excel
     excel_buffer = BytesIO()
+    
+    # ใช้ openpyxl engine สำหรับการเขียนข้อมูล
     df_clean.to_excel(excel_buffer, index=False, engine='openpyxl')
+
+    # รีเซ็ต pointer ของ buffer กลับไปที่เริ่มต้น
     excel_buffer.seek(0)
+
     return excel_buffer
 
 # === Report Mode ===
