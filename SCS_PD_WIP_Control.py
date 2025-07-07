@@ -74,7 +74,8 @@ def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
     prev_woc = ""
-    
+
+    # เลือก WOC ก่อนหน้า
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
@@ -92,8 +93,7 @@ def transfer_mode(dept_from):
         part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
     part_name = st.text_input("Part Name", value=part_name)
 
-    dept_to_options = ["TP", "FI", "OS"] if dept_from != "OS" else ["FI"]
-    dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
+    dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
     lot_number = st.text_input("Lot Number")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
     barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
@@ -287,15 +287,11 @@ def upload_wip_from_excel():
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
 
-    if dept_to == "FI":
-        status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
-    else:
-        dept_from_map = {
-            "TP": ["FM", "TP Working"],
-            "OS": ["FM", "TP"]
-        }
-        from_depts = dept_from_map.get(dept_to, [])
-        status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
+    status_filters = {
+        "FI": ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"],
+        "TP": ["FM", "TP Working"],
+        "OS": ["FM", "TP"]
+    }.get(dept_to, [])
 
     df = get_jobs_by_status_list(status_filters)
 
@@ -318,43 +314,17 @@ def receive_mode(dept_to):
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
-    try:
-        diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
-    except Exception:
-        diff_pct = 0
-    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
-
-    if diff_pct > 2:
-        send_telegram_message(
-            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
-            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
-        )
-
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    if dept_to == "TP":
-        dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
-    elif dept_to == "FI":
-        dept_to_next = "Final Work"
-        st.markdown(f"- แผนกถัดไป: {dept_to_next}")
-    elif dept_to == "OS":
-        dept_to_next = st.selectbox("แผนกถัดไป", ["OS Transfer"])
-    else:
-        dept_to_next = ""
-        st.markdown("- กรุณาระบุแผนกถัดไป")
-
     if st.button("รับเข้าและส่งต่อ"):
-        if not dept_to_next:
-            st.error("กรุณาเลือกแผนกถัดไป")
-            return
+        next_status = f"WIP-{dept_to}"
 
-        next_status = f"WIP-{dept_to_next}"
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
             "operator_name": operator_name,
             "dept_from": dept_to,
-            "dept_to": dept_to_next,
+            "dept_to": dept_to,
             "lot_number": job["lot_number"],
             "total_weight": total_weight,
             "barrel_weight": barrel_weight,
@@ -365,12 +335,12 @@ def receive_mode(dept_to):
             "created_at": datetime.utcnow()
         })
 
-        # ตรวจสอบและเปลี่ยนสถานะ WOC เดิมเป็น "Completed"
+        # Change previous status to "Completed"
         if job['status'] == "TP Received":
             update_status(woc_selected, "Completed")
 
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
-        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
+        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to}")
 
 # === Work Mode ===
 def work_mode(dept):
@@ -525,96 +495,22 @@ def dashboard_mode():
     # ฟิลเตอร์แสดงตามแผนกที่เลือก
     if selected_dept == "WIP-All":
         # แสดงข้อมูล WIP ทั้งหมด
-        wip_map = {
-            "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
-            "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
-            "WIP-OS": ["OS Received", "OS Transfer FI"],
-            "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
-            "Completed": ["Completed"]
-        }
-
-        st.subheader("WIP All แยกแผนก")
-        
-        for wip_name, statuses in wip_map.items():
-            st.subheader(f"{wip_name}")
-            df_wip = df[df["status"].isin(statuses)]
-            total = df_wip["pieces_count"].sum()
-            st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
-
-            if not df_wip.empty:
-                part_summary = df_wip.groupby("part_name").agg(
-                    จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                    จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
-                ).reset_index()
-                st.dataframe(part_summary)
-            else:
-                st.info("ไม่มีข้อมูลในกลุ่มนี้")
+        st.write(f"**แสดง WIP ทั้งหมด**")
+        df_wip = df[df["status"].str.contains("WIP")]
+        st.dataframe(df_wip)
     
-    elif selected_dept == "WIP-TP":
-        status_filters = ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"]
+    # เพิ่มฟิลเตอร์แสดงแต่ละแผนก
+    if selected_dept == "WIP-TP":
+        status_filters = ["TP Received", "TP Working"]
         df_wip = df[df["status"].isin(status_filters)]
         st.subheader("WIP-TP")
-        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-TP)**: {len(df_wip)} ชิ้น")
         st.dataframe(df_wip)
 
-    elif selected_dept == "WIP-FM":
+    if selected_dept == "WIP-FM":
         status_filters = ["FM Transfer TP", "FM Transfer OS"]
         df_wip = df[df["status"].isin(status_filters)]
         st.subheader("WIP-FM")
-        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-FM)**: {len(df_wip)} ชิ้น")
         st.dataframe(df_wip)
-
-    elif selected_dept == "WIP-FI":
-        status_filters = ["FI Received", "FI Working", "WIP-Final Work"]
-        df_wip = df[df["status"].isin(status_filters)]
-        st.subheader("WIP-FI")
-        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-FI)**: {len(df_wip)} ชิ้น")
-        st.dataframe(df_wip)
-
-    elif selected_dept == "WIP-OS":
-        status_filters = ["OS Received", "OS Transfer FI"]
-        df_wip = df[df["status"].isin(status_filters)]
-        st.subheader("WIP-OS")
-        st.write(f"**จำนวนงานที่กำลังดำเนินการ (WIP-OS)**: {len(df_wip)} ชิ้น")
-        st.dataframe(df_wip)
-
-    # ฟิลเตอร์แสดงเฉพาะสถานะ On Machine
-    st.subheader("WIP On Machine")
-    df_on_machine = df[df["status"] == "On Machine"]
-
-    if not df_on_machine.empty:
-        st.write(f"**จำนวนงานที่กำลังทำงานบนเครื่องจักร**: {len(df_on_machine)} ชิ้น")
-        st.write("แสดงข้อมูล WIP ที่สถานะเป็น 'On Machine':")
-        
-        # แสดงข้อมูลที่ต้องการในรูปแบบตาราง
-        for _, row in df_on_machine.iterrows():
-            part_name = row["part_name"]
-            woc_number = row["woc_number"]
-            pieces_count = row["pieces_count"]
-            on_machine_time = row["on_machine_time"]
-
-            st.markdown(f"### WOC: {woc_number}")
-            st.markdown(f"- **Part Name**: {part_name}")
-            st.markdown(f"- **จำนวนชิ้นงาน**: {pieces_count}")
-            st.markdown(f"- **เริ่มทำงานที่**: {on_machine_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    else:
-        st.info("ไม่มีงานที่กำลังทำงานบนเครื่องจักร")
-
-    # ตัวเลือกในการค้นหา WOC หรือ Part Name
-    search = st.text_input("ค้นหา WOC หรือ Part Name")
-    if search:
-        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
-                df["part_name"].str.contains(search, case=False, na=False)]
-
-    # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
-    excel_file = convert_df_to_excel(df)
-    
-    st.download_button(
-        label="ดาวน์โหลดเป็นไฟล์ Excel",
-        data=excel_file,
-        file_name="wip_report.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 
 # === Admin Management Mode ===
 def admin_management():
