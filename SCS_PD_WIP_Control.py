@@ -322,22 +322,34 @@ def completion_mode():
 def report_mode():
     st.header("รายงานและสรุป WIP")
     df = get_all_jobs()
+    
+    # ค้นหาจากชื่อ Part หรือ WOC
     search = st.text_input("ค้นหา Part Name หรือ WOC")
     if search:
         df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
+    
+    # แสดงข้อมูลทั้งหมด
     st.dataframe(df)
 
     st.markdown("### สรุป WIP แยกตามแผนก")
     depts = ["FM", "TP", "FI", "OS"]
+    
     for d in depts:
         wip_df = df[df["status"].str.contains(f"WIP-{d}")]
+        
         if wip_df.empty:
             st.write(f"แผนก {d}: ไม่มีงาน WIP")
         else:
+            # แยกชื่อเครื่องจักรจากสถานะ FI Working-SM20
+            wip_df['machine_name'] = wip_df['status'].apply(lambda x: x.split('-')[1] if '-' in x else 'ไม่พบเครื่องจักร')
+
+            # สรุปการทำงานตามแผนกและแสดงข้อมูล
             summary = wip_df.groupby("part_name").agg(
                 จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum"),
+                เครื่องจักร=pd.NamedAgg(column="machine_name", aggfunc="first")  # แสดงชื่อเครื่องจักร
             ).reset_index()
+
             st.write(f"แผนก {d}")
             st.dataframe(summary)
 
