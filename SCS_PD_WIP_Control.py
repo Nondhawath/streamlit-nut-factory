@@ -218,7 +218,7 @@ def work_mode(dept):
     st.header(f"{dept} Work")
 
     status_working = {
-        "TP": "WIP-Tapping Work",  # เปลี่ยนสถานะเป็น WIP-Tapping Work
+        "TP": "WIP-Tapping Work",  
         "FI": "FI Received"
     }
     status_filter = status_working.get(dept, "")
@@ -241,16 +241,17 @@ def work_mode(dept):
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    machine_name = st.text_input("ชื่อเครื่องจักร")  # ชื่อเครื่องจักรที่พนักงานคีย์
+    # ให้กรอกชื่อเครื่องจักร
+    machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
+    # ตรวจสอบว่าเครื่องจักรไม่ว่าง
     if st.button("เริ่มทำงาน"):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working")
-
-        # บันทึกเวลาเครื่องจักร (timestamp) เมื่อเริ่มทำงาน
+        
+        # บันทึกเวลาเครื่องจักร
         on_machine_time = datetime.utcnow()  # ใช้เวลา timestamp เมื่อบันทึก
 
         # บันทึกข้อมูลการทำงาน
@@ -259,7 +260,7 @@ def work_mode(dept):
             "part_name": job["part_name"],
             "operator_name": operator_name,
             "dept_from": dept,
-            "dept_to": dept,  # แผนกปลายทางยังคงเหมือนเดิม
+            "dept_to": dept,
             "lot_number": job["lot_number"],
             "total_weight": job["total_weight"],
             "barrel_weight": job["barrel_weight"],
