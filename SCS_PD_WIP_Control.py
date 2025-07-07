@@ -22,12 +22,19 @@ def send_telegram_message(message):
 # === Database Operations ===
 def insert_job(data):
     with get_connection() as conn:
-        cur = conn.cursor()
-        keys = ', '.join(data.keys())
-        values = ', '.join(['%s'] * len(data))
-        sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
-        cur.execute(sql, list(data.values()))
-        conn.commit()
+        try:
+            cur = conn.cursor()
+            keys = ', '.join(data.keys())
+            values = ', '.join(['%s'] * len(data))
+            sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
+            cur.execute(sql, list(data.values()))
+            conn.commit()
+        except psycopg2.Error as e:
+            st.error(f"Database error: {e}")
+            raise
+        except Exception as e:
+            st.error(f"Error during data insertion: {e}")
+            raise
 
 def update_status(woc, new_status):
     with get_connection() as conn:
