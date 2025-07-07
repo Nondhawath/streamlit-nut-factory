@@ -446,12 +446,19 @@ def completion_mode():
 # === Convert DataFrame to Excel ===
 @st.cache_data
 def convert_df_to_excel(df):
-    """แปลง DataFrame เป็นไฟล์ Excel"""
     from io import BytesIO
-    # สร้าง buffer ของ BytesIO เพื่อเก็บข้อมูลไฟล์ Excel
+    import numpy as np
+
+    df_clean = df.copy()
+    df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
+    df_clean.fillna("", inplace=True)
+    for col in df_clean.columns:
+        if df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].astype(str)
+
     excel_buffer = BytesIO()
-    df.to_excel(excel_buffer, index=False, engine='openpyxl')  # ระบุ engine ให้ชัดเจน
-    excel_buffer.seek(0)  # กลับไปที่จุดเริ่มต้นของ buffer
+    df_clean.to_excel(excel_buffer, index=False, engine='openpyxl')
+    excel_buffer.seek(0)
     return excel_buffer
 
 # === Report Mode ===
