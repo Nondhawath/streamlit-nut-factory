@@ -280,6 +280,10 @@ def completion_mode():
     # กรองสถานะ FI Working ที่มีเครื่องจักร
     df_filtered = df[df['status'].str.contains('FI Working-', na=False)]
 
+    # ดีบั๊ก: แสดงข้อมูลที่กรองมา
+    st.write(f"จำนวนข้อมูลที่กรองได้: {len(df_filtered)}")
+    st.write(df_filtered[['woc_number', 'status']])  # แสดง WOC และสถานะที่กรอง
+
     if df_filtered.empty:
         st.info("ไม่มีงานรอ Completion ในสถานะ FI Working พร้อมชื่อเครื่องจักร")
         return
