@@ -483,7 +483,9 @@ def convert_df_to_excel(df):
 def report_mode():
     st.header("รายงานและสรุป WIP")
     df = get_all_jobs()
-    search = st.text_input("ค้นหา Part Name หรือ WOC")
+    
+    # เพิ่ม key ใน text_input เพื่อให้ widget มี element_id ที่ไม่ซ้ำกัน
+    search = st.text_input("ค้นหา WOC หรือ Part Name", key="search_input_1")
 
     if search:
         df = df[df['part_name'].str.contains(search, case=False) | df['woc_number'].str.contains(search, case=False)]
@@ -527,7 +529,7 @@ def dashboard_mode():
     df = get_all_jobs()
 
     # เพิ่มช่องค้นหา
-    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    search = st.text_input("ค้นหา WOC หรือ Part Name", key="search_input_2")
     if search:
         df = df[df['woc_number'].str.contains(search, case=False, na=False) |
                 df['part_name'].str.contains(search, case=False, na=False)]
@@ -579,7 +581,7 @@ def dashboard_mode():
         st.info("ไม่มีงานที่กำลังทำงานบนเครื่องจักร")
 
     # ตัวเลือกในการค้นหา WOC หรือ Part Name
-    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    search = st.text_input("ค้นหา WOC หรือ Part Name", key="search_input_3")
     if search:
         df = df[df['woc_number'].str.contains(search, case=False, na=False) |
                 df['part_name'].str.contains(search, case=False, na=False)]
