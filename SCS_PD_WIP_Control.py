@@ -477,6 +477,7 @@ def report_mode():
     depts = ["FM", "TP", "FI", "OS"]
     
     for d in depts:
+        # ตรวจสอบงานในสถานะที่เกี่ยวข้อง
         wip_df = df[df["status"].str.contains(f"WIP-{d}")]
         if wip_df.empty:
             st.write(f"แผนก {d}: ไม่มีงาน WIP")
@@ -485,7 +486,11 @@ def report_mode():
                 จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
                 จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
             ).reset_index()
+
+            # เพิ่มการคำนวณและแสดงผลจำนวนชิ้นงานทั้งหมด
+            total_pieces = summary["จำนวนชิ้นงาน"].sum()
             st.write(f"แผนก {d}")
+            st.write(f"**จำนวนชิ้นงานรวมทั้งหมด**: {total_pieces:,} ชิ้น")
             st.dataframe(summary)
     
     # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
@@ -497,6 +502,7 @@ def report_mode():
         file_name="wip_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 # === Dashboard Mode ===
 def dashboard_mode():
