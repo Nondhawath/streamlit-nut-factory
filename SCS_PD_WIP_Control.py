@@ -328,6 +328,10 @@ def dashboard_mode():
         df = df[df["woc_number"].str.contains(search, case=False, na=False) |
                 df["part_name"].str.contains(search, case=False, na=False)]
 
+    # คัดกรองข้อมูลเพื่อให้แสดง WOC ล่าสุดแค่รายการเดียว
+    df = df.sort_values('created_at', ascending=False)
+    df = df.drop_duplicates(subset=['woc_number'], keep='first')
+
     # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
         "WIP-FM": [
@@ -361,6 +365,7 @@ def dashboard_mode():
             st.dataframe(part_summary)
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
+
 # === Main ===
 def main():
     st.set_page_config(page_title="WOC Tracker", layout="wide")
