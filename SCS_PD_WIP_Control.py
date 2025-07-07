@@ -175,6 +175,11 @@ def upload_wip_from_excel():
         # โหลดข้อมูลจากไฟล์ Excel
         df = pd.read_excel(uploaded_file)
 
+        # ตรวจสอบว่า df ถูกโหลดมาหรือไม่
+        if df is None or df.empty:
+            st.error("ไม่สามารถโหลดข้อมูลจากไฟล์ Excel ได้ หรือไฟล์ว่าง")
+            return
+
         # แทนค่าที่เป็น np.inf และ -np.inf ด้วย NaN
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
@@ -219,15 +224,22 @@ def upload_wip_from_excel():
         def delete_existing_woc(woc_number):
             with get_connection() as conn:
                 cur = conn.cursor()
-                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
-                conn.commit()
+                # ตรวจสอบว่า WOC นี้มีอยู่ในฐานข้อมูลหรือไม่
+                cur.execute("SELECT COUNT(*) FROM job_tracking WHERE woc_number = %s", (woc_number,))
+                count = cur.fetchone()[0]
+                if count > 0:
+                    cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
+                    conn.commit()
+                else:
+                    st.warning(f"WOC {woc_number} ไม่พบในฐานข้อมูล")
 
         def safe_int(val):
             try:
                 if pd.isna(val):
                     return 0
                 return int(float(val))
-            except:
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาดในการแปลงค่าเป็นจำนวนเต็ม: {e}")
                 return 0
 
         def safe_float(val):
@@ -235,7 +247,8 @@ def upload_wip_from_excel():
                 if pd.isna(val):
                     return 0.0
                 return float(val)
-            except:
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาดในการแปลงค่าเป็นจำนวนทศนิยม: {e}")
                 return 0.0
 
         for _, row in df.iterrows():
