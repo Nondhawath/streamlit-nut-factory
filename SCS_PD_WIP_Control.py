@@ -217,8 +217,9 @@ def receive_mode(dept_to):
 def work_mode(dept):
     st.header(f"{dept} Work")
 
+    # กรองสถานะที่ต้องการ
     status_working = {
-        "TP": "TP Received",
+        "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
         "FI": "FI Received"
     }
     status_filter = status_working.get(dept, "")
@@ -227,12 +228,16 @@ def work_mode(dept):
         st.warning("ไม่มีสถานะสำหรับโหมดนี้")
         return
 
+    # กรอง WOC ที่มีสถานะล่าสุด (ไม่ซ้ำกัน)
     df = get_jobs_by_status(status_filter)
+    df = df.sort_values('created_at', ascending=False)  # จัดเรียงตามเวลาสร้างล่าสุด
+    df = df.drop_duplicates(subset=['woc_number'], keep='first')  # ลบ WOC ซ้ำ
 
     if df.empty:
         st.info("ไม่มีงานรอทำ")
         return
 
+    # เลือก WOC ที่จะทำงาน
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
@@ -248,7 +253,7 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working")
+        update_status(woc_selected, f"{dept} Working")  # เปลี่ยนสถานะเป็น "Working"
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
