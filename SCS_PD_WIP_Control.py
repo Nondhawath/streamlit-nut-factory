@@ -278,19 +278,24 @@ def upload_wip_from_excel():
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
 
-    # กำหนดสถานะที่จะกรอง
-    status_filters = {
-        "FI": ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"],
-        "TP": ["FM", "TP Working"],
-        "OS": ["FM", "TP"]
-    }.get(dept_to, [])
+    # กำหนดสถานะที่แผนกต้องการรับ
+    if dept_to == "FI":
+        status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
+    elif dept_to == "TP":
+        status_filters = ["FM Transfer TP", "OS Transfer TP"]
+    elif dept_to == "OS":
+        status_filters = ["FM Transfer OS", "TP Transfer OS"]
+    else:
+        status_filters = []
 
+    # ดึงข้อมูลจากฐานข้อมูลที่ตรงกับสถานะที่ต้องการ
     df = get_jobs_by_status_list(status_filters)
 
     if df.empty:
         st.warning("ไม่มีงานรอรับ")
         return
 
+    # แสดง WOC ที่สามารถเลือกได้
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
@@ -306,6 +311,7 @@ def receive_mode(dept_to):
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
+    # คำนวณเปอร์เซ็นต์คลาดเคลื่อนระหว่างจำนวนชิ้นงานที่คำนวณได้และจำนวนที่บันทึกไว้
     try:
         diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
     except Exception:
@@ -320,6 +326,7 @@ def receive_mode(dept_to):
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
+    # เลือกแผนกถัดไป
     if dept_to == "TP":
         dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
     elif dept_to == "FI":
@@ -331,14 +338,14 @@ def receive_mode(dept_to):
         dept_to_next = ""
         st.markdown("- กรุณาระบุแผนกถัดไป")
 
+    # ปุ่มบันทึกการรับงาน
     if st.button("รับเข้าและส่งต่อ"):
         if not dept_to_next:
             st.error("กรุณาเลือกแผนกถัดไป")
             return
 
         next_status = f"WIP-{dept_to_next}"
-        
-        # บันทึกข้อมูลและเปลี่ยนสถานะ
+
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -355,13 +362,13 @@ def receive_mode(dept_to):
             "created_at": datetime.utcnow()
         })
 
-        # เปลี่ยนสถานะ WOC เดิมเป็น "Completed" หากสถานะเป็น "TP Received"
+        # เปลี่ยนสถานะของ WOC ก่อนหน้าให้เป็น "Completed" หากสถานะเดิมเป็น "TP Received"
         if job['status'] == "TP Received":
             update_status(woc_selected, "Completed")
 
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
-        
+
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
