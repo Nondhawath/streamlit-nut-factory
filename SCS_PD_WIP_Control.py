@@ -3,23 +3,11 @@ import psycopg2
 import pandas as pd
 import requests
 import math
-from datetime import datetime, timedelta
-import numpy as np
-import io
+from datetime import datetime
 
-# แทนค่าที่เป็น inf, -inf ด้วย NaN และเติมค่าว่างใน df (ถ้ามี)
-# (หากมี df อยู่แล้ว ควรเรียกในส่วนที่เหมาะสม)
-# df.replace([np.inf, -np.inf], np.nan, inplace=True)
-# df.fillna("", inplace=True)
-
-# === Database Connection ===
+# === Connection ===
 def get_connection():
-    try:
-        conn = psycopg2.connect(st.secrets["postgres"]["conn_str"])
-        return conn
-    except psycopg2.DatabaseError as e:
-        st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
-        return None
+    return psycopg2.connect(st.secrets["postgres"]["conn_str"])
 
 # === Telegram Notification ===
 def send_telegram_message(message):
@@ -27,16 +15,12 @@ def send_telegram_message(message):
     chat_id = st.secrets["telegram"]["chat_id"]
     url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
     try:
-        response = requests.get(url)
-        if response.status_code != 200:
-            st.error(f"Telegram แจ้งเตือนไม่สำเร็จ: {response.status_code}")
+        requests.get(url)
     except Exception as e:
         st.error(f"Telegram แจ้งเตือนไม่สำเร็จ: {e}")
 
 # === Database Operations ===
 def insert_job(data):
-    # เพิ่มเวลาสร้างเป็น UTC+7
-    data["created_at"] = datetime.utcnow() + timedelta(hours=7)
     with get_connection() as conn:
         cur = conn.cursor()
         keys = ', '.join(data.keys())
@@ -65,34 +49,20 @@ def get_all_jobs():
     with get_connection() as conn:
         return pd.read_sql("SELECT * FROM job_tracking ORDER BY created_at DESC", conn)
 
-# === Helper Functions ===
+# === Helper ===
 def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
-    if total_weight <= barrel_weight or sample_weight <= 0 or sample_count <= 0:
-        st.warning("ค่าที่กรอกไม่ถูกต้อง: น้ำหนักรวม, น้ำหนักตัวอย่าง, และจำนวนตัวอย่างต้องเป็นค่าบวกที่ถูกต้อง")
+    if sample_count == 0:
         return 0
     try:
         return math.ceil((total_weight - barrel_weight) / ((sample_weight / sample_count) / 1000))
     except ZeroDivisionError:
-        st.error("เกิดข้อผิดพลาดในการคำนวณ: แบ่งด้วยศูนย์")
         return 0
 
-def validate_data(row):
-    # ตรวจสอบค่าว่างในคอลัมน์สำคัญ
-    if pd.isnull(row["lot_number"]) or pd.isnull(row["total_weight"]) or pd.isnull(row["barrel_weight"]) or pd.isnull(row["sample_weight"]):
-        st.warning(f"คอลัมน์บางคอลัมน์ใน WOC {row['woc_number']} มีค่าว่าง")
-        return False
-    # ตรวจสอบค่ามากเกินไป
-    if row["total_weight"] > 1000000 or row["pieces_count"] > 10000000:
-        st.error(f"ข้อมูลใน WOC {row['woc_number']} เกินขีดจำกัด")
-        return False
-    return True
-
-# === Mode: Transfer ===
+# === Transfer Mode ===
 def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
     prev_woc = ""
-
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
@@ -129,10 +99,6 @@ def transfer_mode(dept_from):
         pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
         st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
 
-    if pieces_count > 10000000:
-        st.error("จำนวนชิ้นงานมากเกินไป")
-        return
-
     if st.button("บันทึก Transfer"):
         if not new_woc.strip():
             st.error("กรุณากรอก WOC ใหม่")
@@ -141,7 +107,7 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
-        data = {
+        insert_job({
             "woc_number": new_woc,
             "part_name": part_name,
             "operator_name": operator_name,
@@ -154,135 +120,15 @@ def transfer_mode(dept_from):
             "sample_count": sample_count,
             "pieces_count": pieces_count,
             "status": f"{dept_from} Transfer {dept_to}",
-            "created_at": datetime.utcnow(),
-            "prev_woc_number": prev_woc,
-            "ok_count": st.number_input("จำนวน OK", min_value=0, step=1),
-            "ng_count": st.number_input("จำนวน NG", min_value=0, step=1),
-            "rework_count": st.number_input("จำนวน Rework", min_value=0, step=1),
-            "remain_count": st.number_input("จำนวนคงเหลือ", min_value=0, step=1),
-            "machine_name": st.text_input("ชื่อเครื่องจักร")
-        }
-
-        insert_job(data)
+            "created_at": datetime.utcnow()
+        })
 
         if prev_woc:
             update_status(prev_woc, "Completed")
 
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
 
-# === Mode: Upload WIP from Excel ===
-def upload_wip_from_excel():
-    st.header("อัพโหลด WIP จากไฟล์ Excel")
-
-    uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
-
-    if uploaded_file is not None:
-        df = pd.read_excel(uploaded_file)
-
-        # Mapping ชื่อคอลัมน์
-        column_map = {
-            "WOC": "woc_number",
-            "Part": "part_name",
-            "Operator": "operator_name",
-            "From": "dept_from",
-            "To": "dept_to",
-            "Count": "pieces_count",
-            "Lot": "lot_number",
-            "Total_Weight": "total_weight",
-            "Barrel_Weight": "barrel_weight",
-            "Sample_Weight": "sample_weight",
-            "Sample_Count": "sample_count",
-            "OK": "ok_count",
-            "NG": "ng_count",
-            "Rework": "rework_count",
-            "Remain": "remain_count",
-            "Machine": "machine_name"
-        }
-
-        df.rename(columns=column_map, inplace=True)
-
-        st.write("ข้อมูลในไฟล์ Excel (หลังจัดรูปแบบ):")
-        st.dataframe(df.head())
-
-        required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
-        optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "ok_count", "ng_count", "rework_count", "remain_count", "machine_name"]
-
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            st.error(f"คอลัมน์ต่อไปนี้ขาดในไฟล์ Excel: {', '.join(missing_columns)}")
-            return
-
-        for col in optional_columns:
-            if col in df.columns and df[col].isnull().any():
-                st.warning(f"คอลัมน์ '{col}' มีข้อมูลที่เป็นค่าว่าง แต่ยังคงสามารถดำเนินการได้")
-
-        def delete_existing_woc(woc_number):
-            with get_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
-                conn.commit()
-
-        def safe_int(val):
-            try:
-                if pd.isna(val):
-                    return 0
-                return int(float(val))
-            except:
-                return 0
-
-        def safe_float(val):
-            try:
-                if pd.isna(val):
-                    return 0.0
-                return float(val)
-            except:
-                return 0.0
-
-        for _, row in df.iterrows():
-            if pd.isnull(row["woc_number"]):
-                continue
-
-            try:
-                pieces = safe_int(row["pieces_count"])
-            except Exception:
-                st.error(f"WOC {row['woc_number']} มีจำนวนชิ้นงานไม่ถูกต้อง: {row['pieces_count']}")
-                continue
-
-            delete_existing_woc(row["woc_number"])
-
-            status = f"{row['dept_from']} Transfer {row['dept_to']}"
-
-            try:
-                data = {
-                    "woc_number": str(row["woc_number"]),
-                    "part_name": str(row["part_name"]),
-                    "operator_name": str(row["operator_name"]),
-                    "dept_from": str(row.get("dept_from", "")),
-                    "dept_to": str(row["dept_to"]),
-                    "lot_number": str(row.get("lot_number", "")),
-                    "total_weight": safe_float(row.get("total_weight", 0.0)),
-                    "barrel_weight": safe_float(row.get("barrel_weight", 0.0)),
-                    "sample_weight": safe_float(row.get("sample_weight", 0.0)),
-                    "sample_count": safe_int(row.get("sample_count", 0)),
-                    "pieces_count": pieces,
-                    "status": status,
-                    "created_at": datetime.utcnow() + timedelta(hours=7),
-                    "prev_woc_number": str(row.get("prev_woc_number", "")),
-                    "ok_count": safe_int(row.get("ok_count", 0)),
-                    "ng_count": safe_int(row.get("ng_count", 0)),
-                    "rework_count": safe_int(row.get("rework_count", 0)),
-                    "remain_count": safe_int(row.get("remain_count", 0)),
-                    "machine_name": str(row.get("machine_name", "")),
-                }
-                insert_job(data)
-            except Exception as e:
-                st.error(f"❌ ไม่สามารถบันทึก WOC {row['woc_number']} ได้: {e}")
-
-        st.success("📥 ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกเรียบร้อยแล้ว")
-        st.info("สามารถไปใช้งานต่อได้ในโหมด Receive / Work / Completion / Dashboard / Report")
-        report_mode()
-
-# === Mode: Receive ===
+# === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
 
@@ -365,166 +211,140 @@ def receive_mode(dept_to):
         })
         update_status(woc_selected, f"{dept_to} Received")
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
-        report_mode()
+        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
-# === Mode: Work ===
+# === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
 
-    status_wip = f"WIP-{dept}"
-    df = get_jobs_by_status(status_wip)
+    status_working = {
+        "TP": "TP Received",
+        "FI": "FI Received"
+    }
+    status_filter = status_working.get(dept, "")
+
+    if not status_filter:
+        st.warning("ไม่มีสถานะสำหรับโหมดนี้")
+        return
+
+    df = get_jobs_by_status(status_filter)
 
     if df.empty:
-        st.warning(f"ไม่มีงานในสถานะ {status_wip}")
+        st.info("ไม่มีงานรอทำ")
         return
 
     woc_list = df["woc_number"].tolist()
-    woc_selected = st.selectbox("เลือก WOC เพื่อเริ่มทำงาน", woc_list)
+    woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
+    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    ok_count = st.number_input("จำนวน OK", min_value=0, max_value=job["pieces_count"], step=1)
-    ng_count = st.number_input("จำนวน NG", min_value=0, max_value=job["pieces_count"] - ok_count, step=1)
-    rework_count = st.number_input("จำนวน Rework", min_value=0, max_value=job["pieces_count"] - ok_count - ng_count, step=1)
-    remain_count = job["pieces_count"] - ok_count - ng_count - rework_count
-    st.markdown(f"- **จำนวนคงเหลือ:** {remain_count}")
-
+    machine_name = st.text_input("ชื่อเครื่องจักร")
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    if st.button("บันทึกงาน"):
-        if ok_count + ng_count + rework_count > job["pieces_count"]:
-            st.error("จำนวนรวม OK, NG, Rework เกินจำนวนชิ้นงาน")
+    if st.button("เริ่มทำงาน"):
+        if not machine_name.strip():
+            st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-
         update_status(woc_selected, f"{dept} Working")
+        st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
+        send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
-        insert_job({
-            "woc_number": woc_selected,
-            "part_name": job["part_name"],
-            "operator_name": operator_name,
-            "dept_from": dept,
-            "dept_to": dept,
-            "lot_number": job["lot_number"],
-            "ok_count": ok_count,
-            "ng_count": ng_count,
-            "rework_count": rework_count,
-            "remain_count": remain_count,
-            "status": f"{dept} Work",
-            "created_at": datetime.utcnow()
-        })
-
-        st.success("บันทึกข้อมูลงานเรียบร้อย")
-
-# === Mode: Completion ===
+# === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-
-    df = get_jobs_by_status("FI Work")
+    df = get_jobs_by_status("FI Working")
 
     if df.empty:
-        st.warning("ไม่มีงานสำหรับ Complete")
+        st.info("ไม่มีงานรอ Completion")
         return
 
     woc_list = df["woc_number"].tolist()
-    woc_selected = st.selectbox("เลือก WOC", woc_list)
+    woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
-    st.markdown(f"- **จำนวนชิ้นงาน:** {job['pieces_count']}")
+    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    ok_count = st.number_input("จำนวน OK", min_value=0, max_value=job["pieces_count"], step=1)
-    ng_count = st.number_input("จำนวน NG", min_value=0, max_value=job["pieces_count"] - ok_count, step=1)
-    rework_count = st.number_input("จำนวน Rework", min_value=0, max_value=job["pieces_count"] - ok_count - ng_count, step=1)
-    remain_count = job["pieces_count"] - ok_count - ng_count - rework_count
-
-    if remain_count == 0:
-        status = "Completed"
-    else:
-        status = "ยังคงเหลือ"
-
-    st.markdown(f"- **สถานะ:** {status}")
+    ok = st.number_input("จำนวน OK", min_value=0, step=1)
+    ng = st.number_input("จำนวน NG", min_value=0, step=1)
+    rework = st.number_input("จำนวน Rework", min_value=0, step=1)
+    remain = st.number_input("จำนวนคงเหลือ", min_value=0, step=1)
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
+    total_count = ok + ng + rework + remain
+
     if st.button("บันทึก Completion"):
-        insert_job({
-            "woc_number": woc_selected,
-            "part_name": job["part_name"],
-            "operator_name": operator_name,
-            "dept_from": "FI",
-            "dept_to": "WH",
-            "lot_number": job["lot_number"],
-            "ok_count": ok_count,
-            "ng_count": ng_count,
-            "rework_count": rework_count,
-            "remain_count": remain_count,
-            "status": status,
-            "created_at": datetime.utcnow()
-        })
-        update_status(woc_selected, status)
-        st.success("บันทึกสถานะ Completion เรียบร้อย")
+        expected_count = job['pieces_count']
+        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
 
-# === Mode: Report ===
+        if diff_pct > 2:
+            st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
+            return
+
+        update_status(woc_selected, "Completed")
+        st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
+
+        send_telegram_message(
+            f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
+            f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
+        )
+
+# === Report Mode ===
 def report_mode():
-    st.header("รายงาน")
-
+    st.header("รายงานและสรุป WIP")
     df = get_all_jobs()
+    search = st.text_input("ค้นหา Part Name หรือ WOC")
+    if search:
+        df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
     st.dataframe(df)
 
-    excel_data = convert_df_to_excel(df)
-    st.download_button(label="ดาวน์โหลดรายงานเป็น Excel", data=excel_data, file_name="job_report.xlsx")
+    st.markdown("### สรุป WIP แยกตามแผนก")
+    depts = ["FM", "TP", "FI", "OS"]
+    for d in depts:
+        wip_df = df[df["status"].str.contains(f"WIP-{d}")]
+        if wip_df.empty:
+            st.write(f"แผนก {d}: ไม่มีงาน WIP")
+        else:
+            summary = wip_df.groupby("part_name").agg(
+                จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
+            ).reset_index()
+            st.write(f"แผนก {d}")
+            st.dataframe(summary)
 
-# === Excel Converter Helper ===
-@st.cache_data
-def convert_df_to_excel(df):
-    from io import BytesIO
-    import numpy as np
-
-    df_clean = df.copy()
-
-    # จัดการ NaN, inf, -inf
-    df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df_clean.fillna("", inplace=True)
-
-    # แปลงทุกคอลัมน์ให้เป็น string ปลอดภัย
-    for col in df_clean.columns:
-        df_clean[col] = df_clean[col].astype(str)
-
-    # แปลง datetime เป็น string ด้วย
-    for col in df_clean.columns:
-        if df_clean[col].str.contains("Timestamp|datetime|NaT", case=False).any():
-            df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
-            df_clean[col].fillna("", inplace=True)
-
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_clean.to_excel(writer, index=False, sheet_name="Report")
-
-    output.seek(0)
-    return output
-#Dashboard_Mode
+# === Dashboard Mode ===
 def dashboard_mode():
     st.header("Dashboard WIP รวม")
     df = get_all_jobs()
 
-    df['created_at'] = pd.to_datetime(df['created_at']) + timedelta(hours=7)
-    df = df.sort_values("created_at").groupby("woc_number", as_index=False).last()
-
+    # เพิ่มช่องค้นหา
     search = st.text_input("ค้นหา WOC หรือ Part Name")
     if search:
         df = df[df["woc_number"].str.contains(search, case=False, na=False) |
                 df["part_name"].str.contains(search, case=False, na=False)]
 
+    # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
-        "WIP-FM": ["FM Transfer TP", "FM Transfer OS"],
-        "WIP-TP": ["TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"],
-        "WIP-OS": ["OS Received", "OS Transfer FI"],
-        "WIP-FI": ["FI Received", "FI Working", "WIP-Final Work"],
-        "Completed": ["Completed"]
+        "WIP-FM": [
+            "FM Transfer TP", "FM Transfer OS"
+        ],
+        "WIP-TP": [
+            "TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
+        ],
+        "WIP-OS": [
+            "OS Received", "OS Transfer FI"
+        ],
+        "WIP-FI": [
+            "FI Received", "FI Working", "WIP-Final Work"
+        ],
+        "Completed": [
+            "Completed"
+        ]
     }
 
     for wip_name, statuses in wip_map.items():
@@ -541,87 +361,47 @@ def dashboard_mode():
             st.dataframe(part_summary)
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
-
-# === Admin Management ===
-def admin_management():
-    st.header("🛠️ Admin Management")
-
-    df = get_all_jobs()
-
-    if df.empty:
-        st.warning("ไม่มีข้อมูลในฐานข้อมูล")
-        return
-
-    df_display = df[["woc_number", "part_name", "dept_from", "dept_to", "status", "pieces_count", "created_at"]]
-
-    selected_wocs = st.multiselect(
-        "เลือก WOC ที่ต้องการลบ",
-        options=df_display["woc_number"].unique().tolist()
-    )
-
-    if st.checkbox("เลือกทั้งหมด"):
-        selected_wocs = df_display["woc_number"].unique().tolist()
-
-    st.dataframe(df_display[df_display["woc_number"].isin(selected_wocs)])
-
-    if selected_wocs:
-        if st.button(f"🗑️ ลบรายการที่เลือกทั้งหมด ({len(selected_wocs)} รายการ)"):
-            with get_connection() as conn:
-                cur = conn.cursor()
-                cur.executemany(
-                    "DELETE FROM job_tracking WHERE woc_number = %s",
-                    [(woc,) for woc in selected_wocs]
-                )
-                conn.commit()
-            st.success(f"✅ ลบข้อมูล WOC ทั้งหมด {len(selected_wocs)} รายการเรียบร้อยแล้ว")
-    else:
-        st.info("กรุณาเลือกรายการ WOC ก่อนลบ")
-        
-# === Main Application ===
+# === Main ===
 def main():
-    st.title("ระบบจัดการงานในโรงงาน")
+    st.set_page_config(page_title="WOC Tracker", layout="wide")
+    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
 
-    menu = [
-        "FM Transfer", "TP Transfer", "OS Transfer",
-        "FM Receive", "TP Receive", "FI Receive",
-        "TP Work", "FI Work",
+    menu = st.sidebar.selectbox("เลือกโหมด", [
+        "Forming Transfer",
+        "Tapping Transfer",
+        "Tapping Receive",
+        "Tapping Work",
+        "OS Transfer",
+        "OS Receive",
+        "Final Receive",
+        "Final Work",
         "Completion",
-        "Upload WIP Excel",
         "Report",
-        "Dashboard",  # ✅ เพิ่มตรงนี้
-        "Admin Management"
-    ]
+        "Dashboard"
+    ])
 
-    choice = st.sidebar.selectbox("เลือกโหมด", menu)
-
-    if choice == "FM Transfer":
+    if menu == "Forming Transfer":
         transfer_mode("FM")
-    elif choice == "TP Transfer":
+    elif menu == "Tapping Transfer":
         transfer_mode("TP")
-    elif choice == "OS Transfer":
-        transfer_mode("OS")
-    elif choice == "FM Receive":
-        receive_mode("FM")
-    elif choice == "TP Receive":
+    elif menu == "Tapping Receive":
         receive_mode("TP")
-    elif choice == "FI Receive":
-        receive_mode("FI")
-    elif choice == "TP Work":
+    elif menu == "Tapping Work":
         work_mode("TP")
-    elif choice == "FI Work":
+    elif menu == "OS Transfer":
+        transfer_mode("OS")
+    elif menu == "OS Receive":
+        receive_mode("OS")
+    elif menu == "Final Receive":
+        receive_mode("FI")
+    elif menu == "Final Work":
         work_mode("FI")
-    elif choice == "Completion":
+    elif menu == "Completion":
         completion_mode()
-    elif choice == "Upload WIP Excel":
-        upload_wip_from_excel()
-    elif choice == "Report":
+    elif menu == "Report":
         report_mode()
-    elif choice == "Dashboard":  # ✅ เพิ่มตรงนี้
+    elif menu == "Dashboard":
         dashboard_mode()
-    elif choice == "Admin Management":
-        admin_management()
-    else:
-        st.write("เลือกโหมดในเมนูด้านซ้าย")
 
 if __name__ == "__main__":
     main()
