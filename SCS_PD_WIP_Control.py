@@ -75,7 +75,6 @@ def transfer_mode(dept_from):
     df_all = get_all_jobs()
     prev_woc = ""
     
-    # เลือก WOC ก่อนหน้า
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
@@ -88,17 +87,12 @@ def transfer_mode(dept_from):
         st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
 
     new_woc = st.text_input("WOC ใหม่")
-
     part_name = ""
     if prev_woc:
         part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
     part_name = st.text_input("Part Name", value=part_name)
 
-    if dept_from == "OS":
-        dept_to_options = ["FI"]
-    else:
-        dept_to_options = ["TP", "FI", "OS"]
-
+    dept_to_options = ["TP", "FI", "OS"] if dept_from != "OS" else ["FI"]
     dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
     lot_number = st.text_input("Lot Number")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
@@ -107,15 +101,8 @@ def transfer_mode(dept_from):
     sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    pieces_count = 0
-    if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
-        pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
-        st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
-
-    # ตรวจสอบค่าก่อนบันทึก
-    if pieces_count > 10000000:  # ขีดจำกัดที่สมมุติว่า 10 ล้าน
-        st.error("จำนวนชิ้นงานมากเกินไป")
-        return
+    pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
+    st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
 
     if st.button("บันทึก Transfer"):
         if not new_woc.strip():
@@ -125,7 +112,6 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
-        # ข้อมูลที่ต้องการบันทึก
         data = {
             "woc_number": new_woc,
             "part_name": part_name,
@@ -140,12 +126,17 @@ def transfer_mode(dept_from):
             "pieces_count": pieces_count,
             "status": f"{dept_from} Transfer {dept_to}",
             "created_at": datetime.utcnow(),
-            "prev_woc_number": prev_woc,  # ฟิลด์ใหม่ที่เก็บ WOC ก่อนหน้า
-            # ลบจำนวน OK, NG, Rework, Remain และเครื่องจักรจากข้อมูลที่ต้องบันทึก
+            "prev_woc_number": prev_woc,
+            "ok_count": 0,
+            "ng_count": 0,
+            "rework_count": 0,
+            "remain_count": 0,
+            "machine_name": ""
         }
 
-        insert_job(data)  # ใช้ฟังก์ชัน insert_job เพื่อบันทึกข้อมูลลงฐานข้อมูล
+        insert_job(data)
 
+        # Update status of the previous WOC as "Completed"
         if prev_woc:
             update_status(prev_woc, "Completed")
 
@@ -295,16 +286,12 @@ def upload_wip_from_excel():
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
-
-    if dept_to == "FI":
-        status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
-    else:
-        dept_from_map = {
-            "TP": ["FM", "TP Working"],
-            "OS": ["FM", "TP"]
-        }
-        from_depts = dept_from_map.get(dept_to, [])
-        status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
+    
+    status_filters = {
+        "FI": ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"],
+        "TP": ["FM", "TP Working"],
+        "OS": ["FM", "TP"]
+    }.get(dept_to, [])
 
     df = get_jobs_by_status_list(status_filters)
 
@@ -327,43 +314,17 @@ def receive_mode(dept_to):
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
-    try:
-        diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
-    except Exception:
-        diff_pct = 0
-    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
-
-    if diff_pct > 2:
-        send_telegram_message(
-            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
-            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
-        )
-
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-    if dept_to == "TP":
-        dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
-    elif dept_to == "FI":
-        dept_to_next = "Final Work"
-        st.markdown(f"- แผนกถัดไป: {dept_to_next}")
-    elif dept_to == "OS":
-        dept_to_next = st.selectbox("แผนกถัดไป", ["OS Transfer"])
-    else:
-        dept_to_next = ""
-        st.markdown("- กรุณาระบุแผนกถัดไป")
-
     if st.button("รับเข้าและส่งต่อ"):
-        if not dept_to_next:
-            st.error("กรุณาเลือกแผนกถัดไป")
-            return
+        next_status = f"WIP-{dept_to}"
 
-        next_status = f"WIP-{dept_to_next}"
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
             "operator_name": operator_name,
             "dept_from": dept_to,
-            "dept_to": dept_to_next,
+            "dept_to": dept_to,
             "lot_number": job["lot_number"],
             "total_weight": total_weight,
             "barrel_weight": barrel_weight,
@@ -373,23 +334,21 @@ def receive_mode(dept_to):
             "status": next_status,
             "created_at": datetime.utcnow()
         })
-        update_status(woc_selected, f"{dept_to} Received")
+
+        # Update status to "Completed" if it was previously "Received"
+        if job['status'] == "TP Received":
+            update_status(woc_selected, "Completed")
+
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
-        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
 
-    status_working = {
+    status_filter = {
         "TP": "TP Received",
         "FI": "FI Received"
-    }
-    status_filter = status_working.get(dept, "")
-
-    if not status_filter:
-        st.warning("ไม่มีสถานะสำหรับโหมดนี้")
-        return
+    }.get(dept, "")
 
     df = get_jobs_by_status(status_filter)
 
@@ -412,14 +371,12 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
+        # Update status to "Completed" if it was previously "Received"
+        if job['status'] == "TP Received" or job['status'] == "FI Received":
+            update_status(woc_selected, "Completed")
 
-        # เปลี่ยนสถานะจาก TP Working เป็น On Machine
-        update_status_to_on_machine(woc_selected)  # เปลี่ยนสถานะไปที่ On Machine
-        st.success(f"เปลี่ยนสถานะ WOC {woc_selected} เป็น On Machine")
-
-        # เมื่อการทำงานเสร็จสิ้นและโอนงานไปยังแผนกถัดไป
-        update_status(woc_selected, "Completed")  # เปลี่ยนสถานะเป็น Completed
-        st.success(f"สถานะ WOC {woc_selected} เป็น Completed")
+        update_status(woc_selected, f"{dept} Working")
+        st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
 
 # === Completion Mode ===
 def completion_mode():
@@ -443,8 +400,6 @@ def completion_mode():
     rework = st.number_input("จำนวน Rework", min_value=0, step=1)
     remain = st.number_input("จำนวนคงเหลือ", min_value=0, step=1)
 
-    operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-
     total_count = ok + ng + rework + remain
 
     if st.button("บันทึก Completion"):
@@ -458,10 +413,6 @@ def completion_mode():
         update_status(woc_selected, "Completed")
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
-        send_telegram_message(
-            f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
-            f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
-        )
 # === Convert DataFrame to Excel ===
 @st.cache_data
 def convert_df_to_excel(df):
