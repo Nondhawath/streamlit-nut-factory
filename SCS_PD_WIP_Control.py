@@ -361,48 +361,111 @@ def dashboard_mode():
             st.dataframe(part_summary)
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
+# === Admin Management Mode ===
+def admin_management()
+    st.header(Admin Management)
+
+    woc_df = get_all_jobs()  # หรือใช้ get_jobs_by_status(WIP) เพื่อกรองเฉพาะ WIP
+
+    if woc_df.empty
+        st.error(ไม่มีข้อมูล WOC ในฐานข้อมูล)
+        return
+
+    woc_list = woc_df[woc_number].unique().tolist()
+
+    select_all = st.checkbox(เลือกทั้งหมด, value=False)
+
+    if select_all
+        woc_selected = woc_list
+    else
+        woc_selected = st.multiselect(เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ, woc_list)
+
+    if woc_selected
+        st.write(ข้อมูล WOC ที่เลือก)
+        selected_wocs = woc_df[woc_df[woc_number].isin(woc_selected)]
+        st.dataframe(selected_wocs)
+
+        total_to_delete = len(woc_selected)
+        deleted_count = 0
+
+        if st.button(ลบ WOC ที่เลือก)
+            for woc_number in woc_selected
+                with get_connection() as conn
+                    cur = conn.cursor()
+                    cur.execute(DELETE FROM job_tracking WHERE woc_number = %s, (woc_number,))
+                    conn.commit()
+                deleted_count += 1
+                st.success(fลบ WOC {woc_number} เรียบร้อยแล้ว)
+
+            st.info(fลบแล้ว {deleted_count}{total_to_delete} WOC)
+
+            woc_df = get_all_jobs()
+
+        if st.button(ลบทั้งหมด)
+            confirm_delete = st.radio(คุณแน่ใจหรือไม่ว่าต้องการลบทั้งหมด, [ไม่, ใช่])
+            if confirm_delete == ใช่
+                with get_connection() as conn
+                    cur = conn.cursor()
+                    cur.execute(DELETE FROM job_tracking)
+                    conn.commit()
+                st.success(ลบข้อมูลทั้งหมดเรียบร้อยแล้ว)
+                woc_df = get_all_jobs()
+
+                st.info(fลบแล้ว {total_to_delete}{total_to_delete} WOC)
+            else
+                st.warning(การลบทั้งหมดถูกยกเลิก)
+
+    else
+        st.info(กรุณาเลือก WOC ที่ต้องการจัดการ)
+
 
 # === Main ===
-def main():
-    st.set_page_config(page_title="WOC Tracker", layout="wide")
-    st.title("🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit)")
+def main()
+    st.set_page_config(page_title=WOC Tracker, layout=wide)
+    st.title(🏭 ระบบติดตามงานโรงงาน (Supabase + Streamlit))
 
-    menu = st.sidebar.selectbox("เลือกโหมด", [
-        "Forming Transfer",
-        "Tapping Transfer",
-        "Tapping Receive",
-        "Tapping Work",
-        "OS Transfer",
-        "OS Receive",
-        "Final Receive",
-        "Final Work",
-        "Completion",
-        "Report",
-        "Dashboard"
+    menu = st.sidebar.selectbox(เลือกโหมด, [
+        Forming Transfer,
+        Tapping Transfer,
+        Tapping Receive,
+        Tapping Work,
+        OS Transfer,
+        OS Receive,
+        Final Receive,
+        Final Work,
+        Completion,
+        Report,
+        Dashboard,
+        Upload WIP from Excel,  # เพิ่มโหมดใหม่สำหรับการอัปโหลด Excel
+        Admin Management  # เพิ่มโหมดใหม่สำหรับการจัดการข้อมูล WOC
     ])
 
-    if menu == "Forming Transfer":
-        transfer_mode("FM")
-    elif menu == "Tapping Transfer":
-        transfer_mode("TP")
-    elif menu == "Tapping Receive":
-        receive_mode("TP")
-    elif menu == "Tapping Work":
-        work_mode("TP")
-    elif menu == "OS Transfer":
-        transfer_mode("OS")
-    elif menu == "OS Receive":
-        receive_mode("OS")
-    elif menu == "Final Receive":
-        receive_mode("FI")
-    elif menu == "Final Work":
-        work_mode("FI")
-    elif menu == "Completion":
+    if menu == Forming Transfer
+        transfer_mode(FM)
+    elif menu == Tapping Transfer
+        transfer_mode(TP)
+    elif menu == Tapping Receive
+        receive_mode(TP)
+    elif menu == Tapping Work
+        work_mode(TP)
+    elif menu == OS Transfer
+        transfer_mode(OS)
+    elif menu == OS Receive
+        receive_mode(OS)
+    elif menu == Final Receive
+        receive_mode(FI)
+    elif menu == Final Work
+        work_mode(FI)
+    elif menu == Completion
         completion_mode()
-    elif menu == "Report":
+    elif menu == Report
         report_mode()
-    elif menu == "Dashboard":
+    elif menu == Dashboard
         dashboard_mode()
+    elif menu == Upload WIP from Excel
+        upload_wip_from_excel()  # เรียกฟังก์ชันการอัปโหลดข้อมูลจาก Excel
+    elif menu == Admin Management  # การเลือกโหมด Admin Management
+        admin_management()  # เรียกฟังก์ชันจัดการข้อมูล WOC
 
-if __name__ == "__main__":
+if __name__ == __main__
     main()
