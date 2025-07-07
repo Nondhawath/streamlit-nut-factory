@@ -9,12 +9,12 @@ import numpy as np
 # === Connection Pool ===
 def get_connection():
     try:
-        # ใช้ psycopg2.connect แทนการใช้ Connection Pool
         conn = psycopg2.connect(st.secrets["postgres"]["conn_str"])
         return conn
     except psycopg2.DatabaseError as e:
         st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
         return None
+
 # === Telegram Notification ===
 def send_telegram_message(message):
     token = st.secrets["telegram"]["token"]
@@ -29,8 +29,7 @@ def send_telegram_message(message):
 
 # === Database Operations ===
 def insert_job(data):
-    # เพิ่มการปรับเวลาเป็น GMT+7
-    data["created_at"] = datetime.utcnow() + timedelta(hours=7)  # ปรับเวลาเป็น GMT+7
+    data["created_at"] = datetime.utcnow() + timedelta(hours=7)
     with get_connection() as conn:
         cur = conn.cursor()
         keys = ', '.join(data.keys())
@@ -59,7 +58,7 @@ def get_all_jobs():
     with get_connection() as conn:
         return pd.read_sql("SELECT * FROM job_tracking ORDER BY created_at DESC", conn)
 
-# === Helper ===
+# === Helper Functions ===
 def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
     if total_weight <= barrel_weight or sample_weight <= 0 or sample_count <= 0:
         st.warning("ค่าที่กรอกไม่ถูกต้อง: น้ำหนักรวม, น้ำหนักตัวอย่าง, และจำนวนตัวอย่างต้องเป็นค่าบวกที่ถูกต้อง")
@@ -143,7 +142,6 @@ def transfer_mode(dept_from):
         st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
 
 def update_status_to_on_machine(woc_number):
-    # เปลี่ยนสถานะของ WOC เป็น "On Machine" พร้อมบันทึกเวลา
     with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("""
@@ -159,18 +157,14 @@ def upload_wip_from_excel():
     uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
 
     if uploaded_file is not None:
-        # โหลดข้อมูลจากไฟล์ Excel
         df = pd.read_excel(uploaded_file)
 
-        # ตรวจสอบว่า df ถูกโหลดมาหรือไม่
         if df is None or df.empty:
             st.error("ไม่สามารถโหลดข้อมูลจากไฟล์ Excel ได้ หรือไฟล์ว่าง")
             return
 
-        # แทนค่าที่เป็น np.inf และ -np.inf ด้วย NaN
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-        # ===== Mapping ชื่อคอลัมน์ =====
         column_map = {
             "WOC": "woc_number",
             "Part": "part_name",
@@ -196,7 +190,6 @@ def upload_wip_from_excel():
         st.dataframe(df.head())
 
         required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
-
         optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "ok_count", "ng_count", "rework_count", "remain_count", "machine_name"]
 
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -211,7 +204,6 @@ def upload_wip_from_excel():
         def delete_existing_woc(woc_number):
             with get_connection() as conn:
                 cur = conn.cursor()
-                # ตรวจสอบว่า WOC นี้มีอยู่ในฐานข้อมูลหรือไม่
                 cur.execute("SELECT COUNT(*) FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 count = cur.fetchone()[0]
                 if count > 0:
@@ -250,7 +242,6 @@ def upload_wip_from_excel():
 
             delete_existing_woc(row["woc_number"])
 
-            # คำนวณสถานะจาก dept_from และ dept_to
             status = f"{row['dept_from']} Transfer {row['dept_to']}"
 
             try:
@@ -494,12 +485,10 @@ def dashboard_mode():
 
     # ฟิลเตอร์แสดงตามแผนกที่เลือก
     if selected_dept == "WIP-All":
-        # แสดงข้อมูล WIP ทั้งหมด
         st.write(f"**แสดง WIP ทั้งหมด**")
         df_wip = df[df["status"].str.contains("WIP")]
         st.dataframe(df_wip)
     
-    # แสดงข้อมูลตามแผนก TP
     elif selected_dept == "WIP-TP":
         status_filters = ["TP Received", "TP Working", "TP Transfer FI", "TP Transfer OS", "WIP-Tapping Work"]
         df_wip = df[df["status"].isin(status_filters)]
@@ -509,7 +498,6 @@ def dashboard_mode():
         else:
             st.dataframe(df_wip)
 
-    # แสดงข้อมูลตามแผนก FM
     elif selected_dept == "WIP-FM":
         status_filters = ["FM Transfer TP", "FM Transfer OS"]
         df_wip = df[df["status"].isin(status_filters)]
@@ -519,7 +507,6 @@ def dashboard_mode():
         else:
             st.dataframe(df_wip)
 
-    # แสดงข้อมูลตามแผนก FI
     elif selected_dept == "WIP-FI":
         status_filters = ["FI Received", "FI Working", "WIP-Final Work"]
         df_wip = df[df["status"].isin(status_filters)]
@@ -529,7 +516,6 @@ def dashboard_mode():
         else:
             st.dataframe(df_wip)
 
-    # แสดงข้อมูลตามแผนก OS
     elif selected_dept == "WIP-OS":
         status_filters = ["OS Received", "OS Transfer FI"]
         df_wip = df[df["status"].isin(status_filters)]
@@ -581,40 +567,31 @@ def dashboard_mode():
 def admin_management():
     st.header("Admin Management")
 
-    # ดึงข้อมูล WOC ทั้งหมดจากฐานข้อมูล
     woc_df = get_all_jobs()  # หรือใช้ get_jobs_by_status("WIP") เพื่อกรองเฉพาะ WIP
 
-    # ตรวจสอบว่ามี WOC ในฐานข้อมูลหรือไม่
     if woc_df.empty:
         st.error("ไม่มีข้อมูล WOC ในฐานข้อมูล")
         return
 
-    # แสดงหมายเลข WOC ใน Dropdown (selectbox) หรือให้เลือกหลายรายการ
     woc_list = woc_df["woc_number"].unique().tolist()
 
-    # ปุ่มเลือกทั้งหมด
     select_all = st.checkbox("เลือกทั้งหมด", value=False)
 
-    # ถ้าเลือกทั้งหมด ให้เลือก WOC ทั้งหมด
     if select_all:
         woc_selected = woc_list
     else:
         woc_selected = st.multiselect("เลือกหมายเลข WOC ที่ต้องการแก้ไขหรือลบ", woc_list)
 
     if woc_selected:
-        # แสดงข้อมูลของ WOC ที่เลือก
         st.write("ข้อมูล WOC ที่เลือก:")
         selected_wocs = woc_df[woc_df["woc_number"].isin(woc_selected)]
         st.dataframe(selected_wocs)
 
-        # สถานะการลบ
         total_to_delete = len(woc_selected)
         deleted_count = 0
 
-        # เพิ่มปุ่มให้ลบ WOC ที่เลือก
         if st.button("ลบ WOC ที่เลือก"):
             for woc_number in woc_selected:
-                # ลบ WOC
                 with get_connection() as conn:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
@@ -622,25 +599,20 @@ def admin_management():
                 deleted_count += 1
                 st.success(f"ลบ WOC {woc_number} เรียบร้อยแล้ว")
 
-            # แสดงสถานะการลบ
             st.info(f"ลบแล้ว {deleted_count}/{total_to_delete} WOC")
 
-            # อัพเดทข้อมูลหลังการลบ
-            woc_df = get_all_jobs()  # รีเฟรชข้อมูล WOC หลังจากลบ
+            woc_df = get_all_jobs()
 
-        # เพิ่มปุ่มลบทั้งหมด
         if st.button("ลบทั้งหมด"):
             confirm_delete = st.radio("คุณแน่ใจหรือไม่ว่าต้องการลบทั้งหมด?", ["ไม่", "ใช่"])
             if confirm_delete == "ใช่":
-                # ลบข้อมูลทั้งหมด
                 with get_connection() as conn:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM job_tracking")
                     conn.commit()
                 st.success("ลบข้อมูลทั้งหมดเรียบร้อยแล้ว")
-                woc_df = get_all_jobs()  # รีเฟรชข้อมูล WOC หลังจากลบทั้งหมด
+                woc_df = get_all_jobs()
 
-                # แสดงสถานะการลบ
                 st.info(f"ลบแล้ว {total_to_delete}/{total_to_delete} WOC")
             else:
                 st.warning("การลบทั้งหมดถูกยกเลิก")
