@@ -6,8 +6,8 @@ import math
 from datetime import datetime
 import numpy as np  # เพิ่มการนำเข้า numpy
 
-# === Connection ===
 def get_connection():
+    # เพิ่มการตั้งค่า search_path ในการเชื่อมต่อฐานข้อมูล
     return psycopg2.connect(st.secrets["postgres"]["conn_str"], options="-c search_path=public")
 
 # === Telegram Notification ===
