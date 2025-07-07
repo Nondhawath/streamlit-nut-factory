@@ -287,7 +287,7 @@ def completion_mode():
 
     # ตรวจสอบว่า status มีเครื่องหมาย '-' หรือไม่ ก่อนทำการ split
     if '-' in job['status']:
-        machine_name = job['status'].split('-')[1]  # แสดงชื่อเครื่องจักรจากสถานะ
+        machine_name = job['status'].split('-')[1]  # แสดงชื่อเครื่องจักรจากสถานะหลัง '-'
         st.markdown(f"- **เครื่องจักร:** {machine_name}")
     else:
         st.markdown("- **เครื่องจักร:** ไม่พบข้อมูลเครื่องจักร")
