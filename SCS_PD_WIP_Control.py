@@ -268,8 +268,11 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
+    
+    # กรองข้อมูลที่มีสถานะ "FI Working" โดยไม่จำกัดชื่อเครื่องจักร
     df = get_jobs_by_status("FI Working")
 
+    # หากสถานะที่เลือกมีเครื่องจักรในชื่อสถานะ FI Working-SM01
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
@@ -281,17 +284,16 @@ def completion_mode():
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
+    # แสดงข้อมูลเกี่ยวกับงานที่เลือก
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    # ตรวจสอบว่า status มีเครื่องหมาย '-' หรือไม่ ก่อนทำการ split
-    if '-' in job['status']:
-        machine_name = job['status'].split('-')[1]  # แสดงชื่อเครื่องจักรจากสถานะหลัง '-'
-        st.markdown(f"- **เครื่องจักร:** {machine_name}")
-    else:
-        st.markdown("- **เครื่องจักร:** ไม่พบข้อมูลเครื่องจักร")
+    # แสดงชื่อเครื่องจักรจากสถานะ
+    machine_name = job['status'].split('-')[1] if '-' in job['status'] else 'ไม่พบเครื่องจักร'
+    st.markdown(f"- **เครื่องจักร:** {machine_name}")
 
+    # รับข้อมูลจากผู้ใช้งานเกี่ยวกับผลการทำงาน
     ok = st.number_input("จำนวน OK", min_value=0, step=1)
     ng = st.number_input("จำนวน NG", min_value=0, step=1)
     rework = st.number_input("จำนวน Rework", min_value=0, step=1)
@@ -301,6 +303,7 @@ def completion_mode():
 
     total_count = ok + ng + rework + remain
 
+    # เมื่อผู้ใช้งานคลิกบันทึก Completion
     if st.button("บันทึก Completion"):
         expected_count = job['pieces_count']
         diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
@@ -309,6 +312,7 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
+        # อัปเดตสถานะเป็น Completed
         update_status(woc_selected, "Completed")
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
@@ -316,7 +320,6 @@ def completion_mode():
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
-
         
 # === Report Mode ===
 def report_mode():
