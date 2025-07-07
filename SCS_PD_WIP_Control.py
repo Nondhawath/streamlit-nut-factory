@@ -6,10 +6,15 @@ import math
 from datetime import datetime
 import numpy as np  # เพิ่มการนำเข้า numpy
 
+# === Connection ===
+def get_connection():
+    # เพิ่มการตั้งค่า search_path ในการเชื่อมต่อฐานข้อมูล
+    return psycopg2.connect(st.secrets["postgres"]["conn_str"], options="-c search_path=public")
+
+# === Database Operations ===
 def get_jobs_by_status(status):
     with get_connection() as conn:
         return pd.read_sql("SELECT * FROM job_tracking WHERE status = %s ORDER BY created_at DESC", conn, params=(status,))
-
 # === Telegram Notification ===
 def send_telegram_message(message):
     token = st.secrets["telegram"]["token"]
