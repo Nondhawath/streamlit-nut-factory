@@ -59,7 +59,6 @@ def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
         return 0
 
 # === Transfer Mode ===
-# === Transfer Mode ===
 def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
@@ -68,11 +67,11 @@ def transfer_mode(dept_from):
     if dept_from == "TP":
         df = get_jobs_by_status("TP Working")
         prev_woc_options = [""] + list(df["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)  # เลือก WOC ก่อนหน้า
     elif dept_from == "OS":
         df = get_jobs_by_status("OS Received")
         prev_woc_options = [""] + list(df["woc_number"].unique())
-        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)  # เลือก WOC ก่อนหน้า
     else:
         st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
 
@@ -83,18 +82,8 @@ def transfer_mode(dept_from):
         part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
     part_name = st.text_input("Part Name", value=part_name)
 
-    # กำหนดแผนกปลายทาง (Department to)
-    if dept_from == "OS":
-        dept_to_options = ["FI"]
-    else:
-        dept_to_options = ["TP", "FI", "OS"]
-
+    dept_to_options = ["TP", "FI", "OS"]
     dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
-    
-    # ตรวจสอบว่าแผนกปลายทางไม่ใช่แผนกต้นทาง
-    if dept_from == dept_to:
-        st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
-        return  # หยุดการทำงานถ้าพบว่ามีการโอนย้ายไปยังแผนกเดียวกัน
 
     lot_number = st.text_input("Lot Number")
     total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
@@ -116,7 +105,7 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
-        # ทำการบันทึกข้อมูล Transfer
+        # บันทึกข้อมูล Transfer
         insert_job({
             "woc_number": new_woc,
             "part_name": part_name,
@@ -130,7 +119,7 @@ def transfer_mode(dept_from):
             "sample_count": sample_count,
             "pieces_count": pieces_count,
             "status": f"{dept_from} Transfer {dept_to}",
-            "prev_woc_number": prev_woc,  # เพิ่มฟิลด์ prev_woc_number
+            "prev_woc_number": prev_woc,  # บันทึกหมายเลข WOC ก่อนหน้า
             "created_at": datetime.utcnow()
         })
 
@@ -225,7 +214,6 @@ def receive_mode(dept_to):
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
-# === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
 
@@ -253,9 +241,9 @@ def work_mode(dept):
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-    machine_name = st.text_input("ชื่อเครื่องจักร")
+    machine_name = st.text_input("ชื่อเครื่องจักร")  # ชื่อเครื่องจักรที่พนักงานคีย์
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-    on_machine_time = st.number_input("เวลาทำงานบนเครื่อง (ชั่วโมง)", min_value=0.0, step=0.1)  # เพิ่มเวลา
+    on_machine_time = st.number_input("เวลาทำงานบนเครื่อง (ชั่วโมง)", min_value=0.0, step=0.1)  # เวลาทำงาน
 
     if st.button("เริ่มทำงาน"):
         if not machine_name.strip():
@@ -276,8 +264,8 @@ def work_mode(dept):
             "sample_weight": job["sample_weight"],
             "sample_count": job["sample_count"],
             "pieces_count": job["pieces_count"],
-            "machine_name": machine_name,  # เพิ่มฟิลด์ machine_name
-            "on_machine_time": on_machine_time,  # เพิ่มฟิลด์ on_machine_time
+            "machine_name": machine_name,  # ชื่อเครื่องจักรที่พนักงานกรอก
+            "on_machine_time": on_machine_time,  # เวลาทำงานบนเครื่องที่พนักงานกรอก
             "status": f"{dept} Working",
             "created_at": datetime.utcnow()
         })
