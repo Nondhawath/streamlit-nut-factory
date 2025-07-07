@@ -499,18 +499,83 @@ def dashboard_mode():
         df_wip = df[df["status"].str.contains("WIP")]
         st.dataframe(df_wip)
     
-    # เพิ่มฟิลเตอร์แสดงแต่ละแผนก
-    if selected_dept == "WIP-TP":
-        status_filters = ["TP Received", "TP Working"]
+    # แสดงข้อมูลตามแผนก TP
+    elif selected_dept == "WIP-TP":
+        status_filters = ["TP Received", "TP Working", "TP Transfer FI", "TP Transfer OS", "WIP-Tapping Work"]
         df_wip = df[df["status"].isin(status_filters)]
         st.subheader("WIP-TP")
-        st.dataframe(df_wip)
+        if df_wip.empty:
+            st.write("ไม่มีงาน WIP ในแผนก TP")
+        else:
+            st.dataframe(df_wip)
 
-    if selected_dept == "WIP-FM":
+    # แสดงข้อมูลตามแผนก FM
+    elif selected_dept == "WIP-FM":
         status_filters = ["FM Transfer TP", "FM Transfer OS"]
         df_wip = df[df["status"].isin(status_filters)]
         st.subheader("WIP-FM")
-        st.dataframe(df_wip)
+        if df_wip.empty:
+            st.write("ไม่มีงาน WIP ในแผนก FM")
+        else:
+            st.dataframe(df_wip)
+
+    # แสดงข้อมูลตามแผนก FI
+    elif selected_dept == "WIP-FI":
+        status_filters = ["FI Received", "FI Working", "WIP-Final Work"]
+        df_wip = df[df["status"].isin(status_filters)]
+        st.subheader("WIP-FI")
+        if df_wip.empty:
+            st.write("ไม่มีงาน WIP ในแผนก FI")
+        else:
+            st.dataframe(df_wip)
+
+    # แสดงข้อมูลตามแผนก OS
+    elif selected_dept == "WIP-OS":
+        status_filters = ["OS Received", "OS Transfer FI"]
+        df_wip = df[df["status"].isin(status_filters)]
+        st.subheader("WIP-OS")
+        if df_wip.empty:
+            st.write("ไม่มีงาน WIP ในแผนก OS")
+        else:
+            st.dataframe(df_wip)
+
+    # ฟิลเตอร์แสดงเฉพาะสถานะ On Machine
+    st.subheader("WIP On Machine")
+    df_on_machine = df[df["status"] == "On Machine"]
+
+    if not df_on_machine.empty:
+        st.write(f"**จำนวนงานที่กำลังทำงานบนเครื่องจักร**: {len(df_on_machine)} ชิ้น")
+        st.write("แสดงข้อมูล WIP ที่สถานะเป็น 'On Machine':")
+        
+        # แสดงข้อมูลที่ต้องการในรูปแบบตาราง
+        for _, row in df_on_machine.iterrows():
+            part_name = row["part_name"]
+            woc_number = row["woc_number"]
+            pieces_count = row["pieces_count"]
+            on_machine_time = row["on_machine_time"]
+
+            st.markdown(f"### WOC: {woc_number}")
+            st.markdown(f"- **Part Name**: {part_name}")
+            st.markdown(f"- **จำนวนชิ้นงาน**: {pieces_count}")
+            st.markdown(f"- **เริ่มทำงานที่**: {on_machine_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        st.info("ไม่มีงานที่กำลังทำงานบนเครื่องจักร")
+
+    # ตัวเลือกในการค้นหา WOC หรือ Part Name
+    search = st.text_input("ค้นหา WOC หรือ Part Name")
+    if search:
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
+                df["part_name"].str.contains(search, case=False, na=False)]
+
+    # เพิ่มปุ่มดาวน์โหลดรายงานเป็น Excel
+    excel_file = convert_df_to_excel(df)
+    
+    st.download_button(
+        label="ดาวน์โหลดเป็นไฟล์ Excel",
+        data=excel_file,
+        file_name="wip_report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # === Admin Management Mode ===
 def admin_management():
