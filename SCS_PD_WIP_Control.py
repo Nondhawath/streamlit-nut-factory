@@ -544,6 +544,7 @@ def main():
         "Completion",
         "Upload WIP Excel",
         "Report",
+        "Dashboard",  # ✅ เพิ่มตรงนี้
         "Admin Management"
     ]
 
@@ -571,6 +572,8 @@ def main():
         upload_wip_from_excel()
     elif choice == "Report":
         report_mode()
+    elif choice == "Dashboard":  # ✅ เพิ่มตรงนี้
+        dashboard_mode()
     elif choice == "Admin Management":
         admin_management()
     else:
