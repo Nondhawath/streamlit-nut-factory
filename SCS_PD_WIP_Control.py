@@ -278,15 +278,12 @@ def upload_wip_from_excel():
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
 
-    if dept_to == "FI":
-        status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
-    else:
-        dept_from_map = {
-            "TP": ["FM", "TP Working"],
-            "OS": ["FM", "TP"]
-        }
-        from_depts = dept_from_map.get(dept_to, [])
-        status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
+    # กำหนดสถานะที่จะกรอง
+    status_filters = {
+        "FI": ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"],
+        "TP": ["FM", "TP Working"],
+        "OS": ["FM", "TP"]
+    }.get(dept_to, [])
 
     df = get_jobs_by_status_list(status_filters)
 
@@ -340,6 +337,8 @@ def receive_mode(dept_to):
             return
 
         next_status = f"WIP-{dept_to_next}"
+        
+        # บันทึกข้อมูลและเปลี่ยนสถานะ
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -355,10 +354,14 @@ def receive_mode(dept_to):
             "status": next_status,
             "created_at": datetime.utcnow()
         })
-        update_status(woc_selected, f"{dept_to} Received")
+
+        # เปลี่ยนสถานะ WOC เดิมเป็น "Completed" หากสถานะเป็น "TP Received"
+        if job['status'] == "TP Received":
+            update_status(woc_selected, "Completed")
+
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
-
+        
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
