@@ -266,11 +266,9 @@ def work_mode(dept):
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
 # === Completion Mode ===
-# === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    # กรองสถานะที่มีชื่อเครื่องจักร
-    df = get_jobs_by_status("FI Working")  # กรองเฉพาะ FI Working
+    df = get_jobs_by_status("FI Working")
 
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
@@ -286,7 +284,13 @@ def completion_mode():
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
-    st.markdown(f"- **เครื่องจักร:** {job['status'].split('-')[1]}")  # แสดงชื่อเครื่องจักรจากสถานะ
+
+    # ตรวจสอบว่า status มีเครื่องหมาย '-' หรือไม่ ก่อนทำการ split
+    if '-' in job['status']:
+        machine_name = job['status'].split('-')[1]  # แสดงชื่อเครื่องจักรจากสถานะ
+        st.markdown(f"- **เครื่องจักร:** {machine_name}")
+    else:
+        st.markdown("- **เครื่องจักร:** ไม่พบข้อมูลเครื่องจักร")
 
     ok = st.number_input("จำนวน OK", min_value=0, step=1)
     ng = st.number_input("จำนวน NG", min_value=0, step=1)
@@ -305,13 +309,14 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
-        update_status(woc_selected, "Completed")  # เปลี่ยนสถานะเป็น "Completed"
+        update_status(woc_selected, "Completed")
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
         send_telegram_message(
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
+
         
 # === Report Mode ===
 def report_mode():
