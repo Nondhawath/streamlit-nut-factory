@@ -362,7 +362,7 @@ def receive_mode(dept_to):
             "created_at": datetime.utcnow()
         })
 
-        # เปลี่ยนสถานะของ WOC ก่อนหน้าให้เป็น "Completed" หากสถานะเดิมเป็น "Received"
+        # เปลี่ยนสถานะของ WOC ที่เป็น "TP Received" หรือ "FI Received" ให้เป็น "Completed"
         if job['status'] == "TP Received" or job['status'] == "FI Received":
             update_status(woc_selected, "Completed")
 
