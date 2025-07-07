@@ -4,6 +4,9 @@ import pandas as pd
 import requests
 import math
 from datetime import datetime, timedelta
+import numpy as np
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+df.fillna("", inplace=True)  # แทนค่าว่างด้วย string ว่าง
 
 # === Connection Pool ===
 def get_connection():
@@ -167,17 +170,39 @@ def validate_data(row):
 
 def upload_wip_from_excel():
     st.header("อัพโหลด WIP จากไฟล์ Excel")
-    
+
     uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
-    
+
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
 
-        st.write("ข้อมูลในไฟล์ Excel:")
+        # ===== Mapping ชื่อคอลัมน์ =====
+        column_map = {
+            "WOC": "woc_number",
+            "Part": "part_name",
+            "Operator": "operator_name",
+            "From": "dept_from",
+            "To": "dept_to",
+            "Count": "pieces_count",
+            "Lot": "lot_number",
+            "Total_Weight": "total_weight",
+            "Barrel_Weight": "barrel_weight",
+            "Sample_Weight": "sample_weight",
+            "Sample_Count": "sample_count",
+            "OK": "ok_count",
+            "NG": "ng_count",
+            "Rework": "rework_count",
+            "Remain": "remain_count",
+            "Machine": "machine_name"
+        }
+
+        df.rename(columns=column_map, inplace=True)
+
+        st.write("ข้อมูลในไฟล์ Excel (หลังจัดรูปแบบ):")
         st.dataframe(df.head())
 
         required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
-        
+
         optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "ok_count", "ng_count", "rework_count", "remain_count", "machine_name"]
 
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -195,40 +220,67 @@ def upload_wip_from_excel():
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_number,))
                 conn.commit()
 
+        def safe_int(val):
+            try:
+                if pd.isna(val):
+                    return 0
+                return int(float(val))
+            except:
+                return 0
+
+        def safe_float(val):
+            try:
+                if pd.isna(val):
+                    return 0.0
+                return float(val)
+            except:
+                return 0.0
+
         for _, row in df.iterrows():
-            # ตรวจสอบข้อมูลก่อนบันทึก
-            if not validate_data(row):
-                continue  # ข้ามข้อมูล WOC นี้
+            if pd.isnull(row["woc_number"]):
+                continue
+
+            try:
+                pieces = safe_int(row["pieces_count"])
+            except Exception:
+                st.error(f"WOC {row['woc_number']} มีจำนวนชิ้นงานไม่ถูกต้อง: {row['pieces_count']}")
+                continue
 
             delete_existing_woc(row["woc_number"])
 
-            # เพิ่มการปรับเวลา GMT+7 ในข้อมูล
-            data = {
-                "woc_number": row["woc_number"],
-                "part_name": row["part_name"],
-                "operator_name": row["operator_name"],
-                "dept_from": row.get("dept_from", ""),
-                "dept_to": row["dept_to"],
-                "lot_number": row.get("lot_number", ""),
-                "total_weight": row.get("total_weight", 0.0),
-                "barrel_weight": row.get("barrel_weight", 0.0),
-                "sample_weight": row.get("sample_weight", 0.0),
-                "sample_count": row.get("sample_count", 0),
-                "pieces_count": row["pieces_count"],
-                "status": "WIP",
-                "created_at": datetime.utcnow() + timedelta(hours=7),  # ใช้เวลา GMT+7
-                "prev_woc_number": row.get("prev_woc_number", ""),
-                "ok_count": row.get("ok_count", 0),
-                "ng_count": row.get("ng_count", 0),
-                "rework_count": row.get("rework_count", 0),
-                "remain_count": row.get("remain_count", 0),
-                "machine_name": row.get("machine_name", ""),
-            }
-            insert_job(data)  # บันทึกข้อมูล
+            # คำนวณสถานะจาก dept_from และ dept_to
+            status = f"{row['dept_from']} Transfer {row['dept_to']}"
 
-        if st.button("ยืนยันการอัปโหลด"):
-            st.success("อัปโหลดและบันทึกข้อมูล WIP จาก Excel เรียบร้อยแล้ว")
-            
+            try:
+                data = {
+                    "woc_number": str(row["woc_number"]),
+                    "part_name": str(row["part_name"]),
+                    "operator_name": str(row["operator_name"]),
+                    "dept_from": str(row.get("dept_from", "")),
+                    "dept_to": str(row["dept_to"]),
+                    "lot_number": str(row.get("lot_number", "")),
+                    "total_weight": safe_float(row.get("total_weight", 0.0)),
+                    "barrel_weight": safe_float(row.get("barrel_weight", 0.0)),
+                    "sample_weight": safe_float(row.get("sample_weight", 0.0)),
+                    "sample_count": safe_int(row.get("sample_count", 0)),
+                    "pieces_count": pieces,
+                    "status": status,
+                    "created_at": datetime.utcnow() + timedelta(hours=7),
+                    "prev_woc_number": str(row.get("prev_woc_number", "")),
+                    "ok_count": safe_int(row.get("ok_count", 0)),
+                    "ng_count": safe_int(row.get("ng_count", 0)),
+                    "rework_count": safe_int(row.get("rework_count", 0)),
+                    "remain_count": safe_int(row.get("remain_count", 0)),
+                    "machine_name": str(row.get("machine_name", "")),
+                }
+                insert_job(data)
+            except Exception as e:
+                st.error(f"❌ ไม่สามารถบันทึก WOC {row['woc_number']} ได้: {e}")
+
+        st.success("📥 ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกเรียบร้อยแล้ว")
+        st.info("สามารถไปใช้งานต่อได้ในโหมด Receive / Work / Completion / Dashboard / Report")
+        report_mode()
+        
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
@@ -397,12 +449,19 @@ def completion_mode():
 # === Convert DataFrame to Excel ===
 @st.cache_data
 def convert_df_to_excel(df):
-    """แปลง DataFrame เป็นไฟล์ Excel"""
     from io import BytesIO
-    # สร้าง buffer ของ BytesIO เพื่อเก็บข้อมูลไฟล์ Excel
+    import numpy as np
+
+    df_clean = df.copy()
+    df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
+    df_clean.fillna("", inplace=True)
+    for col in df_clean.columns:
+        if df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].astype(str)
+
     excel_buffer = BytesIO()
-    df.to_excel(excel_buffer, index=False, engine='openpyxl')  # ระบุ engine ให้ชัดเจน
-    excel_buffer.seek(0)  # กลับไปที่จุดเริ่มต้นของ buffer
+    df_clean.to_excel(excel_buffer, index=False, engine='openpyxl')
+    excel_buffer.seek(0)
     return excel_buffer
 
 # === Report Mode ===
