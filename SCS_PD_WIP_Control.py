@@ -227,7 +227,7 @@ def work_mode(dept):
 
     # กรองสถานะที่ต้องการ
     status_working = {
-        "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
+        "TP": "TP Received",  
         "FI": "FI Working"
     }
     status_filter = status_working.get(dept, "")
@@ -261,14 +261,14 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working")  # เปลี่ยนสถานะเป็น "Working"
+        update_status(woc_selected, f"{dept} Working-{machine_name}")  # เปลี่ยนสถานะเป็น "FI Working-ชื่อเครื่อง"
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    df = get_jobs_by_status("FI Working")
+    df = get_jobs_by_status("FI Working")  # กรองเฉพาะ FI Working
 
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
@@ -302,7 +302,7 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
-        update_status(woc_selected, "Completed")
+        update_status(woc_selected, "Completed")  # เปลี่ยนสถานะเป็น "Completed"
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
         send_telegram_message(
