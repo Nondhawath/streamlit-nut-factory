@@ -167,17 +167,39 @@ def validate_data(row):
 
 def upload_wip_from_excel():
     st.header("อัพโหลด WIP จากไฟล์ Excel")
-    
+
     uploaded_file = st.file_uploader("เลือกไฟล์ Excel", type=["xlsx"])
-    
+
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
 
-        st.write("ข้อมูลในไฟล์ Excel:")
+        # ===== Mapping ชื่อคอลัมน์ =====
+        column_map = {
+            "WOC": "woc_number",
+            "Part": "part_name",
+            "Operator": "operator_name",
+            "From": "dept_from",
+            "To": "dept_to",
+            "Count": "pieces_count",
+            "Lot": "lot_number",
+            "Total_Weight": "total_weight",
+            "Barrel_Weight": "barrel_weight",
+            "Sample_Weight": "sample_weight",
+            "Sample_Count": "sample_count",
+            "OK": "ok_count",
+            "NG": "ng_count",
+            "Rework": "rework_count",
+            "Remain": "remain_count",
+            "Machine": "machine_name"
+        }
+
+        df.rename(columns=column_map, inplace=True)
+
+        st.write("ข้อมูลในไฟล์ Excel (หลังจัดรูปแบบ):")
         st.dataframe(df.head())
 
         required_columns = ["woc_number", "part_name", "operator_name", "dept_from", "dept_to", "pieces_count"]
-        
+
         optional_columns = ["lot_number", "total_weight", "barrel_weight", "sample_weight", "sample_count", "ok_count", "ng_count", "rework_count", "remain_count", "machine_name"]
 
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -196,13 +218,14 @@ def upload_wip_from_excel():
                 conn.commit()
 
         for _, row in df.iterrows():
-            # ตรวจสอบข้อมูลก่อนบันทึก
-            if not validate_data(row):
-                continue  # ข้ามข้อมูล WOC นี้
+            if pd.isnull(row["woc_number"]):
+                continue
 
             delete_existing_woc(row["woc_number"])
 
-            # เพิ่มการปรับเวลา GMT+7 ในข้อมูล
+            # คำนวณสถานะจาก dept_from และ dept_to
+            status = f"{row['dept_from']} Transfer {row['dept_to']}"
+
             data = {
                 "woc_number": row["woc_number"],
                 "part_name": row["part_name"],
@@ -215,8 +238,8 @@ def upload_wip_from_excel():
                 "sample_weight": row.get("sample_weight", 0.0),
                 "sample_count": row.get("sample_count", 0),
                 "pieces_count": row["pieces_count"],
-                "status": "WIP",
-                "created_at": datetime.utcnow() + timedelta(hours=7),  # ใช้เวลา GMT+7
+                "status": status,
+                "created_at": datetime.utcnow() + timedelta(hours=7),
                 "prev_woc_number": row.get("prev_woc_number", ""),
                 "ok_count": row.get("ok_count", 0),
                 "ng_count": row.get("ng_count", 0),
@@ -224,12 +247,11 @@ def upload_wip_from_excel():
                 "remain_count": row.get("remain_count", 0),
                 "machine_name": row.get("machine_name", ""),
             }
-            insert_job(data)  # บันทึกข้อมูล
+            insert_job(data)
 
-        # หลังจากบันทึกเสร็จ ไปที่รายงาน
-        st.write("ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกแล้ว")
-        report_mode()  # เรียกฟังก์ชันรายงาน
-            
+        st.success("📥 ข้อมูล WIP ได้ถูกอัปโหลดและบันทึกเรียบร้อยแล้ว")
+        st.info("สามารถไปใช้งานต่อได้ในโหมด Receive / Work / Completion / Dashboard / Report")
+        report_mode()
 # === Receive Mode ===
 def receive_mode(dept_to):
     st.header(f"{dept_to} Receive")
