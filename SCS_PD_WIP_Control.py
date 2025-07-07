@@ -243,13 +243,15 @@ def work_mode(dept):
 
     machine_name = st.text_input("ชื่อเครื่องจักร")  # ชื่อเครื่องจักรที่พนักงานคีย์
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-    on_machine_time = st.number_input("เวลาทำงานบนเครื่อง (ชั่วโมง)", min_value=0.0, step=0.1)  # เวลาทำงาน
 
     if st.button("เริ่มทำงาน"):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
         update_status(woc_selected, f"{dept} Working")
+
+        # บันทึกเวลาเครื่องจักร (timestamp) เมื่อเริ่มทำงาน
+        on_machine_time = datetime.utcnow()  # ใช้เวลา timestamp เมื่อบันทึก
 
         # บันทึกข้อมูลการทำงาน
         insert_job({
@@ -265,7 +267,7 @@ def work_mode(dept):
             "sample_count": job["sample_count"],
             "pieces_count": job["pieces_count"],
             "machine_name": machine_name,  # ชื่อเครื่องจักรที่พนักงานกรอก
-            "on_machine_time": on_machine_time,  # เวลาทำงานบนเครื่องที่พนักงานกรอก
+            "on_machine_time": on_machine_time,  # ใช้เวลา timestamp ที่บันทึก
             "status": f"{dept} Working",
             "created_at": datetime.utcnow()
         })
