@@ -219,7 +219,7 @@ def work_mode(dept):
 
     status_working = {
         "TP": "WIP-Tapping Work",  
-        "FI": "FI Received"
+        "FI": "FI Working"
     }
     status_filter = status_working.get(dept, "")
 
