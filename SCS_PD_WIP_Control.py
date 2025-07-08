@@ -64,12 +64,13 @@ def transfer_mode(dept_from):
     df_all = get_all_jobs()
     prev_woc = ""
 
-    # เพิ่มส่วนสำหรับ FM: แก้ไขย้อนหลังได้
-    editable_wocs = df_all[df_all["dept_from"] == "FM"]["woc_number"].unique().tolist()
+    # === เฉพาะ FM: แก้ไขย้อนหลังเฉพาะสถานะ FM Transfer เท่านั้น ===
+    editable_df = df_all[(df_all["dept_from"] == "FM") & (df_all["status"].str.startswith("FM Transfer"))]
+    editable_wocs = editable_df["woc_number"].unique().tolist()
     selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", [""] + editable_wocs)
 
     if selected_edit_woc:
-        existing = df_all[df_all["woc_number"] == selected_edit_woc].iloc[0]
+        existing = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
         new_woc = selected_edit_woc
         part_name = existing["part_name"]
         lot_number = existing["lot_number"]
