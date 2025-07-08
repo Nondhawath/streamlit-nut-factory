@@ -62,107 +62,100 @@ def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
 
+    # === Forming Transfer: Allow editing WOC ===
+    editable_df = get_jobs_by_status_list(["FM Transfer TP", "FM Transfer OS", "FM Transfer FI"])
+    selected_edit_woc = None
     if dept_from == "FM":
-        # --- เลือก WOC เดิมเพื่อแก้ไข (หรือเพิ่มใหม่) ---
-        editable_df = df_all[(df_all["dept_from"] == "FM") & (df_all["status"].str.startswith("FM Transfer"))]
-        editable_wocs = editable_df["woc_number"].unique().tolist()
-        selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไขหมายเลข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", [""] + editable_wocs)
+        editable_woc_options = [""] + editable_df["woc_number"].unique().tolist()
+        selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไขหมายเลข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", editable_woc_options)
 
-        # ถ้ามีการเลือก WOC เดิม → ดึงข้อมูลที่เคยบันทึก
+    # === WOC ก่อนหน้า สำหรับ TP/OS เท่านั้น ===
+    prev_woc = ""
+    if dept_from == "TP":
+        df = get_jobs_by_status("TP Working")
+        prev_woc_options = [""] + list(df["woc_number"].unique())
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+    elif dept_from == "OS":
+        df = get_jobs_by_status("OS Received")
+        prev_woc_options = [""] + list(df["woc_number"].unique())
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+    else:
+        st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
+
+    # === กรอกข้อมูลฟอร์ม ===
+    if selected_edit_woc:
+        job = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
+        new_woc = st.text_input("หมายเลข WOC ใหม่", value=selected_edit_woc)
+        part_name = st.text_input("Part Name", value=job.get("part_name", ""))
+        lot_number = st.text_input("Lot Number", value=job.get("lot_number", ""))
+        total_weight = st.number_input("น้ำหนักรวม", value=job.get("total_weight", 0.0), min_value=0.0, step=0.01)
+        barrel_weight = st.number_input("น้ำหนักถัง", value=job.get("barrel_weight", 0.0), min_value=0.0, step=0.01)
+        sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", value=job.get("sample_weight", 0.0), min_value=0.0, step=0.01)
+        sample_count = st.number_input("จำนวนตัวอย่าง", value=job.get("sample_count", 0), min_value=0, step=1)
+        operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)", value=job.get("operator_name", ""))
+        dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"], index=["TP", "FI", "OS"].index(job["dept_to"]))
+    else:
+        new_woc = st.text_input("WOC ใหม่")
+        part_name = ""
+        if prev_woc:
+            part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
+        part_name = st.text_input("Part Name", value=part_name)
+        lot_number = st.text_input("Lot Number")
+        total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
+        barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
+        sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
+        sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
+        operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+        dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
+
+    if dept_from == dept_to:
+        st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
+        return
+
+    # === คำนวณจำนวนชิ้น ===
+    pieces_count = 0
+    if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
+        pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
+        st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
+
+    # === บันทึกหรืออัปเดต ===
+    if st.button("บันทึก Transfer"):
+        if not new_woc.strip():
+            st.error("กรุณากรอก WOC ใหม่")
+            return
+        if pieces_count == 0:
+            st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
+            return
+
         if selected_edit_woc:
-            job = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
-
-            new_woc = st.text_input("หมายเลข WOC ใหม่", value=selected_edit_woc)
-            part_name = st.text_input("Part Name", value=job["part_name"])
-            lot_number = st.text_input("Lot Number", value=job["lot_number"])
-            total_weight = st.number_input("น้ำหนักรวม", value=job["total_weight"], min_value=0.0, step=0.01)
-            barrel_weight = st.number_input("น้ำหนักถัง", value=job["barrel_weight"], min_value=0.0, step=0.01)
-            sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", value=job["sample_weight"], min_value=0.0, step=0.01)
-            sample_count = st.number_input("จำนวนตัวอย่าง", value=job["sample_count"], min_value=0, step=1)
-            operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)", value=job["operator_name"])
-            dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"], index=["TP", "FI", "OS"].index(job["dept_to"]))
-
-            pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
-            st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
-
-            if st.button("อัปเดตหมายเลข WOC"):
-                if not new_woc.strip():
-                    st.error("กรุณากรอกหมายเลข WOC ใหม่")
-                    return
-
-                with get_connection() as conn:
-                    cur = conn.cursor()
-                    # ตรวจสอบว่า WOC ใหม่ซ้ำหรือไม่
-                    cur.execute("SELECT COUNT(*) FROM job_tracking WHERE woc_number = %s", (new_woc,))
-                    if cur.fetchone()[0] > 0 and new_woc != selected_edit_woc:
-                        st.error("หมายเลข WOC ใหม่ซ้ำในระบบ")
-                        return
-
-                    # อัปเดตข้อมูล WOC
-                    cur.execute("""
-                        UPDATE job_tracking 
-                        SET woc_number = %s,
-                            part_name = %s,
-                            lot_number = %s,
-                            total_weight = %s,
-                            barrel_weight = %s,
-                            sample_weight = %s,
-                            sample_count = %s,
-                            pieces_count = %s,
-                            operator_name = %s,
-                            dept_to = %s
-                        WHERE woc_number = %s
-                    """, (
-                        new_woc, part_name, lot_number, total_weight, barrel_weight,
-                        sample_weight, sample_count, pieces_count, operator_name, dept_to,
-                        selected_edit_woc
-                    ))
-                    conn.commit()
-
-                st.success(f"อัปเดตหมายเลข WOC เป็น {new_woc} สำเร็จแล้ว ✅")
-
+            # แก้ไขหมายเลข WOC เดิม
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("UPDATE job_tracking SET woc_number = %s WHERE woc_number = %s", (new_woc, selected_edit_woc))
+                conn.commit()
+            st.success(f"อัปเดตหมายเลข WOC จาก {selected_edit_woc} → {new_woc} สำเร็จแล้ว")
         else:
             # เพิ่มใหม่
-            new_woc = st.text_input("WOC ใหม่")
-            part_name = st.text_input("Part Name")
-            lot_number = st.text_input("Lot Number")
-            total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
-            barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
-            sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
-            sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
-            operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-            dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
+            insert_job({
+                "woc_number": new_woc,
+                "part_name": part_name,
+                "operator_name": operator_name,
+                "dept_from": dept_from,
+                "dept_to": dept_to,
+                "lot_number": lot_number,
+                "total_weight": total_weight,
+                "barrel_weight": barrel_weight,
+                "sample_weight": sample_weight,
+                "sample_count": sample_count,
+                "pieces_count": pieces_count,
+                "status": f"{dept_from} Transfer {dept_to}",
+                "created_at": datetime.utcnow()
+            })
 
-            pieces_count = 0
-            if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
-                pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
-                st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
+            if prev_woc:
+                update_status(prev_woc, "Completed")
 
-            if st.button("บันทึก Transfer"):
-                if not new_woc.strip():
-                    st.error("กรุณากรอก WOC ใหม่")
-                    return
-                if pieces_count == 0:
-                    st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
-                    return
-
-                insert_job({
-                    "woc_number": new_woc,
-                    "part_name": part_name,
-                    "operator_name": operator_name,
-                    "dept_from": "FM",
-                    "dept_to": dept_to,
-                    "lot_number": lot_number,
-                    "total_weight": total_weight,
-                    "barrel_weight": barrel_weight,
-                    "sample_weight": sample_weight,
-                    "sample_count": sample_count,
-                    "pieces_count": pieces_count,
-                    "status": f"FM Transfer {dept_to}",
-                    "created_at": datetime.utcnow()
-                })
-
-                st.success(f"บันทึก FM Transfer เรียบร้อยแล้ว ✅")
+            st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
 
 # === Receive Mode ===
 def receive_mode(dept_to):
