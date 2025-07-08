@@ -362,9 +362,8 @@ def dashboard_mode():
         df = df[df["woc_number"].str.contains(search, case=False, na=False) |
                 df["part_name"].str.contains(search, case=False, na=False)]
 
-    # คัดกรองข้อมูลเพื่อให้แสดง WOC ล่าสุดแค่รายการเดียว
-    df = df.sort_values('created_at', ascending=False)
-    df = df.drop_duplicates(subset=['woc_number'], keep='first')
+    # หาค่าที่เป็นรายการล่าสุดของแต่ละ WOC โดยอิงจาก created_at ล่าสุด
+    df_latest = df.sort_values('created_at', ascending=False).drop_duplicates(subset=['woc_number'], keep='first')
 
     # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
@@ -387,7 +386,7 @@ def dashboard_mode():
 
     for wip_name, statuses in wip_map.items():
         st.subheader(f"{wip_name}")
-        df_wip = df[df["status"].isin(statuses)]
+        df_wip = df_latest[df_latest["status"].isin(statuses)]
         total = df_wip["pieces_count"].sum()
         st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
 
