@@ -63,15 +63,15 @@ def transfer_mode(dept_from):
     df_all = get_all_jobs()
 
     if dept_from == "FM":
-        # --- แสดงรายการ WOC เดิมที่สามารถแก้ไขได้ ---
+        # --- เลือก WOC เดิมเพื่อแก้ไข (หรือเพิ่มใหม่) ---
         editable_df = df_all[(df_all["dept_from"] == "FM") & (df_all["status"].str.startswith("FM Transfer"))]
         editable_wocs = editable_df["woc_number"].unique().tolist()
         selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไขหมายเลข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", [""] + editable_wocs)
 
+        # ถ้ามีการเลือก WOC เดิม → ดึงข้อมูลที่เคยบันทึก
         if selected_edit_woc:
             job = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
 
-            # กรอก WOC ใหม่ที่ต้องการเปลี่ยน
             new_woc = st.text_input("หมายเลข WOC ใหม่", value=selected_edit_woc)
             part_name = st.text_input("Part Name", value=job["part_name"])
             lot_number = st.text_input("Lot Number", value=job["lot_number"])
@@ -92,13 +92,13 @@ def transfer_mode(dept_from):
 
                 with get_connection() as conn:
                     cur = conn.cursor()
-                    # ตรวจสอบว่าหมายเลขใหม่ยังไม่มีในระบบ
+                    # ตรวจสอบว่า WOC ใหม่ซ้ำหรือไม่
                     cur.execute("SELECT COUNT(*) FROM job_tracking WHERE woc_number = %s", (new_woc,))
                     if cur.fetchone()[0] > 0 and new_woc != selected_edit_woc:
                         st.error("หมายเลข WOC ใหม่ซ้ำในระบบ")
                         return
-                    
-                    # อัปเดต WOC
+
+                    # อัปเดตข้อมูล WOC
                     cur.execute("""
                         UPDATE job_tracking 
                         SET woc_number = %s,
@@ -122,7 +122,7 @@ def transfer_mode(dept_from):
                 st.success(f"อัปเดตหมายเลข WOC เป็น {new_woc} สำเร็จแล้ว ✅")
 
         else:
-            # --- กรอกใหม่ ---
+            # เพิ่มใหม่
             new_woc = st.text_input("WOC ใหม่")
             part_name = st.text_input("Part Name")
             lot_number = st.text_input("Lot Number")
