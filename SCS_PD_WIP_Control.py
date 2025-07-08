@@ -228,7 +228,7 @@ def work_mode(dept):
     # กรองสถานะที่ต้องการ
     status_working = {
         "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
-        "FI": "FI Working"
+        "FI": "FI Received"
     }
     status_filter = status_working.get(dept, "")
 
@@ -274,10 +274,7 @@ def completion_mode():
         st.info("ไม่มีงานรอ Completion")
         return
 
-    # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
-    woc_list = df["woc_number"].drop_duplicates().tolist()
-    
-    # เลือก WOC ที่จะทำ Completion
+    woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
