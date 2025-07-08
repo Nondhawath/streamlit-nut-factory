@@ -58,49 +58,78 @@ def calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count):
     except ZeroDivisionError:
         return 0
 
-# === Transfer Mode ===
 def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
-    prev_woc = ""
+    
+    # === เฉพาะ FM: แสดงช่องแก้ไขย้อนหลัง ===
+    if dept_from == "FM":
+        editable_df = df_all[(df_all["dept_from"] == "FM") & (df_all["status"].str.startswith("FM Transfer"))]
+        editable_wocs = editable_df["woc_number"].unique().tolist()
+        selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", [""] + editable_wocs)
 
-    # === เฉพาะ FM: แก้ไขย้อนหลังเฉพาะสถานะ FM Transfer เท่านั้น ===
-    editable_df = df_all[(df_all["dept_from"] == "FM") & (df_all["status"].str.startswith("FM Transfer"))]
-    editable_wocs = editable_df["woc_number"].unique().tolist()
-    selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", [""] + editable_wocs)
-
-    if selected_edit_woc:
-        existing = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
-        new_woc = selected_edit_woc
-        part_name = existing["part_name"]
-        lot_number = existing["lot_number"]
-        total_weight = existing["total_weight"]
-        barrel_weight = existing["barrel_weight"]
-        sample_weight = existing["sample_weight"]
-        sample_count = existing["sample_count"]
-        operator_name = existing["operator_name"]
-        dept_to = existing["dept_to"]
+        if selected_edit_woc:
+            existing = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
+            new_woc = selected_edit_woc
+            part_name = existing["part_name"]
+            lot_number = existing["lot_number"]
+            total_weight = existing["total_weight"]
+            barrel_weight = existing["barrel_weight"]
+            sample_weight = existing["sample_weight"]
+            sample_count = existing["sample_count"]
+            operator_name = existing["operator_name"]
+            dept_to = existing["dept_to"]
+        else:
+            new_woc = st.text_input("WOC ใหม่")
+            part_name = st.text_input("Part Name")
+            lot_number = st.text_input("Lot Number")
+            total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
+            barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
+            sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
+            sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
+            operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
+            dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
+    
     else:
+        # === โหมดอื่น: ให้เลือก WOC ก่อนหน้า (prev_woc) ===
+        prev_woc = ""
+        if dept_from == "TP":
+            df = get_jobs_by_status("TP Working")
+        elif dept_from == "OS":
+            df = get_jobs_by_status("OS Received")
+        else:
+            df = pd.DataFrame()
+
+        prev_woc_options = [""] + list(df["woc_number"].unique())
+        prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
+
         new_woc = st.text_input("WOC ใหม่")
-        part_name = st.text_input("Part Name")
+        part_name = ""
+        if prev_woc:
+            part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
+        part_name = st.text_input("Part Name", value=part_name)
+
+        dept_to_options = ["TP", "FI", "OS"] if dept_from != "OS" else ["FI"]
+        dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
+
+        if dept_from == dept_to:
+            st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
+            return
+
         lot_number = st.text_input("Lot Number")
         total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, step=0.01)
         barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, step=0.01)
         sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, step=0.01)
         sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, step=1, value=0)
         operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-        dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
 
-    # ตรวจสอบว่าแผนกปลายทางไม่ใช่แผนกต้นทาง
-    if dept_to == dept_from:
-        st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
-        return
-
+    # === คำนวณจำนวนชิ้น ===
     pieces_count = 0
     if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
         pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
         st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
 
+    # === ปุ่มบันทึก ===
     if st.button("บันทึก Transfer"):
         if not new_woc.strip():
             st.error("กรุณากรอก WOC ใหม่")
@@ -109,8 +138,8 @@ def transfer_mode(dept_from):
             st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
-        # ถ้าเป็นการแก้ไขย้อนหลัง ให้ลบของเดิมก่อน
-        if selected_edit_woc:
+        # ถ้าแก้ไขย้อนหลัง ให้ลบรายการเก่าก่อน
+        if dept_from == "FM" and selected_edit_woc:
             with get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (selected_edit_woc,))
@@ -133,7 +162,10 @@ def transfer_mode(dept_from):
             "created_at": datetime.utcnow()
         })
 
-        st.success(f"{'แก้ไข' if selected_edit_woc else 'บันทึก'} {dept_from} Transfer เรียบร้อยแล้ว")
+        if dept_from != "FM" and prev_woc:
+            update_status(prev_woc, "Completed")
+
+        st.success(f"{'แก้ไข' if dept_from == 'FM' and selected_edit_woc else 'บันทึก'} {dept_from} Transfer เรียบร้อยแล้ว")
 
 # === Receive Mode ===
 def receive_mode(dept_to):
