@@ -227,7 +227,7 @@ def work_mode(dept):
 
     # กรองสถานะที่ต้องการ
     status_working = {
-        "TP": "TP Received",  
+        "TP": "TP Received",  # หรือสถานะอื่นๆ ที่ต้องการ
         "FI": "FI Working"
     }
     status_filter = status_working.get(dept, "")
@@ -261,35 +261,25 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working-{machine_name}")  # เปลี่ยนสถานะเป็น "FI Working-ชื่อเครื่อง"
+        update_status(woc_selected, f"{dept} Working")  # เปลี่ยนสถานะเป็น "Working"
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-    
-    # ดึงข้อมูลที่มีสถานะ FI Working ทั้งหมด
     df = get_jobs_by_status("FI Working")
 
-    # ตรวจสอบว่ามีข้อมูลที่มีสถานะ FI Working
     if df.empty:
         st.info("ไม่มีงานรอ Completion")
         return
 
-    # กรองสถานะที่มีชื่อเครื่องจักรหลัง 'FI Working-'
-    df_filtered = df[df['status'].str.startswith('FI Working-', na=False)]
-
-    if df_filtered.empty:
-        st.info("ไม่มีงานรอ Completion ในสถานะ FI Working-")
-        return
-
     # กรองให้แสดง WOC ที่ไม่ซ้ำกัน
-    woc_list = df_filtered["woc_number"].drop_duplicates().tolist()
-
+    woc_list = df["woc_number"].drop_duplicates().tolist()
+    
     # เลือก WOC ที่จะทำ Completion
     woc_selected = st.selectbox("เลือก WOC ที่จะทำ Completion", woc_list)
-    job = df_filtered[df_filtered["woc_number"] == woc_selected].iloc[0]
+    job = df[df["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
@@ -312,7 +302,6 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
-        # อัปเดตสถานะเป็น "Completed"
         update_status(woc_selected, "Completed")
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
@@ -325,34 +314,22 @@ def completion_mode():
 def report_mode():
     st.header("รายงานและสรุป WIP")
     df = get_all_jobs()
-    
-    # ค้นหาจากชื่อ Part หรือ WOC
     search = st.text_input("ค้นหา Part Name หรือ WOC")
     if search:
         df = df[df["part_name"].str.contains(search, case=False) | df["woc_number"].str.contains(search, case=False)]
-    
-    # แสดงข้อมูลทั้งหมด
     st.dataframe(df)
 
     st.markdown("### สรุป WIP แยกตามแผนก")
     depts = ["FM", "TP", "FI", "OS"]
-    
     for d in depts:
         wip_df = df[df["status"].str.contains(f"WIP-{d}")]
-        
         if wip_df.empty:
             st.write(f"แผนก {d}: ไม่มีงาน WIP")
         else:
-            # แยกชื่อเครื่องจักรจากสถานะ FI Working-SM20
-            wip_df['machine_name'] = wip_df['status'].apply(lambda x: x.split('-')[1] if '-' in x else 'ไม่พบเครื่องจักร')
-
-            # สรุปการทำงานตามแผนกและแสดงข้อมูล
             summary = wip_df.groupby("part_name").agg(
                 จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
-                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum"),
-                เครื่องจักร=pd.NamedAgg(column="machine_name", aggfunc="first")  # แสดงชื่อเครื่องจักร
+                จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
             ).reset_index()
-
             st.write(f"แผนก {d}")
             st.dataframe(summary)
 
