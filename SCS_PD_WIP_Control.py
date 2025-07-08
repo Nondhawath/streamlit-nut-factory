@@ -95,7 +95,7 @@ def transfer_mode(dept_from):
         operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)", value=job.get("operator_name", ""))
         dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"], index=["TP", "FI", "OS"].index(job["dept_to"]))
     else:
-        new_woc = st.text_input("ระบุหมายเลขเครื่อง - Part name (TP ระบุหมายเลข WOC ใหม่)")
+        new_woc = st.text_input("FMระบุหมายเลขเครื่อง - Part name (TP ระบุหมายเลข WOC ใหม่)")
         part_name = ""
         if prev_woc:
             part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
