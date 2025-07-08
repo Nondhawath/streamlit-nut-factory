@@ -368,7 +368,7 @@ def dashboard_mode():
     # แผนกและสถานะที่นับว่าเป็น WIP
     wip_map = {
         "WIP-FM": [
-            "FM Transfer TP", "FM Transfer OS"
+            "FM Transfer TP", "FM Transfer OS" ,"FM Transfer FI"
         ],
         "WIP-TP": [
             "TP Received", "TP Transfer FI", "TP Working", "WIP-Tapping Work", "TP Transfer OS"
