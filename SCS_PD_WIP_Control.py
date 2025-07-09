@@ -618,7 +618,7 @@ def main():
         "Completion",
         "Report",
         "Dashboard",
-        "On machine",
+         "🔧 On Machine",
         "Admin Management"
     ])
 
