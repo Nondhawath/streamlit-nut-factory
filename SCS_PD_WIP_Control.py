@@ -472,10 +472,27 @@ def admin_mode():
     dept_from = st.text_input("แผนกต้นทาง", job["dept_from"])
     dept_to = st.text_input("แผนกปลายทาง", job["dept_to"])
 
+    on_machine_time_str = ""
+    if job["on_machine_time"] is not None:
+        on_machine_time_str = job["on_machine_time"].strftime("%Y-%m-%d %H:%M:%S")
+
+    machine_name = st.text_input("ชื่อเครื่องจักร", job.get("machine_name", ""))
+    on_machine_time_input = st.text_input("เวลาเริ่มงาน (YYYY-MM-DD HH:MM:SS)", on_machine_time_str)
+    ok_count = st.number_input("จำนวน OK", min_value=0, value=int(job.get("ok_count", 0)), step=1)
+    ng_count = st.number_input("จำนวน NG", min_value=0, value=int(job.get("ng_count", 0)), step=1)
+    rework_count = st.number_input("จำนวน Rework", min_value=0, value=int(job.get("rework_count", 0)), step=1)
+    remain_count = st.number_input("จำนวนคงเหลือ", min_value=0, value=int(job.get("remain_count", 0)), step=1)
+
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("💾 อัปเดตข้อมูล"):
+            try:
+                on_machine_time = datetime.strptime(on_machine_time_input, "%Y-%m-%d %H:%M:%S") if on_machine_time_input else None
+            except ValueError:
+                st.error("รูปแบบวันที่เวลาไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD HH:MM:SS)")
+                return
+
             with get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("""
@@ -490,12 +507,21 @@ def admin_mode():
                         operator_name = %s,
                         status = %s,
                         dept_from = %s,
-                        dept_to = %s
+                        dept_to = %s,
+                        machine_name = %s,
+                        on_machine_time = %s,
+                        ok_count = %s,
+                        ng_count = %s,
+                        rework_count = %s,
+                        remain_count = %s
                     WHERE woc_number = %s
                 """, (
                     part_name, lot_number, total_weight, barrel_weight,
                     sample_weight, sample_count, pieces_count, operator_name,
-                    status, dept_from, dept_to, woc_selected
+                    status, dept_from, dept_to,
+                    machine_name, on_machine_time,
+                    ok_count, ng_count, rework_count, remain_count,
+                    woc_selected
                 ))
                 conn.commit()
             st.success(f"อัปเดต WOC {woc_selected} เรียบร้อยแล้ว")
