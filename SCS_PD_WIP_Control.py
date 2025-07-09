@@ -148,9 +148,11 @@ def transfer_mode(dept_from):
                 "sample_weight": sample_weight,
                 "sample_count": sample_count,
                 "pieces_count": pieces_count,
+                "prev_woc_number": prev_woc if prev_woc else None,
                 "status": f"{dept_from} Transfer {dept_to}",
                 "created_at": datetime.utcnow()
             })
+
 
             if prev_woc:
                 update_status(prev_woc, "Completed")
@@ -282,7 +284,24 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        update_status(woc_selected, f"{dept} Working")  # เปลี่ยนสถานะเป็น "Working"
+       insert_job({
+            "woc_number": woc_selected,
+            "part_name": job["part_name"],
+            "operator_name": operator_name,
+            "dept_from": job["dept_from"],
+            "dept_to": job["dept_to"],
+            "lot_number": job["lot_number"],
+            "total_weight": job["total_weight"],
+            "barrel_weight": job["barrel_weight"],
+            "sample_weight": job["sample_weight"],
+            "sample_count": job["sample_count"],
+            "pieces_count": job["pieces_count"],
+            "machine_name": machine_name,
+            "on_machine_time": datetime.utcnow(),
+            "status": f"{dept} Working",
+            "created_at": datetime.utcnow()
+        })
+
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
@@ -320,7 +339,22 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
-        update_status(woc_selected, "Completed")
+        insert_job({
+            "woc_number": woc_selected,
+            "part_name": job["part_name"],
+            "operator_name": operator_name,
+            "dept_from": job["dept_from"],
+            "dept_to": "WH",
+            "lot_number": job["lot_number"],
+            "pieces_count": total_count,
+            "ok_count": ok,
+            "ng_count": ng,
+            "rework_count": rework,
+            "remain_count": remain,
+            "status": "Completed",
+            "created_at": datetime.utcnow()
+        })
+
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
         send_telegram_message(
