@@ -574,7 +574,7 @@ def on_machine_mode():
     df = get_all_jobs()
 
     # กรองเฉพาะงานที่สถานะ TP Working หรือ FI Working และมีเวลาเริ่มงาน
-    working_statuses = ["TP Working", "FI Working"]
+    working_statuses = ["TP Work", "FI Work"]
     df_on_machine = df[
         df["status"].isin(working_statuses) &
         df["on_machine_time"].notnull()
