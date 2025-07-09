@@ -284,23 +284,23 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-       insert_job({
-            "woc_number": woc_selected,
-            "part_name": job["part_name"],
-            "operator_name": operator_name,
-            "dept_from": job["dept_from"],
-            "dept_to": job["dept_to"],
-            "lot_number": job["lot_number"],
-            "total_weight": job["total_weight"],
-            "barrel_weight": job["barrel_weight"],
-            "sample_weight": job["sample_weight"],
-            "sample_count": job["sample_count"],
-            "pieces_count": job["pieces_count"],
-            "machine_name": machine_name,
-            "on_machine_time": datetime.utcnow(),
-            "status": f"{dept} Working",
-            "created_at": datetime.utcnow()
-        })
+    insert_job({
+        "woc_number": woc_selected,
+        "part_name": job["part_name"],
+        "operator_name": operator_name,
+        "dept_from": job["dept_from"],
+        "dept_to": job["dept_to"],
+        "lot_number": job["lot_number"],
+        "total_weight": job["total_weight"],
+        "barrel_weight": job["barrel_weight"],
+        "sample_weight": job["sample_weight"],
+        "sample_count": job["sample_count"],
+        "pieces_count": job["pieces_count"],
+        "machine_name": machine_name,
+        "on_machine_time": datetime.utcnow(),
+        "status": f"{dept} Working",
+        "created_at": datetime.utcnow()
+    })
 
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
