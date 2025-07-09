@@ -431,10 +431,16 @@ def dashboard_mode():
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
 # === Admin Management Mode ===
+def safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
 def admin_mode():
     st.header("🛠️ Admin Management - แก้ไข/ลบข้อมูล")
 
-    # ✅ รหัสผ่านก่อนเข้าถึงโหมดนี้
+    # รหัสผ่านก่อนเข้าถึงโหมดนี้
     password = st.text_input("กรุณาใส่รหัสผ่านเพื่อเข้าถึง", type="password")
     if password != "0":
         st.warning("ใส่รหัสผ่านเพื่อเข้าถึงโหมดนี้")
@@ -462,34 +468,30 @@ def admin_mode():
     st.subheader("📝 แก้ไขข้อมูล")
     part_name = st.text_input("Part Name", job["part_name"])
     lot_number = st.text_input("Lot Number", job["lot_number"])
-    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, value=float(job["total_weight"]), step=0.01)
-    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, value=float(job["barrel_weight"]), step=0.01)
-    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, value=float(job["sample_weight"]), step=0.01)
-    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, value=int(job["sample_count"]), step=1)
-    pieces_count = st.number_input("จำนวนชิ้นงาน", min_value=0, value=int(job["pieces_count"]), step=1)
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, value=float(job["total_weight"] or 0), step=0.01)
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, value=float(job["barrel_weight"] or 0), step=0.01)
+    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, value=float(job["sample_weight"] or 0), step=0.01)
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, value=safe_int(job["sample_count"]), step=1)
+    pieces_count = st.number_input("จำนวนชิ้นงาน", min_value=0, value=safe_int(job["pieces_count"]), step=1)
     operator_name = st.text_input("ชื่อผู้ใช้งาน", job["operator_name"])
     status = st.text_input("สถานะ", job["status"])
     dept_from = st.text_input("แผนกต้นทาง", job["dept_from"])
     dept_to = st.text_input("แผนกปลายทาง", job["dept_to"])
 
-    # แปลง on_machine_time ให้เป็น datetime ก่อน
-    on_machine_time_value = job.get("on_machine_time", None)
-    if isinstance(on_machine_time_value, str):
-        try:
-            on_machine_time_value = pd.to_datetime(on_machine_time_value)
-        except Exception:
-            on_machine_time_value = None
-
+    # on_machine_time เป็น datetime หรือ None
     on_machine_time_str = ""
-    if pd.notna(on_machine_time_value) and on_machine_time_value is not None:
-        on_machine_time_str = on_machine_time_value.strftime("%Y-%m-%d %H:%M:%S")
+    if job["on_machine_time"] is not None:
+        if isinstance(job["on_machine_time"], str):
+            on_machine_time_str = job["on_machine_time"]
+        else:
+            on_machine_time_str = job["on_machine_time"].strftime("%Y-%m-%d %H:%M:%S")
 
     machine_name = st.text_input("ชื่อเครื่องจักร", job.get("machine_name", ""))
     on_machine_time_input = st.text_input("เวลาเริ่มงาน (YYYY-MM-DD HH:MM:SS)", on_machine_time_str)
-    ok_count = st.number_input("จำนวน OK", min_value=0, value=int(job.get("ok_count", 0)), step=1)
-    ng_count = st.number_input("จำนวน NG", min_value=0, value=int(job.get("ng_count", 0)), step=1)
-    rework_count = st.number_input("จำนวน Rework", min_value=0, value=int(job.get("rework_count", 0)), step=1)
-    remain_count = st.number_input("จำนวนคงเหลือ", min_value=0, value=int(job.get("remain_count", 0)), step=1)
+    ok_count = st.number_input("จำนวน OK", min_value=0, value=safe_int(job.get("ok_count", 0)), step=1)
+    ng_count = st.number_input("จำนวน NG", min_value=0, value=safe_int(job.get("ng_count", 0)), step=1)
+    rework_count = st.number_input("จำนวน Rework", min_value=0, value=safe_int(job.get("rework_count", 0)), step=1)
+    remain_count = st.number_input("จำนวนคงเหลือ", min_value=0, value=safe_int(job.get("remain_count", 0)), step=1)
 
     col1, col2 = st.columns(2)
 
@@ -535,14 +537,13 @@ def admin_mode():
             st.success(f"อัปเดต WOC {woc_selected} เรียบร้อยแล้ว")
 
     with col2:
-        if st.button("🗑️ ลบข้อมูลนี้"):
-            confirm = st.checkbox("ยืนยันว่าต้องการลบจริง ๆ")
-            if confirm:
-                with get_connection() as conn:
-                    cur = conn.cursor()
-                    cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_selected,))
-                    conn.commit()
-                st.success(f"ลบ WOC {woc_selected} เรียบร้อยแล้ว")
+        confirm = st.checkbox("ยืนยันว่าต้องการลบจริง ๆ")
+        if st.button("🗑️ ลบข้อมูลนี้") and confirm:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_selected,))
+                conn.commit()
+            st.success(f"ลบ WOC {woc_selected} เรียบร้อยแล้ว")
 
 # === Main ===
 def main():
