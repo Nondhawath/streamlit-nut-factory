@@ -577,7 +577,8 @@ def on_machine_mode():
     working_statuses = ["TP Working", "FI Working"]
     df_on_machine = df[
         df["status"].isin(working_statuses) &
-        df["on_machine_time"].notnull()
+        df["on_machine_time"].notnull() &
+        (df["status"] != "Completed")  # ตัดสถานะ Completed ออก
     ].copy()
 
     if df_on_machine.empty:
