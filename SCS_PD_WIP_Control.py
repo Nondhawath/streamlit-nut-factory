@@ -444,10 +444,11 @@ def dashboard_mode():
         st.markdown(f"**มีจำนวน: {int(total):,} ชิ้น**")
 
         if not df_wip.empty:
-            part_summary = df_wip.groupby(["part_name", "status"]).agg(
+            part_summary = df_wip.groupby(["part_name", "machine_name", "status"]).agg(
                 จำนวนงาน=pd.NamedAgg(column="woc_number", aggfunc="count"),
                 จำนวนชิ้นงาน=pd.NamedAgg(column="pieces_count", aggfunc="sum")
             ).reset_index()
+            
             st.dataframe(part_summary)
 
         else:
