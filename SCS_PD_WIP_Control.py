@@ -80,7 +80,7 @@ def transfer_mode(dept_from):
         prev_woc_options = [""] + list(df["woc_number"].unique())
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     else:
-        st.write("FM Transfer ไม่ต้องเลือก WOC ก่อนหน้า")
+        st.write("แผนก FM บันทึกชื่อเครื่องและรหัสงาน")
 
     # === กรอกข้อมูลฟอร์ม ===
     if selected_edit_woc:
