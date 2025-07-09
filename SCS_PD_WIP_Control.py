@@ -567,6 +567,51 @@ def admin_mode():
                 cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_selected,))
                 conn.commit()
             st.success(f"ลบ WOC {woc_selected} เรียบร้อยแล้ว")
+def on_machine_mode():
+    st.header("🛠️ งานที่กำลัง On Machine")
+
+    df = get_all_jobs()
+
+    # กรองเฉพาะงานที่มีสถานะ Working และมีเวลา on_machine_time
+    df_on_machine = df[
+        df["status"].str.contains("Working", case=False, na=False) &
+        df["on_machine_time"].notnull()
+    ].copy()
+
+    if df_on_machine.empty:
+        st.info("ไม่มีงานที่กำลัง On Machine")
+        return
+
+    # === ตัวกรองแผนก ===
+    depts = sorted(df_on_machine["dept_to"].dropna().unique())
+    selected_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด"] + depts)
+
+    if selected_dept != "ทั้งหมด":
+        df_on_machine = df_on_machine[df_on_machine["dept_to"] == selected_dept]
+
+    # คำนวณระยะเวลาบนเครื่อง
+    now = datetime.utcnow()
+    df_on_machine["duration_minutes"] = df_on_machine["on_machine_time"].apply(
+        lambda x: round((now - x).total_seconds() / 60, 2)
+    )
+
+    df_on_machine = df_on_machine.sort_values("on_machine_time", ascending=False)
+
+    # แสดงผล
+    st.dataframe(df_on_machine[[
+        "woc_number", "part_name", "machine_name", "operator_name",
+        "dept_to", "on_machine_time", "duration_minutes", "status"
+    ]].rename(columns={
+        "woc_number": "WOC",
+        "part_name": "Part",
+        "machine_name": "เครื่องจักร",
+        "operator_name": "ผู้ทำงาน",
+        "dept_to": "แผนก",
+        "on_machine_time": "เริ่มงานเมื่อ",
+        "duration_minutes": "อยู่บนเครื่อง (นาที)",
+        "status": "สถานะ"
+    }))
+
 
 # === Main ===
 def main():
@@ -585,6 +630,7 @@ def main():
         "Completion",
         "Report",
         "Dashboard",
+        "On machine",
         "Admin Management"
     ])
 
@@ -610,8 +656,10 @@ def main():
         report_mode()
     elif menu == "Dashboard":
         dashboard_mode()
+    elif menu == "🔧 On Machine":
+        on_machine_mode()
     elif menu == "Admin Management":
         admin_mode()
-
+    
 if __name__ == "__main__":
     main()
