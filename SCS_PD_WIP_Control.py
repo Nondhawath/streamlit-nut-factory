@@ -300,19 +300,19 @@ def work_mode(dept):
 
         on_machine_time = datetime.utcnow()
 
-        # เตรียมข้อมูลส่งเข้า DB โดยแปลงค่า Nullable ให้เป็น None ถ้าค่าว่าง
+        # แปลงค่า numpy ให้เป็น Python native types
         data = {
-            "woc_number": woc_selected,
-            "part_name": job["part_name"],
-            "operator_name": operator_name,
-            "dept_from": job["dept_from"],
-            "dept_to": job["dept_to"],
-            "lot_number": job["lot_number"],
-            "total_weight": job["total_weight"],
-            "barrel_weight": job["barrel_weight"],
-            "sample_weight": job["sample_weight"],
-            "sample_count": job["sample_count"],
-            "pieces_count": job["pieces_count"],
+            "woc_number": str(woc_selected),
+            "part_name": str(job["part_name"]),
+            "operator_name": str(operator_name),
+            "dept_from": str(job["dept_from"]),
+            "dept_to": str(job["dept_to"]),
+            "lot_number": str(job["lot_number"]),
+            "total_weight": float(job["total_weight"]) if job["total_weight"] is not None else None,
+            "barrel_weight": float(job["barrel_weight"]) if job["barrel_weight"] is not None else None,
+            "sample_weight": float(job["sample_weight"]) if job["sample_weight"] is not None else None,
+            "sample_count": int(job["sample_count"]) if job["sample_count"] is not None else None,
+            "pieces_count": float(job["pieces_count"]) if job["pieces_count"] is not None else None,
             "machine_name": machine_name if machine_name.strip() != "" else None,
             "on_machine_time": on_machine_time,
             "status": f"{dept} Working",
