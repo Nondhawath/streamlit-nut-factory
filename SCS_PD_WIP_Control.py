@@ -245,6 +245,19 @@ def receive_mode(dept_to):
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
+def insert_job(data):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        keys = ', '.join(data.keys())
+        values = ', '.join(['%s'] * len(data))
+        sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
+        try:
+            cur.execute(sql, list(data.values()))
+            conn.commit()
+        except Exception as e:
+            st.error(f"SQL Insert Error: {e}")
+            raise
+
 def work_mode(dept):
     st.header(f"{dept} Work")
 
@@ -281,7 +294,14 @@ def work_mode(dept):
         if not machine_name.strip():
             st.error("กรุณากรอกชื่อเครื่องจักร")
             return
-        insert_job({
+        if not operator_name.strip():
+            st.error("กรุณากรอกชื่อผู้ใช้งาน")
+            return
+
+        on_machine_time = datetime.utcnow()
+
+        # เตรียมข้อมูลส่งเข้า DB โดยแปลงค่า Nullable ให้เป็น None ถ้าค่าว่าง
+        data = {
             "woc_number": woc_selected,
             "part_name": job["part_name"],
             "operator_name": operator_name,
@@ -293,11 +313,13 @@ def work_mode(dept):
             "sample_weight": job["sample_weight"],
             "sample_count": job["sample_count"],
             "pieces_count": job["pieces_count"],
-            "machine_name": machine_name,
-            "on_machine_time": datetime.utcnow(),
+            "machine_name": machine_name if machine_name.strip() != "" else None,
+            "on_machine_time": on_machine_time,
             "status": f"{dept} Working",
             "created_at": datetime.utcnow()
-        })
+        }
+
+        insert_job(data)
 
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
