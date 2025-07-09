@@ -574,7 +574,7 @@ def on_machine_mode():
     df = get_all_jobs()
 
     # กรองเฉพาะงานที่สถานะ TP Working หรือ FI Working และมีเวลาเริ่มงาน
-    working_statuses = ["TP Work", "FI Work"]
+    working_statuses = ["TP Working", "FI Working"]
     df_on_machine = df[
         df["status"].isin(working_statuses) &
         df["on_machine_time"].notnull()
@@ -584,22 +584,27 @@ def on_machine_mode():
         st.info("ไม่มีงานที่กำลัง On Machine")
         return
 
-    # ตัวกรองแผนก (optional)
-    selected_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด", "TP", "FI"])
-    if selected_dept != "ทั้งหมด":
-        df_on_machine = df_on_machine[df_on_machine["dept_to"] == selected_dept]
-
-    # แสดงเฉพาะคอลัมน์ที่ต้องการ
-    df_show = df_on_machine[[
-        "part_name", "pieces_count", "on_machine_time", "operator_name"
-    ]].rename(columns={
-        "part_name": "ชื่อชิ้นงาน",
-        "pieces_count": "จำนวน",
-        "on_machine_time": "เวลาเริ่มงาน",
-        "operator_name": "ชื่อพนักงาน"
+    # Map dept_to กลับเป็นแผนกย่อ เพื่อใช้ในการกรอง
+    df_on_machine["dept_group"] = df_on_machine["dept_to"].replace({
+        "Tapping Work": "TP",
+        "Final Work": "FI"
     })
 
-    st.dataframe(df_show.sort_values("on_machine_time", ascending=False), use_container_width=True)
+    selected_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด", "TP", "FI"])
+    if selected_dept != "ทั้งหมด":
+        df_on_machine = df_on_machine[df_on_machine["dept_group"] == selected_dept]
+
+    df_show = df_on_machine[[
+        "machine_name", "part_name", "pieces_count", "operator_name", "on_machine_time"
+    ]].rename(columns={
+        "machine_name": "ชื่อเครื่องจักร",
+        "part_name": "ชื่อชิ้นงาน",
+        "pieces_count": "จำนวน",
+        "operator_name": "ชื่อพนักงาน",
+        "on_machine_time": "เวลาเริ่มงาน"
+    })
+
+    st.dataframe(df_show.sort_values("เวลาเริ่มงาน", ascending=False), use_container_width=True)
 
 # === Main ===
 def main():
