@@ -501,16 +501,17 @@ def admin_mode():
     dept_from = st.text_input("แผนกต้นทาง", job["dept_from"])
     dept_to = st.text_input("แผนกปลายทาง", job["dept_to"])
 
-    # on_machine_time เป็น datetime หรือ None
-    on_machine_time_str = ""
-    if job["on_machine_time"] is not None:
-        if isinstance(job["on_machine_time"], str):
-            on_machine_time_str = job["on_machine_time"]
-        else:
-            on_machine_time_str = job["on_machine_time"].strftime("%Y-%m-%d %H:%M:%S")
-
     machine_name = st.text_input("ชื่อเครื่องจักร", job.get("machine_name", ""))
+
+    # ตรวจสอบ on_machine_time
+    on_machine_time_str = ""
+    if pd.notnull(job.get("on_machine_time")):
+        try:
+            on_machine_time_str = job["on_machine_time"].strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            on_machine_time_str = str(job["on_machine_time"])
     on_machine_time_input = st.text_input("เวลาเริ่มงาน (YYYY-MM-DD HH:MM:SS)", on_machine_time_str)
+
     ok_count = st.number_input("จำนวน OK", min_value=0, value=safe_int(job.get("ok_count", 0)), step=1)
     ng_count = st.number_input("จำนวน NG", min_value=0, value=safe_int(job.get("ng_count", 0)), step=1)
     rework_count = st.number_input("จำนวน Rework", min_value=0, value=safe_int(job.get("rework_count", 0)), step=1)
