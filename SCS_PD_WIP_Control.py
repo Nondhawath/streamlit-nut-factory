@@ -85,7 +85,7 @@ def transfer_mode(dept_from):
     # === กรอกข้อมูลฟอร์ม ===
     if selected_edit_woc:
         job = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
-        new_woc = st.text_input("หมายเลข WOC ใหม่", value=" ")
+        new_woc = st.text_input("หมายเลข WOC ใหม่", value="")
         part_name = st.text_input("Part Name", value=job.get("part_name", ""))
         lot_number = st.text_input("Lot Number", value=job.get("lot_number", ""))
         total_weight = st.number_input("น้ำหนักรวม", value=job.get("total_weight", 0.0), min_value=0.0, step=0.01)
