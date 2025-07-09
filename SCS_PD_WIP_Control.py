@@ -398,6 +398,85 @@ def dashboard_mode():
             st.dataframe(part_summary)
         else:
             st.info("ไม่มีข้อมูลในกลุ่มนี้")
+# === Admin Management Mode ===
+def admin_mode():
+    st.header("🛠️ Admin Management - แก้ไข/ลบข้อมูล")
+
+    # ✅ รหัสผ่านก่อนเข้าถึงโหมดนี้
+    password = st.text_input("กรุณาใส่รหัสผ่านเพื่อเข้าถึง", type="password")
+    if password != "0":
+        st.warning("ใส่รหัสผ่าน '0' เพื่อเข้าถึงโหมดนี้")
+        return
+
+    st.success("✅ เข้าสู่โหมดผู้ดูแลระบบแล้ว")
+
+    df = get_all_jobs()
+    search = st.text_input("🔍 ค้นหา WOC หรือ Part Name")
+
+    if search:
+        df = df[df["woc_number"].str.contains(search, case=False, na=False) |
+                df["part_name"].str.contains(search, case=False, na=False)]
+
+    if df.empty:
+        st.warning("ไม่พบข้อมูลที่ค้นหา")
+        return
+
+    woc_selected = st.selectbox("เลือก WOC เพื่อแก้ไข/ลบ", df["woc_number"].unique())
+    job = df[df["woc_number"] == woc_selected].iloc[0]
+
+    with st.expander("📄 รายละเอียดปัจจุบัน"):
+        st.json(job.to_dict(), expanded=False)
+
+    st.subheader("📝 แก้ไขข้อมูล")
+    part_name = st.text_input("Part Name", job["part_name"])
+    lot_number = st.text_input("Lot Number", job["lot_number"])
+    total_weight = st.number_input("น้ำหนักรวม", min_value=0.0, value=job["total_weight"])
+    barrel_weight = st.number_input("น้ำหนักถัง", min_value=0.0, value=job["barrel_weight"])
+    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม", min_value=0.0, value=job["sample_weight"])
+    sample_count = st.number_input("จำนวนตัวอย่าง", min_value=0, value=job["sample_count"])
+    pieces_count = st.number_input("จำนวนชิ้นงาน", min_value=0, value=job["pieces_count"])
+    operator_name = st.text_input("ชื่อผู้ใช้งาน", job["operator_name"])
+    status = st.text_input("สถานะ", job["status"])
+    dept_from = st.text_input("แผนกต้นทาง", job["dept_from"])
+    dept_to = st.text_input("แผนกปลายทาง", job["dept_to"])
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("💾 อัปเดตข้อมูล"):
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    UPDATE job_tracking SET
+                        part_name = %s,
+                        lot_number = %s,
+                        total_weight = %s,
+                        barrel_weight = %s,
+                        sample_weight = %s,
+                        sample_count = %s,
+                        pieces_count = %s,
+                        operator_name = %s,
+                        status = %s,
+                        dept_from = %s,
+                        dept_to = %s
+                    WHERE woc_number = %s
+                """, (
+                    part_name, lot_number, total_weight, barrel_weight,
+                    sample_weight, sample_count, pieces_count, operator_name,
+                    status, dept_from, dept_to, woc_selected
+                ))
+                conn.commit()
+            st.success(f"อัปเดต WOC {woc_selected} เรียบร้อยแล้ว")
+
+    with col2:
+        if st.button("🗑️ ลบข้อมูลนี้"):
+            confirm = st.checkbox("ยืนยันว่าต้องการลบจริง ๆ")
+            if confirm:
+                with get_connection() as conn:
+                    cur = conn.cursor()
+                    cur.execute("DELETE FROM job_tracking WHERE woc_number = %s", (woc_selected,))
+                    conn.commit()
+                st.success(f"ลบ WOC {woc_selected} เรียบร้อยแล้ว")
 
 # === Main ===
 def main():
@@ -415,7 +494,8 @@ def main():
         "Final Work",
         "Completion",
         "Report",
-        "Dashboard"
+        "Dashboard",
+        "Admin Management"
     ])
 
     if menu == "Forming Transfer":
@@ -440,6 +520,8 @@ def main():
         report_mode()
     elif menu == "Dashboard":
         dashboard_mode()
+    elif menu == "Admin Management":
+        admin_mode()
 
 if __name__ == "__main__":
     main()
