@@ -472,9 +472,17 @@ def admin_mode():
     dept_from = st.text_input("แผนกต้นทาง", job["dept_from"])
     dept_to = st.text_input("แผนกปลายทาง", job["dept_to"])
 
+    # แปลง on_machine_time ให้เป็น datetime ก่อน
+    on_machine_time_value = job.get("on_machine_time", None)
+    if isinstance(on_machine_time_value, str):
+        try:
+            on_machine_time_value = pd.to_datetime(on_machine_time_value)
+        except Exception:
+            on_machine_time_value = None
+
     on_machine_time_str = ""
-    if job["on_machine_time"] is not None:
-        on_machine_time_str = job["on_machine_time"].strftime("%Y-%m-%d %H:%M:%S")
+    if pd.notna(on_machine_time_value) and on_machine_time_value is not None:
+        on_machine_time_str = on_machine_time_value.strftime("%Y-%m-%d %H:%M:%S")
 
     machine_name = st.text_input("ชื่อเครื่องจักร", job.get("machine_name", ""))
     on_machine_time_input = st.text_input("เวลาเริ่มงาน (YYYY-MM-DD HH:MM:SS)", on_machine_time_str)
