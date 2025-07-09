@@ -573,9 +573,8 @@ def on_machine_mode():
 
     df = get_all_jobs()
 
+    # กรองเฉพาะงานที่สถานะ TP Working หรือ FI Working และมีเวลาเริ่มงาน
     working_statuses = ["TP Working", "FI Working"]
-
-    # กรองเฉพาะสถานะที่กำลังทำงาน และมีเวลา on_machine_time
     df_on_machine = df[
         df["status"].isin(working_statuses) &
         df["on_machine_time"].notnull()
@@ -585,33 +584,22 @@ def on_machine_mode():
         st.info("ไม่มีงานที่กำลัง On Machine")
         return
 
-    # ตัวกรองแผนก
-    depts = sorted(df_on_machine["dept_to"].dropna().unique())
-    selected_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด"] + depts)
-
+    # ตัวกรองแผนก (optional)
+    selected_dept = st.selectbox("เลือกแผนก", ["ทั้งหมด", "TP", "FI"])
     if selected_dept != "ทั้งหมด":
         df_on_machine = df_on_machine[df_on_machine["dept_to"] == selected_dept]
 
-    now = datetime.utcnow()
-    df_on_machine["duration_minutes"] = df_on_machine["on_machine_time"].apply(
-        lambda x: round((now - x).total_seconds() / 60, 2)
-    )
-
-    df_on_machine = df_on_machine.sort_values("on_machine_time", ascending=False)
-
-    st.dataframe(df_on_machine[[
-        "woc_number", "part_name", "machine_name", "operator_name",
-        "dept_to", "on_machine_time", "duration_minutes", "status"
+    # แสดงเฉพาะคอลัมน์ที่ต้องการ
+    df_show = df_on_machine[[
+        "part_name", "pieces_count", "on_machine_time", "operator_name"
     ]].rename(columns={
-        "woc_number": "WOC",
-        "part_name": "Part",
-        "machine_name": "เครื่องจักร",
-        "operator_name": "ผู้ทำงาน",
-        "dept_to": "แผนก",
-        "on_machine_time": "เริ่มงานเมื่อ",
-        "duration_minutes": "อยู่บนเครื่อง (นาที)",
-        "status": "สถานะ"
-    }))
+        "part_name": "ชื่อชิ้นงาน",
+        "pieces_count": "จำนวน",
+        "on_machine_time": "เวลาเริ่มงาน",
+        "operator_name": "ชื่อพนักงาน"
+    })
+
+    st.dataframe(df_show.sort_values("on_machine_time", ascending=False), use_container_width=True)
 
 # === Main ===
 def main():
