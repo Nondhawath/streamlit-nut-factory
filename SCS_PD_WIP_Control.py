@@ -190,7 +190,7 @@ def receive_mode(dept_to):
         status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
     else:
         dept_from_map = {
-            "TP": ["FM", "TP Working"],
+            "TP": ["FM", "TP Working", "OS"],  # เพิ่ม "OS"
             "OS": ["FM", "TP"]
         }
         from_depts = dept_from_map.get(dept_to, [])
