@@ -346,6 +346,12 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
+
+    # 🔐 ตรวจสอบรหัสผ่านก่อนเข้าโหมด
+    password = st.text_input("กรุณาใส่รหัสผ่าน", type="password")
+    if password != "FI":
+        st.warning("🔐 กรุณาใส่รหัสผ่านให้ถูกต้องเพื่อเข้าใช้งานโหมด Completion")
+        return
     df = get_jobs_by_status("FI Working")
 
     if df.empty:
