@@ -190,13 +190,30 @@ def receive_mode(dept_to):
         return
 
     woc_list = df["woc_number"].tolist()
-    woc_selected = st.selectbox("เลือก WOC", woc_list)
+
+    # ✅ ใช้ session_state เพื่อล็อค WOC ที่เลือกไว้
+    if "receive_woc_selected" not in st.session_state:
+        st.session_state.receive_woc_selected = ""
+
+    if st.session_state.receive_woc_selected in woc_list:
+        current_index = woc_list.index(st.session_state.receive_woc_selected)
+    else:
+        current_index = 0
+        st.session_state.receive_woc_selected = woc_list[0] if woc_list else ""
+
+    woc_selected = st.selectbox("เลือก WOC", woc_list, index=current_index, key="receive_woc_selector")
+    st.session_state.receive_woc_selected = woc_selected
+
+    # ปุ่มล้างการเลือก
+    if st.button("❌ ล้างการเลือก WOC"):
+        st.session_state.receive_woc_selected = ""
+        st.experimental_rerun()
+
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
-
     total_weight = st.number_input("น้ำหนักรวม กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
     sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", min_value=0.0, step=0.01, value=0.0)
