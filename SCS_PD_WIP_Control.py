@@ -371,7 +371,6 @@ def work_mode(dept):
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
-
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
