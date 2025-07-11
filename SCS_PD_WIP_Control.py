@@ -66,7 +66,7 @@ def transfer_mode(dept_from):
     editable_df = get_jobs_by_status_list([
         "FM Transfer TP", "FM Transfer OS", "FM Transfer FI",
         "TP Transfer FI", "TP Transfer OS",
-        "OS Transfer FI"
+        "OS Transfer FI","OS Transfer TP"
     ])
     selected_edit_woc = None
     if dept_from == "FM":
@@ -114,7 +114,7 @@ def transfer_mode(dept_from):
         if dept_from == "TP":
             dept_to_options = ["FI", "OS"]
         elif dept_from == "OS":
-            dept_to_options = ["FI"]
+            dept_to_options = ["FI","TP"]
         dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
 
     if dept_from == dept_to:
