@@ -191,10 +191,11 @@ def receive_mode(dept_to):
 
     woc_list = df["woc_number"].tolist()
 
-    # ✅ ใช้ session_state เพื่อล็อค WOC ที่เลือกไว้
+    # ใช้ session_state ล็อค WOC ที่เลือกไว้
     if "receive_woc_selected" not in st.session_state:
         st.session_state.receive_woc_selected = ""
 
+    # ถ้า WOC ที่ล็อกไว้ยังอยู่ใน list ให้ใช้ index นั้น
     if st.session_state.receive_woc_selected in woc_list:
         current_index = woc_list.index(st.session_state.receive_woc_selected)
     else:
@@ -204,20 +205,22 @@ def receive_mode(dept_to):
     woc_selected = st.selectbox("เลือก WOC", woc_list, index=current_index, key="receive_woc_selector")
     st.session_state.receive_woc_selected = woc_selected
 
-    # ปุ่มล้างการเลือก
+    # ปุ่มล้างล็อก WOC
     if st.button("❌ ล้างการเลือก WOC"):
         st.session_state.receive_woc_selected = ""
-        st.rerun()
+        st.experimental_rerun()
 
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
     st.markdown(f"- **Lot Number:** {job['lot_number']}")
     st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
+
     total_weight = st.number_input("น้ำหนักรวม กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
     barrel_weight = st.number_input("น้ำหนักถัง กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
     sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", min_value=0.0, step=0.01, value=0.0)
     sample_count = st.number_input("จำนวนตัวอย่าง 3 ชิ้น", min_value=0, step=1, value=0)
+
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
@@ -225,13 +228,8 @@ def receive_mode(dept_to):
         diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
     except Exception:
         diff_pct = 0
-    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
-    if diff_pct > 2:
-        send_telegram_message(
-            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
-            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
-        )
+    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
@@ -273,8 +271,20 @@ def receive_mode(dept_to):
         update_status(woc_selected, f"{dept_to} Received")
         mark_previous_entries_completed(woc_selected, now)
 
+        # ส่งแจ้งเตือน Telegram เฉพาะหลังกดรับเข้าและส่งต่อ ถ้า %คลาดเคลื่อนเกิน 2%
+        if diff_pct > 2:
+            send_telegram_message(
+                f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
+                f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+            )
+
+        # ล้างล็อก WOC หลังบันทึก
+        st.session_state.receive_woc_selected = ""
+
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
+
+        st.experimental_rerun()
 
 # === Work Mode ===
     with get_connection() as conn:
