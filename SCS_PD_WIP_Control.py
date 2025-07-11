@@ -190,26 +190,7 @@ def receive_mode(dept_to):
         return
 
     woc_list = df["woc_number"].tolist()
-
-    # ใช้ session_state ล็อค WOC ที่เลือกไว้
-    if "receive_woc_selected" not in st.session_state:
-        st.session_state.receive_woc_selected = ""
-
-    # ถ้า WOC ที่ล็อกไว้ยังอยู่ใน list ให้ใช้ index นั้น
-    if st.session_state.receive_woc_selected in woc_list:
-        current_index = woc_list.index(st.session_state.receive_woc_selected)
-    else:
-        current_index = 0
-        st.session_state.receive_woc_selected = woc_list[0] if woc_list else ""
-
-    woc_selected = st.selectbox("เลือก WOC", woc_list, index=current_index, key="receive_woc_selector")
-    st.session_state.receive_woc_selected = woc_selected
-
-    # ปุ่มล้างล็อก WOC
-    if st.button("❌ ล้างการเลือก WOC"):
-        st.session_state.receive_woc_selected = ""
-        st.experimental_rerun()
-
+    woc_selected = st.selectbox("เลือก WOC", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
     st.markdown(f"- **Part Name:** {job['part_name']}")
@@ -220,7 +201,6 @@ def receive_mode(dept_to):
     barrel_weight = st.number_input("น้ำหนักถัง กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
     sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", min_value=0.0, step=0.01, value=0.0)
     sample_count = st.number_input("จำนวนตัวอย่าง 3 ชิ้น", min_value=0, step=1, value=0)
-
     pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
     st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
@@ -228,8 +208,13 @@ def receive_mode(dept_to):
         diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
     except Exception:
         diff_pct = 0
-
     st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
+
+    if diff_pct > 2:
+        send_telegram_message(
+            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
+            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+        )
 
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
@@ -252,7 +237,6 @@ def receive_mode(dept_to):
         next_status = f"WIP-{dept_to_next}"
         now = datetime.utcnow()
 
-        # บันทึกข้อมูลรับเข้าและส่งต่อ
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -269,25 +253,25 @@ def receive_mode(dept_to):
             "created_at": now
         })
 
-        # อัปเดตสถานะรายการก่อนหน้าเป็น Received
         update_status(woc_selected, f"{dept_to} Received")
-        # อัปเดตสถานะรายการก่อนหน้าที่สร้างก่อนเวลาปัจจุบันเป็น Completed
         mark_previous_entries_completed(woc_selected, now)
-
-        # แจ้งเตือน Telegram ถ้าคลาดเคลื่อนเกิน 2%
-        if diff_pct > 2:
-            send_telegram_message(
-                f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
-                f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
-            )
-
-        # ล้างล็อก WOC หลังบันทึก
-        st.session_state.receive_woc_selected = ""
 
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
-        st.experimental_rerun()
+# === Work Mode ===
+def insert_job(data):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        keys = ', '.join(data.keys())
+        values = ', '.join(['%s'] * len(data))
+        sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
+        try:
+            cur.execute(sql, list(data.values()))
+            conn.commit()
+        except Exception as e:
+            st.error(f"SQL Insert Error: {e}")
+            raise
 
 # === Work Mode ===
 def work_mode(dept):
@@ -332,7 +316,7 @@ def work_mode(dept):
 
         on_machine_time = datetime.utcnow()
 
-        # อัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
+        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
         mark_previous_entries_completed(woc_selected, on_machine_time)
 
         data = {
@@ -358,15 +342,10 @@ def work_mode(dept):
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
 
+
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-
-    # 🔐 ตรวจสอบรหัสผ่านก่อนเข้าโหมด
-    password = st.text_input("กรุณาใส่รหัสผ่าน", type="password")
-    if password != "FI":
-        st.warning("🔐 กรุณาใส่รหัสผ่านให้ถูกต้องเพื่อเข้าใช้งานโหมด Completion")
-        return
     df = get_jobs_by_status("FI Working")
 
     if df.empty:
@@ -425,6 +404,7 @@ def completion_mode():
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
             f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
+
 # === Report Mode ===
 def report_mode():
     st.header("รายงานและสรุป WIP")
