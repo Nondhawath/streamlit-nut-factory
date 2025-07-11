@@ -603,12 +603,16 @@ def on_machine_mode():
     df_on_machine = df[
         df["status"].isin(working_statuses) &
         df["on_machine_time"].notnull() &
-        (df["status"] != "Completed")  # ตัดสถานะ Completed ออก
+        (df["status"] != "Completed")
     ].copy()
 
     if df_on_machine.empty:
         st.info("ไม่มีงานที่กำลัง On Machine")
         return
+
+    # ✅ เหลือเฉพาะรายการล่าสุดต่อเครื่อง
+    df_on_machine = df_on_machine.sort_values("created_at", ascending=False)
+    df_on_machine = df_on_machine.drop_duplicates(subset=["machine_name"], keep="first")
 
     # Map dept_to กลับเป็นแผนกย่อ เพื่อใช้ในการกรอง
     df_on_machine["dept_group"] = df_on_machine["dept_to"].replace({
@@ -621,9 +625,10 @@ def on_machine_mode():
         df_on_machine = df_on_machine[df_on_machine["dept_group"] == selected_dept]
 
     df_show = df_on_machine[[
-        "machine_name", "part_name", "pieces_count", "operator_name", "on_machine_time"
+        "machine_name", "woc_number", "part_name", "pieces_count", "operator_name", "on_machine_time"
     ]].rename(columns={
         "machine_name": "ชื่อเครื่องจักร",
+        "woc_number": "WOC",
         "part_name": "ชื่อชิ้นงาน",
         "pieces_count": "จำนวน",
         "operator_name": "ชื่อพนักงาน",
