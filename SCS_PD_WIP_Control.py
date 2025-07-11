@@ -365,8 +365,6 @@ def completion_mode():
     if password != "FI":
         st.warning("🔐 กรุณาใส่รหัสผ่านให้ถูกต้องเพื่อเข้าใช้งานโหมด Completion")
         return
-def completion_mode():
-    st.header("Completion")
     df = get_jobs_by_status("FI Working")
 
     if df.empty:
