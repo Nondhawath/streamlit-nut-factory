@@ -342,7 +342,7 @@ def work_mode(dept):
 
         on_machine_time = datetime.utcnow()
 
-        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
+        # อัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
         mark_previous_entries_completed(woc_selected, on_machine_time)
 
         data = {
