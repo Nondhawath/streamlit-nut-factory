@@ -158,6 +158,16 @@ def transfer_mode(dept_from):
                 update_status(prev_woc, "Completed")
 
             st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
+# === ฟังก์ชันช่วยอัปเดตสถานะรายการก่อนหน้าให้ Completed ===
+def mark_previous_entries_completed(woc_number, latest_created_at):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE job_tracking
+            SET status = 'Completed'
+            WHERE woc_number = %s AND created_at < %s AND status != 'Completed'
+        """, (woc_number, latest_created_at))
+        conn.commit()
 
 # === Receive Mode ===
 def receive_mode(dept_to):
@@ -225,6 +235,8 @@ def receive_mode(dept_to):
             return
 
         next_status = f"WIP-{dept_to_next}"
+        now = datetime.utcnow()
+
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -238,9 +250,12 @@ def receive_mode(dept_to):
             "sample_count": sample_count,
             "pieces_count": pieces_new,
             "status": next_status,
-            "created_at": datetime.utcnow()
+            "created_at": now
         })
+
         update_status(woc_selected, f"{dept_to} Received")
+        mark_previous_entries_completed(woc_selected, now)
+
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
