@@ -252,6 +252,7 @@ def receive_mode(dept_to):
         next_status = f"WIP-{dept_to_next}"
         now = datetime.utcnow()
 
+        # บันทึกข้อมูลรับเข้าและส่งต่อ
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -268,10 +269,12 @@ def receive_mode(dept_to):
             "created_at": now
         })
 
+        # อัปเดตสถานะรายการก่อนหน้าเป็น Received
         update_status(woc_selected, f"{dept_to} Received")
+        # อัปเดตสถานะรายการก่อนหน้าที่สร้างก่อนเวลาปัจจุบันเป็น Completed
         mark_previous_entries_completed(woc_selected, now)
 
-        # ส่งแจ้งเตือน Telegram เฉพาะหลังกดรับเข้าและส่งต่อ ถ้า %คลาดเคลื่อนเกิน 2%
+        # แจ้งเตือน Telegram ถ้าคลาดเคลื่อนเกิน 2%
         if diff_pct > 2:
             send_telegram_message(
                 f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
