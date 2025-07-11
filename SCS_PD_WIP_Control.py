@@ -62,31 +62,27 @@ def transfer_mode(dept_from):
     st.header(f"{dept_from} Transfer")
     df_all = get_all_jobs()
 
-    # สำหรับ FM สามารถแก้ไขหมายเลข WOC ได้ (ฟังก์ชันนี้เหมาะสำหรับ FM เท่านั้น)
-    editable_df = get_jobs_by_status_list([
-        "FM Transfer TP", "FM Transfer OS", "FM Transfer FI",
-        "TP Transfer FI", "TP Transfer OS",
-        "OS Transfer FI","OS Transfer TP"
-    ])
+    # === Forming Transfer: Allow editing WOC ===
+    editable_df = get_jobs_by_status_list(["FM Transfer TP", "FM Transfer OS", "FM Transfer FI"])
     selected_edit_woc = None
     if dept_from == "FM":
         editable_woc_options = [""] + editable_df["woc_number"].unique().tolist()
         selected_edit_woc = st.selectbox("เลือก WOC ที่ต้องการแก้ไขหมายเลข (หรือปล่อยว่างเพื่อเพิ่มใหม่)", editable_woc_options)
 
-    # WOC ก่อนหน้า สำหรับ TP และ OS
+    # === WOC ก่อนหน้า สำหรับ TP/OS เท่านั้น ===
     prev_woc = ""
     if dept_from == "TP":
-        df_tp_received = get_jobs_by_status("TP Received")
-        prev_woc_options = [""] + list(df_tp_received["woc_number"].unique())
+        df = get_jobs_by_status("TP Working")
+        prev_woc_options = [""] + list(df["woc_number"].unique())
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     elif dept_from == "OS":
-        df_os_received = get_jobs_by_status("OS Received")
-        prev_woc_options = [""] + list(df_os_received["woc_number"].unique())
+        df = get_jobs_by_status("OS Received")
+        prev_woc_options = [""] + list(df["woc_number"].unique())
         prev_woc = st.selectbox("WOC ก่อนหน้า (ถ้ามี)", prev_woc_options)
     else:
-        st.write("กรอกข้อมูลสำหรับ FM")
+        st.write("แผนก FM บันทึกชื่อเครื่องและรหัสงาน")
 
-    # กรอกข้อมูลฟอร์ม
+    # === กรอกข้อมูลฟอร์ม ===
     if selected_edit_woc:
         job = editable_df[editable_df["woc_number"] == selected_edit_woc].iloc[0]
         new_woc = st.text_input("หมายเลข WOC ใหม่", value="")
@@ -99,56 +95,47 @@ def transfer_mode(dept_from):
         operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)", value=job.get("operator_name", ""))
         dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"], index=["TP", "FI", "OS"].index(job["dept_to"]))
     else:
-        new_woc = st.text_input(f"{dept_from} ระบุหมายเลขเครื่อง / WOC ใหม่")
-        part_name_default = ""
+        new_woc = st.text_input("FMระบุหมายเลขเครื่อง - Part name (TP ระบุหมายเลข WOC ใหม่)")
+        part_name = ""
         if prev_woc:
-            part_name_default = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
-        part_name = st.text_input("Part Name", value=part_name_default)
+            part_name = df_all[df_all["woc_number"] == prev_woc]["part_name"].values[0]
+        part_name = st.text_input("Part Name", value=part_name)
         lot_number = st.text_input("Lot Number")
         total_weight = st.number_input("น้ำหนักรวม กิโลกรัม", min_value=0.0, step=0.01)
         barrel_weight = st.number_input("น้ำหนักถัง กิโลกรัม", min_value=0.0, step=0.01)
         sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", min_value=0.0, step=0.01)
-        sample_count = st.number_input("จำนวนตัวอย่าง ชิ้น", min_value=0, step=1, value=0)
+        sample_count = st.number_input("จำนวนตัวอย่าง 3 ชิ้น", min_value=0, step=1, value=0)
         operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-        dept_to_options = ["TP", "FI", "OS"]
-        if dept_from == "TP":
-            dept_to_options = ["FI", "OS"]
-        elif dept_from == "OS":
-            dept_to_options = ["FI","TP"]
-        dept_to = st.selectbox("แผนกปลายทาง", dept_to_options)
+        dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"])
 
     if dept_from == dept_to:
-        st.error("❌ ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
+        st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
         return
 
-    # คำนวณจำนวนชิ้น
+    # === คำนวณจำนวนชิ้น ===
     pieces_count = 0
     if all(v > 0 for v in [total_weight, sample_weight]) and sample_count > 0:
         pieces_count = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
         st.metric("จำนวนชิ้นงาน (คำนวณ)", pieces_count)
 
-    # ตรวจสอบ WOC ซ้ำในฐานข้อมูล
-    existing_wocs = df_all["woc_number"].unique().tolist()
-    if selected_edit_woc is None and new_woc.strip() in existing_wocs:
-        st.error(f"❌ WOC '{new_woc}' มีอยู่ในระบบแล้ว กรุณาตรวจสอบและกรอกใหม่")
-        return
-
-    # บันทึกข้อมูล
+    # === บันทึกหรืออัปเดต ===
     if st.button("บันทึก Transfer"):
         if not new_woc.strip():
-            st.error("❌ กรุณากรอก WOC ใหม่")
+            st.error("กรุณากรอก WOC ใหม่")
             return
         if pieces_count == 0:
-            st.error("❌ กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
+            st.error("กรุณากรอกข้อมูลน้ำหนักและจำนวนตัวอย่างให้ถูกต้อง")
             return
 
         if selected_edit_woc:
+            # แก้ไขหมายเลข WOC เดิม
             with get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute("UPDATE job_tracking SET woc_number = %s WHERE woc_number = %s", (new_woc, selected_edit_woc))
                 conn.commit()
-            st.success(f"✅ อัปเดตหมายเลข WOC จาก {selected_edit_woc} → {new_woc} เรียบร้อย")
+            st.success(f"อัปเดตหมายเลข WOC จาก {selected_edit_woc} → {new_woc} สำเร็จแล้ว")
         else:
+            # เพิ่มใหม่
             insert_job({
                 "woc_number": new_woc,
                 "part_name": part_name,
@@ -166,11 +153,11 @@ def transfer_mode(dept_from):
                 "created_at": datetime.utcnow()
             })
 
+
             if prev_woc:
                 update_status(prev_woc, "Completed")
 
-            st.success(f"✅ บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
-            
+            st.success(f"บันทึก {dept_from} Transfer เรียบร้อยแล้ว")
 # === ฟังก์ชันช่วยอัปเดตสถานะรายการก่อนหน้าให้ Completed ===
 def mark_previous_entries_completed(woc_number, latest_created_at):
     with get_connection() as conn:
@@ -190,7 +177,7 @@ def receive_mode(dept_to):
         status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
     else:
         dept_from_map = {
-            "TP": ["FM", "TP Working", "OS"],  # เพิ่ม "OS"
+            "TP": ["FM", "TP Working"],
             "OS": ["FM", "TP"]
         }
         from_depts = dept_from_map.get(dept_to, [])
@@ -359,12 +346,6 @@ def work_mode(dept):
 # === Completion Mode ===
 def completion_mode():
     st.header("Completion")
-
-    # 🔐 ตรวจสอบรหัสผ่านก่อนเข้าโหมด
-    password = st.text_input("กรุณาใส่รหัสผ่าน", type="password")
-    if password != "FI":
-        st.warning("🔐 กรุณาใส่รหัสผ่านให้ถูกต้องเพื่อเข้าใช้งานโหมด Completion")
-        return
     df = get_jobs_by_status("FI Working")
 
     if df.empty:
@@ -387,35 +368,18 @@ def completion_mode():
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
     total_count = ok + ng + rework + remain
-    expected_count = job['pieces_count']
-    try:
-        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
-    except ZeroDivisionError:
-        diff_pct = 0
 
     if st.button("บันทึก Completion"):
+        expected_count = job['pieces_count']
+        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
+
         if diff_pct > 2:
-            st.error(f"❌ จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
+            st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
-
-        # ===== เริ่มเก็บข้อมูลสะสม =====
-        df_all = get_all_jobs()
-        df_completed = df_all[(df_all["woc_number"] == woc_selected) & (df_all["status"] == "Completed")]
-
-        cumulative_completed = df_completed["latest_completion_count"].sum()
-        latest_completion = ok + ng + rework
-        total_cumulative = cumulative_completed + latest_completion
-        remaining_after_completion = expected_count - total_cumulative
-
-        # กำหนดสถานะใหม่
-        if remaining_after_completion > 0:
-            status = "FI Received"
-        else:
-            status = "Completed"
 
         now = datetime.utcnow()
 
-        # อัปเดตรายการก่อนหน้าให้ Completed
+        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
         mark_previous_entries_completed(woc_selected, now)
 
         insert_job({
@@ -430,21 +394,15 @@ def completion_mode():
             "ng_count": ng,
             "rework_count": rework,
             "remain_count": remain,
-            "latest_completion_count": latest_completion,
-            "cumulative_completed_count": total_cumulative,
-            "remaining_after_completion": remaining_after_completion,
-            "status": status,
+            "status": "Completed",
             "created_at": now
         })
 
-        if status == "Completed":
-            st.success(f"📦 งานเสร็จสิ้นแล้ว ส่ง WH เรียบร้อย WOC: {woc_selected}")
-        else:
-            st.warning(f"⚠️ งานยังไม่เสร็จ เหลืออีก {remaining_after_completion} ชิ้น → กลับไป FI Received")
+        st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
 
         send_telegram_message(
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
-            f"(คลาดเคลื่อน: {diff_pct:.2f}%) | เหลืออีก: {remaining_after_completion} ชิ้น | Status: {status}"
+            f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
         )
 
 # === Report Mode ===
