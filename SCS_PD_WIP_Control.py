@@ -381,18 +381,35 @@ def completion_mode():
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
     total_count = ok + ng + rework + remain
+    expected_count = job['pieces_count']
+    try:
+        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
+    except ZeroDivisionError:
+        diff_pct = 0
 
     if st.button("บันทึก Completion"):
-        expected_count = job['pieces_count']
-        diff_pct = abs(expected_count - total_count) / expected_count * 100 if expected_count > 0 else 0
-
         if diff_pct > 2:
-            st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
+            st.error(f"❌ จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
+
+        # ===== เริ่มเก็บข้อมูลสะสม =====
+        df_all = get_all_jobs()
+        df_completed = df_all[(df_all["woc_number"] == woc_selected) & (df_all["status"] == "Completed")]
+
+        cumulative_completed = df_completed["latest_completion_count"].sum()
+        latest_completion = ok + ng + rework
+        total_cumulative = cumulative_completed + latest_completion
+        remaining_after_completion = expected_count - total_cumulative
+
+        # กำหนดสถานะใหม่
+        if remaining_after_completion > 0:
+            status = "FI Received"
+        else:
+            status = "Completed"
 
         now = datetime.utcnow()
 
-        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
+        # อัปเดตรายการก่อนหน้าให้ Completed
         mark_previous_entries_completed(woc_selected, now)
 
         insert_job({
@@ -407,15 +424,21 @@ def completion_mode():
             "ng_count": ng,
             "rework_count": rework,
             "remain_count": remain,
-            "status": "Completed",
+            "latest_completion_count": latest_completion,
+            "cumulative_completed_count": total_cumulative,
+            "remaining_after_completion": remaining_after_completion,
+            "status": status,
             "created_at": now
         })
 
-        st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
+        if status == "Completed":
+            st.success(f"📦 งานเสร็จสิ้นแล้ว ส่ง WH เรียบร้อย WOC: {woc_selected}")
+        else:
+            st.warning(f"⚠️ งานยังไม่เสร็จ เหลืออีก {remaining_after_completion} ชิ้น → กลับไป FI Received")
 
         send_telegram_message(
             f"📦 Completion WOC {woc_selected} | OK: {ok}, NG: {ng}, Rework: {rework}, Remain: {remain} โดย {operator_name} "
-            f"(คลาดเคลื่อน: {diff_pct:.2f}%)"
+            f"(คลาดเคลื่อน: {diff_pct:.2f}%) | เหลืออีก: {remaining_after_completion} ชิ้น | Status: {status}"
         )
 
 # === Report Mode ===
