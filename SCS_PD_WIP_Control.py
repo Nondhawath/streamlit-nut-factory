@@ -260,7 +260,6 @@ def receive_mode(dept_to):
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
-def insert_job(data):
     with get_connection() as conn:
         cur = conn.cursor()
         keys = ', '.join(data.keys())
