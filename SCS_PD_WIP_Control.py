@@ -273,6 +273,7 @@ def insert_job(data):
             st.error(f"SQL Insert Error: {e}")
             raise
 
+# === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
 
@@ -315,7 +316,9 @@ def work_mode(dept):
 
         on_machine_time = datetime.utcnow()
 
-        # แปลงค่า numpy ให้เป็น Python native types
+        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
+        mark_previous_entries_completed(woc_selected, on_machine_time)
+
         data = {
             "woc_number": str(woc_selected),
             "part_name": str(job["part_name"]),
@@ -331,13 +334,14 @@ def work_mode(dept):
             "machine_name": machine_name if machine_name.strip() != "" else None,
             "on_machine_time": on_machine_time,
             "status": f"{dept} Working",
-            "created_at": datetime.utcnow()
+            "created_at": on_machine_time
         }
 
         insert_job(data)
 
         st.success(f"เริ่มทำงาน WOC {woc_selected} ที่เครื่อง {machine_name}")
         send_telegram_message(f"{dept} เริ่มงาน WOC {woc_selected} ที่เครื่อง {machine_name} โดย {operator_name}")
+
 
 # === Completion Mode ===
 def completion_mode():
@@ -373,6 +377,11 @@ def completion_mode():
             st.error(f"จำนวนไม่ตรงกับจำนวนที่รับเข้า (คลาดเคลื่อน {diff_pct:.2f}%)")
             return
 
+        now = datetime.utcnow()
+
+        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
+        mark_previous_entries_completed(woc_selected, now)
+
         insert_job({
             "woc_number": woc_selected,
             "part_name": job["part_name"],
@@ -386,7 +395,7 @@ def completion_mode():
             "rework_count": rework,
             "remain_count": remain,
             "status": "Completed",
-            "created_at": datetime.utcnow()
+            "created_at": now
         })
 
         st.success(f"บันทึก Completion เรียบร้อย สถานะ WOC {woc_selected} เป็น Completed")
