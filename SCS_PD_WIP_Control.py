@@ -207,7 +207,7 @@ def receive_mode(dept_to):
     # ปุ่มล้างการเลือก
     if st.button("❌ ล้างการเลือก WOC"):
         st.session_state.receive_woc_selected = ""
-        st.experimental_rerun()
+        st.rerun()
 
     job = df[df["woc_number"] == woc_selected].iloc[0]
 
