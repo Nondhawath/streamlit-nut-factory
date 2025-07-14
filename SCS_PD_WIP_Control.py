@@ -189,6 +189,15 @@ def receive_mode(dept_to):
         st.warning("ไม่มีงานรอรับ")
         return
 
+    # 🔍 เพิ่มช่องค้นหา WOC
+    search_woc = st.text_input("ค้นหา WOC")
+    if search_woc:
+        df = df[df["woc_number"].str.contains(search_woc, case=False, na=False)]
+
+    if df.empty:
+        st.warning("ไม่พบ WOC ที่ค้นหา")
+        return
+
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
