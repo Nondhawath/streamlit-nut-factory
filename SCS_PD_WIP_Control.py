@@ -305,7 +305,7 @@ def work_mode(dept):
         return
 
     # 🔍 เพิ่มช่องค้นหา WOC
-    search_woc = st.text_input("ค้นหา WOC")
+    search_woc = st.text_input("SCAN หมายเลข WOC")
     if search_woc:
         df = df[df["woc_number"].str.contains(search_woc, case=False, na=False)]
 
