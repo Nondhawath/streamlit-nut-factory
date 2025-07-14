@@ -304,6 +304,15 @@ def work_mode(dept):
         st.info("ไม่มีงานรอทำ")
         return
 
+    # 🔍 เพิ่มช่องค้นหา WOC
+    search_woc = st.text_input("ค้นหา WOC")
+    if search_woc:
+        df = df[df["woc_number"].str.contains(search_woc, case=False, na=False)]
+
+    if df.empty:
+        st.warning("ไม่พบ WOC ที่ค้นหา")
+        return
+
     woc_list = df["woc_number"].tolist()
     woc_selected = st.selectbox("เลือก WOC ที่จะทำงาน", woc_list)
     job = df[df["woc_number"] == woc_selected].iloc[0]
@@ -325,7 +334,7 @@ def work_mode(dept):
 
         on_machine_time = datetime.utcnow()
 
-        # เพิ่มส่วนนี้ เพื่ออัปเดตสถานะรายการก่อนหน้าให้เป็น Completed
+        # ✅ อัปเดตสถานะก่อนหน้าให้เป็น Completed
         mark_previous_entries_completed(woc_selected, on_machine_time)
 
         data = {
@@ -340,7 +349,7 @@ def work_mode(dept):
             "sample_weight": float(job["sample_weight"]) if job["sample_weight"] is not None else None,
             "sample_count": int(job["sample_count"]) if job["sample_count"] is not None else None,
             "pieces_count": float(job["pieces_count"]) if job["pieces_count"] is not None else None,
-            "machine_name": machine_name if machine_name.strip() != "" else None,
+            "machine_name": machine_name,
             "on_machine_time": on_machine_time,
             "status": f"{dept} Working",
             "created_at": on_machine_time
