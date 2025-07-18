@@ -106,7 +106,7 @@ def transfer_mode(dept_from):
         sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", min_value=0.0, step=0.01)
         sample_count = st.number_input("จำนวนตัวอย่าง 3 ชิ้น", min_value=0, step=1, value=0)
         operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
-        dept_to = st.selectbox("กรุณาเลือกแผนกปลายทาง","แผนกปลายทาง", ["TP", "FI", "OS"])
+        dept_to = st.selectbox("แผนกปลายทาง", ["กรุณาเลือกแผนกปลายทาง","TP", "FI", "OS"])
 
     if dept_from == dept_to:
         st.error("ไม่สามารถโอนย้ายไปยังแผนกเดียวกันได้")
