@@ -93,7 +93,7 @@ def transfer_mode(dept_from):
         sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", value=job.get("sample_weight", 0.0), min_value=0.0, step=0.01)
         sample_count = st.number_input("จำนวนตัวอย่าง ชิ้น", value=job.get("sample_count", 0), min_value=0, step=1)
         operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)", value=job.get("operator_name", ""))
-        dept_to = st.selectbox("แผนกปลายทาง", ["TP", "FI", "OS"], index=["TP", "FI", "OS"].index(job["dept_to"]))
+        dept_to = st.selectbox("แผนกปลายทาง", ["กรุณาเลือกแผนกปลายทาง","TP", "FI", "OS"], index=["กรุณาเลือกแผนกปลายทาง","TP", "FI", "OS"].index(job["dept_to"]))
     else:
         new_woc = st.text_input("FMระบุหมายเลขเครื่อง - Part name (TP ระบุหมายเลข WOC ใหม่)")
         part_name = ""
