@@ -219,12 +219,6 @@ def receive_mode(dept_to):
         diff_pct = 0
     st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
-    if diff_pct > 2:
-        send_telegram_message(
-            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
-            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
-        )
-
     operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
     if dept_to == "TP":
@@ -265,8 +259,16 @@ def receive_mode(dept_to):
         update_status(woc_selected, f"{dept_to} Received")
         mark_previous_entries_completed(woc_selected, now)
 
+        # แจ้งเตือน Telegram เฉพาะตอนกดปุ่มบันทึกเท่านั้น
+        if diff_pct > 2:
+            send_telegram_message(
+                f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
+                f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+            )
+
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
+
 
 # === Work Mode ===
 def insert_job(data):
