@@ -168,6 +168,12 @@ def mark_previous_entries_completed(woc_number, latest_created_at):
             WHERE woc_number = %s AND created_at < %s AND status != 'Completed'
         """, (woc_number, latest_created_at))
         conn.commit()
+# -- Utilities --
+def load_data():
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM job_tracking ORDER BY created_at DESC", conn)
+    conn.close()
+    return df
 
 # === Receive Mode ===
 def receive_mode(dept_to):
