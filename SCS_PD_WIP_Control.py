@@ -269,21 +269,6 @@ def receive_mode(dept_to):
         st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
         send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
-
-# === Work Mode ===
-def insert_job(data):
-    with get_connection() as conn:
-        cur = conn.cursor()
-        keys = ', '.join(data.keys())
-        values = ', '.join(['%s'] * len(data))
-        sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
-        try:
-            cur.execute(sql, list(data.values()))
-            conn.commit()
-        except Exception as e:
-            st.error(f"SQL Insert Error: {e}")
-            raise
-
 # === Work Mode ===
 def work_mode(dept):
     st.header(f"{dept} Work")
