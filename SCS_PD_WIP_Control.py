@@ -168,95 +168,105 @@ def mark_previous_entries_completed(woc_number, latest_created_at):
             WHERE woc_number = %s AND created_at < %s AND status != 'Completed'
         """, (woc_number, latest_created_at))
         conn.commit()
-# -- Utilities --
-def load_data():
-    conn = get_connection()
-    df = pd.read_sql("SELECT * FROM job_tracking ORDER BY created_at DESC", conn)
-    conn.close()
-    return df
 
 # === Receive Mode ===
 def receive_mode(dept_to):
-    st.subheader(f"{dept_to} Receive")
+    st.header(f"{dept_to} Receive")
 
-    df = load_data()
-    df_filtered = df[df["status"].str.contains(f"{dept_to} Transfer")]
-    df_filtered = df_filtered[df_filtered["status"] != f"{dept_to} Received"]
+    if dept_to == "FI":
+        status_filters = ["FM Transfer FI", "TP Transfer FI", "OS Transfer FI"]
+    else:
+        dept_from_map = {
+            "TP": ["FM", "TP Working", "OS"],
+            "OS": ["FM", "TP"]
+        }
+        from_depts = dept_from_map.get(dept_to, [])
+        status_filters = [f"{fd} Transfer {dept_to}" for fd in from_depts]
 
-    search_woc = st.text_input("🔍 ค้นหา WOC", placeholder="ป้อนหมายเลข WOC เพื่อค้นหา...")
-    if search_woc:
-        df_filtered = df_filtered[df_filtered["woc_number"].str.contains(search_woc, case=False)]
+    df = get_jobs_by_status_list(status_filters)
 
-    if df_filtered.empty:
-        st.info("ไม่มีรายการรอรับเข้า")
+    if df.empty:
+        st.warning("ไม่มีงานรอรับ")
         return
 
-    selected = st.radio("เลือกงานที่ต้องการรับ", df_filtered["woc_number"].tolist(), index=0)
+    # 🔍 เพิ่มช่องค้นหา WOC
+    search_woc = st.text_input("SCAN หมายเลข WOC")
+    if search_woc:
+        df = df[df["woc_number"].str.contains(search_woc, case=False, na=False)]
 
-    selected_row = df_filtered[df_filtered["woc_number"] == selected].iloc[0]
-    st.markdown(f"**Part Name:** {selected_row['part_name']}")
-    st.markdown(f"**จำนวนที่ส่งมา:** {selected_row['quantity']}")
-    st.markdown(f"**จากแผนก:** {selected_row['dept_from']}")
+    if df.empty:
+        st.warning("ไม่พบ WOC ที่ค้นหา")
+        return
 
-    actual_qty = st.number_input("📦 จำนวนที่รับจริง", min_value=0, step=1)
-    receiver = st.text_input("👷‍♂️ ชื่อผู้รับ")
-    machine_name = st.text_input("🛠️ ชื่อเครื่องจักร (ถ้ามี)", placeholder="Optional")
+    woc_list = df["woc_number"].tolist()
+    woc_selected = st.selectbox("เลือก WOC", woc_list)
+    job = df[df["woc_number"] == woc_selected].iloc[0]
 
-    if st.button("✅ บันทึกรับเข้า"):
-        # === บันทึกใหม่ ===
-        status = f"{dept_to} Received"
-        timestamp = datetime.now()
+    st.markdown(f"- **Part Name:** {job['part_name']}")
+    st.markdown(f"- **Lot Number:** {job['lot_number']}")
+    st.markdown(f"- **จำนวนชิ้นงานเดิม:** {job['pieces_count']}")
 
-        data = {
-            "woc_number": selected_row["woc_number"],
-            "part_name": selected_row["part_name"],
-            "quantity": actual_qty,
-            "dept_from": selected_row["dept_from"],
-            "dept_to": dept_to,
-            "status": status,
-            "created_at": timestamp,
-            "receiver": receiver,
-            "prev_woc_number": selected_row["woc_number"],
-            "machine_name": machine_name,
-        }
+    total_weight = st.number_input("น้ำหนักรวม กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
+    barrel_weight = st.number_input("น้ำหนักถัง กิโลกรัม", min_value=0.0, step=0.01, value=0.0)
+    sample_weight = st.number_input("น้ำหนักตัวอย่างรวม กรัม", min_value=0.0, step=0.01, value=0.0)
+    sample_count = st.number_input("จำนวนตัวอย่าง 3 ชิ้น", min_value=0, step=1, value=0)
+    pieces_new = calculate_pieces(total_weight, barrel_weight, sample_weight, sample_count)
+    st.metric("จำนวนชิ้นงานที่คำนวณได้", pieces_new)
 
-        keys = ', '.join(data.keys())
-        values = ', '.join(['%s'] * len(data))
-        sql = f"INSERT INTO job_tracking ({keys}) VALUES ({values})"
+    try:
+        diff_pct = abs(pieces_new - job["pieces_count"]) / job["pieces_count"] * 100 if job["pieces_count"] > 0 else 0
+    except Exception:
+        diff_pct = 0
+    st.metric("% คลาดเคลื่อน", f"{diff_pct:.2f}%")
 
-        try:
-            conn = get_connection()
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute(sql, list(data.values()))
-            conn.close()
+    if diff_pct > 2:
+        send_telegram_message(
+            f"⚠️ ความคลาดเคลื่อนน้ำหนักเกิน 2% | แผนก: {dept_to} | WOC: {woc_selected} | Part: {job['part_name']} | "
+            f"จำนวนเดิม: {job['pieces_count']} | จำนวนที่รับจริง: {pieces_new} | คลาดเคลื่อน: {diff_pct:.2f}%"
+        )
 
-            # === อัปเดตสถานะงานก่อนหน้าเป็น Completed ===
-            mark_previous_entries_completed(selected_row["woc_number"], f"{dept_to} Transfer")
+    operator_name = st.text_input("ชื่อผู้ใช้งาน (Operator)")
 
-            # === ตรวจสอบความคลาดเคลื่อนน้ำหนัก ===
-            try:
-                original_qty = float(selected_row["quantity"])
-                diff_percent = abs(actual_qty - original_qty) / original_qty * 100
+    if dept_to == "TP":
+        dept_to_next = st.selectbox("แผนกถัดไป", ["Tapping Work"])
+    elif dept_to == "FI":
+        dept_to_next = "Final Work"
+        st.markdown(f"- แผนกถัดไป: {dept_to_next}")
+    elif dept_to == "OS":
+        dept_to_next = st.selectbox("แผนกถัดไป", ["OS Transfer"])
+    else:
+        dept_to_next = ""
+        st.markdown("- กรุณาระบุแผนกถัดไป")
 
-                if diff_percent > 2:
-                    warning_msg = (
-                        f"⚠️ คลาดเคลื่อนเกิน 2%!\n"
-                        f"👷‍♂️ ผู้รับ: {receiver}\n"
-                        f"📦 Part: {selected_row['part_name']}\n"
-                        f"🧾 WOC: {selected_row['woc_number']}\n"
-                        f"📥 จำนวนรับ: {actual_qty}\n"
-                        f"📤 จำนวนส่ง: {original_qty}\n"
-                        f"📊 คลาดเคลื่อน: {diff_percent:.2f}%"
-                    )
-                    send_telegram_message(warning_msg)
+    if st.button("รับเข้าและส่งต่อ"):
+        if not dept_to_next:
+            st.error("กรุณาเลือกแผนกถัดไป")
+            return
 
-            except Exception as e:
-                st.warning("ไม่สามารถคำนวณคลาดเคลื่อนได้")
+        next_status = f"WIP-{dept_to_next}"
+        now = datetime.utcnow()
 
-            st.success("✅ รับงานเรียบร้อยแล้ว")
-        except Exception as e:
-            st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+        insert_job({
+            "woc_number": woc_selected,
+            "part_name": job["part_name"],
+            "operator_name": operator_name,
+            "dept_from": dept_to,
+            "dept_to": dept_to_next,
+            "lot_number": job["lot_number"],
+            "total_weight": total_weight,
+            "barrel_weight": barrel_weight,
+            "sample_weight": sample_weight,
+            "sample_count": sample_count,
+            "pieces_count": pieces_new,
+            "status": next_status,
+            "created_at": now
+        })
+
+        update_status(woc_selected, f"{dept_to} Received")
+        mark_previous_entries_completed(woc_selected, now)
+
+        st.success(f"รับ WOC {woc_selected} เรียบร้อยและเปลี่ยนสถานะเป็น {dept_to} Received")
+        send_telegram_message(f"{dept_to} รับ WOC {woc_selected} ส่งต่อไปยัง {dept_to_next}")
 
 # === Work Mode ===
 def insert_job(data):
