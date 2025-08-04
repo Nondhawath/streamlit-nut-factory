@@ -647,6 +647,34 @@ def on_machine_mode():
     })
 
     st.dataframe(df_show.sort_values("เวลาเริ่มงาน", ascending=False), use_container_width=True)
+def update_status_from_excel_mode():
+    st.header("📤 อัปเดตสถานะงานจากไฟล์ Excel")
+
+    uploaded_file = st.file_uploader("อัปโหลดไฟล์ Excel ที่มีคอลัมน์ 'woc_number' และ 'status'", type=["xlsx"])
+
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file)
+            st.dataframe(df)
+
+            if 'woc_number' not in df.columns or 'status' not in df.columns:
+                st.error("⚠️ กรุณาตรวจสอบให้มีคอลัมน์ 'woc_number' และ 'status'")
+                return
+
+            if st.button("✅ ยืนยันอัปเดตสถานะ"):
+                with get_connection() as conn:
+                    cur = conn.cursor()
+                    for _, row in df.iterrows():
+                        cur.execute(
+                            "UPDATE job_tracking SET status = %s WHERE woc_number = %s",
+                            (row['status'], row['woc_number'])
+                        )
+                    conn.commit()
+                st.success("🎉 อัปเดตสถานะเรียบร้อยแล้ว")
+                send_telegram_message(f"📤 ระบบอัปเดตสถานะงานจากไฟล์ Excel แล้วทั้งหมด {len(df)} รายการ")
+
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
 
 # === Main ===
 def main():
@@ -666,6 +694,7 @@ def main():
         "Report",
         "Dashboard",
          "🔧 On Machine",
+        "📤 Update Status (Excel)",
         "Admin Management"
     ])
 
@@ -695,6 +724,10 @@ def main():
         on_machine_mode()
     elif menu == "Admin Management":
         admin_mode()
+    elif menu == "📤 Update Status (Excel)":
+        update_status_from_excel_mode()
+
     
 if __name__ == "__main__":
     main()
+
