@@ -647,34 +647,56 @@ def on_machine_mode():
     })
 
     st.dataframe(df_show.sort_values("เวลาเริ่มงาน", ascending=False), use_container_width=True)
+    
+# === Update Status from Excel Mode ===
 def update_status_from_excel_mode():
     st.header("📤 อัปเดตสถานะงานจากไฟล์ Excel")
 
-    uploaded_file = st.file_uploader("อัปโหลดไฟล์ Excel ที่มีคอลัมน์ 'woc_number' และ 'status'", type=["xlsx"])
+    uploaded_file = st.file_uploader("📎 อัปโหลดไฟล์ Excel (ต้องมี: woc_number, current_status, new_status)", type=["xlsx"])
 
     if uploaded_file:
         try:
             df = pd.read_excel(uploaded_file)
             st.dataframe(df)
 
-            if 'woc_number' not in df.columns or 'status' not in df.columns:
-                st.error("⚠️ กรุณาตรวจสอบให้มีคอลัมน์ 'woc_number' และ 'status'")
+            # ตรวจสอบคอลัมน์ที่จำเป็น
+            required_cols = {'woc_number', 'current_status', 'new_status'}
+            if not required_cols.issubset(df.columns):
+                st.error("⚠️ กรุณาตรวจสอบให้มีคอลัมน์ 'woc_number', 'current_status', และ 'new_status'")
                 return
 
+            # แสดงรายการที่จะอัปเดต
+            st.markdown("### 🔄 รายการที่เตรียมอัปเดต:")
+            st.dataframe(df[['woc_number', 'current_status', 'new_status']])
+
             if st.button("✅ ยืนยันอัปเดตสถานะ"):
+                updated_count = 0
+                skipped = []
+
                 with get_connection() as conn:
                     cur = conn.cursor()
                     for _, row in df.iterrows():
-                        cur.execute(
-                            "UPDATE job_tracking SET status = %s WHERE woc_number = %s",
-                            (row['status'], row['woc_number'])
-                        )
+                        woc = row['woc_number']
+                        old_status = row['current_status']
+                        new_status = row['new_status']
+
+                        # ตรวจสอบสถานะปัจจุบันก่อนอัปเดต
+                        cur.execute("SELECT status FROM job_tracking WHERE woc_number = %s ORDER BY created_at DESC LIMIT 1", (woc,))
+                        result = cur.fetchone()
+                        if result and result[0] == old_status:
+                            cur.execute("UPDATE job_tracking SET status = %s WHERE woc_number = %s", (new_status, woc))
+                            updated_count += 1
+                        else:
+                            skipped.append(woc)
                     conn.commit()
-                st.success("🎉 อัปเดตสถานะเรียบร้อยแล้ว")
-                send_telegram_message(f"📤 ระบบอัปเดตสถานะงานจากไฟล์ Excel แล้วทั้งหมด {len(df)} รายการ")
+
+                st.success(f"🎉 อัปเดตสำเร็จ {updated_count} รายการ")
+                if skipped:
+                    st.warning(f"⏭️ ข้าม {len(skipped)} รายการ เนื่องจากสถานะไม่ตรง (หรือไม่พบ WOC): {', '.join(skipped)}")
+                send_telegram_message(f"📤 อัปเดตสถานะสำเร็จ {updated_count} รายการ | ข้าม {len(skipped)} รายการ")
 
         except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
+            st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
 
 # === Main ===
 def main():
@@ -730,4 +752,5 @@ def main():
     
 if __name__ == "__main__":
     main()
+
 
